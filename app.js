@@ -124,12 +124,12 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
 
 // ==================== TAB NAVIGATION ====================
 function switchTab(tabName) {
-  // Update nav items directly by matching onclick
+  // Update nav items directly by matching exact data-tab attribute
   document.querySelectorAll('.nav-item').forEach(item => {
-    item.classList.remove('active');
-    const onclickAttr = item.getAttribute('onclick') || '';
-    if (onclickAttr.includes(`'${tabName}'`)) {
+    if (item.getAttribute('data-tab') === tabName) {
       item.classList.add('active');
+    } else {
+      item.classList.remove('active');
     }
   });
 
