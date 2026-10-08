@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const QRCode = require('qrcode');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 
 const PORT = 5180;
@@ -17,18 +17,28 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml'
 };
 
-// Sessions Store in Memory
+// Active Baileys sessions store
 const activeSessions = {};
 
-// Ensure sessions root directory exists
+// Ensure sessions storage directory exists
 const SESSIONS_DIR = path.join(__dirname, 'sessions');
 if (!fs.existsSync(SESSIONS_DIR)) {
   fs.mkdirSync(SESSIONS_DIR, { recursive: true });
 }
 
 // WhatsApp Multi-Device Session Initializer (Baileys)
-async function getOrInitBaileysSession(sessionId = 'agency_hq') {
+async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingCode = null) {
   if (activeSessions[sessionId] && activeSessions[sessionId].sock) {
+    if (phoneForPairingCode && !activeSessions[sessionId].connected) {
+      try {
+        const clean = phoneForPairingCode.replace(/\D/g, '');
+        const code = await activeSessions[sessionId].sock.requestPairingCode(clean);
+        activeSessions[sessionId].pairingCode = code;
+        return activeSessions[sessionId];
+      } catch (e) {
+        console.error('Error pidiendo pairing code en sesion existente:', e);
+      }
+    }
     return activeSessions[sessionId];
   }
 
@@ -43,6 +53,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq') {
     sock: null,
     qr: null,
     qrImage: null,
+    pairingCode: null,
     connected: false,
     phone: null,
     userName: null,
@@ -54,7 +65,11 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq') {
     auth: state,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: ['NEXUS AI Agency Operating System', 'Chrome', '124.0.0']
+    browser: Browsers.ubuntu('Chrome'),
+    connectTimeoutMs: 60000,
+    defaultQueryTimeoutMs: 60000,
+    keepAliveIntervalMs: 25000,
+    emitOwnEvents: true
   });
   sessionData.sock = sock;
 
@@ -67,12 +82,17 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq') {
       sessionData.qr = qr;
       sessionData.status = 'qr_ready';
       try {
+        // High contrast, standard pure black/white QR code for perfect mobile camera reading
         sessionData.qrImage = await QRCode.toDataURL(qr, {
           width: 320,
-          margin: 2,
-          color: { dark: '#0f172a', light: '#ffffff' }
+          margin: 3,
+          errorCorrectionLevel: 'M',
+          color: {
+            dark: '#000000',
+            light: '#ffffff'
+          }
         });
-        console.log(`[Baileys - ${sessionId}] ⚡ Nuevo Código QR Real de WhatsApp generado.`);
+        console.log(`[Baileys - ${sessionId}] ⚡ Código QR de WhatsApp Web 100% oficial generado.`);
       } catch (err) {
         console.error('Error generando QR Image:', err);
       }
@@ -82,6 +102,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq') {
       sessionData.connected = true;
       sessionData.qr = null;
       sessionData.qrImage = null;
+      sessionData.pairingCode = null;
       sessionData.status = 'connected';
       
       const userJid = sock.user ? sock.user.id : '';
@@ -104,7 +125,6 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq') {
         activeSessions[sessionId].sock = null;
         setTimeout(() => getOrInitBaileysSession(sessionId), 3000);
       } else {
-        // Logged out: clean folder
         try {
           fs.rmSync(sessionFolder, { recursive: true, force: true });
         } catch (e) {}
@@ -127,10 +147,24 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq') {
     }
   });
 
+  // If pairing code requested upon start
+  if (phoneForPairingCode) {
+    setTimeout(async () => {
+      try {
+        const clean = phoneForPairingCode.replace(/\D/g, '');
+        const code = await sock.requestPairingCode(clean);
+        sessionData.pairingCode = code;
+        console.log(`[Baileys - ${sessionId}] 🔢 Código de vinculación generado para +${clean}: ${code}`);
+      } catch (e) {
+        console.error('Error pidiendo pairing code:', e);
+      }
+    }, 2000);
+  }
+
   return sessionData;
 }
 
-// Helper function to send WhatsApp message via Meta Graph API (Fallback for developer mode)
+// Meta Cloud API Fallback
 let META_TOKEN = process.env.META_TOKEN || 'META_TOKEN_PLACEHOLDER';
 let META_PHONE_ID = process.env.META_PHONE_ID || '1342311562300304';
 const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'nexus_ai_secret_token_2026';
@@ -194,7 +228,7 @@ const server = http.createServer((req, res) => {
 
   // ==================== BAILEYS REAL QR & SESSION ENDPOINTS ====================
 
-  // 1. Start or Retrieve Real Baileys WhatsApp Session
+  // 1. Start Session
   if (pathname === '/api/wa-session/start' && req.method === 'POST') {
     const sessionId = urlObj.searchParams.get('sessionId') || 'agency_hq';
     getOrInitBaileysSession(sessionId)
@@ -206,7 +240,8 @@ const server = http.createServer((req, res) => {
           status: session.status,
           connected: session.connected,
           phone: session.phone,
-          qr: session.qrImage
+          qr: session.qrImage,
+          pairingCode: session.pairingCode
         }));
       })
       .catch(err => {
@@ -216,13 +251,45 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 2. Query Status of Baileys WhatsApp Session
+  // 2. Request 8-Digit Pairing Code by Phone Number
+  if (pathname === '/api/wa-session/pairing-code' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const data = JSON.parse(body);
+        const sessionId = data.sessionId || 'agency_hq';
+        const phone = data.phone;
+
+        if (!phone) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Falta número de teléfono' }));
+          return;
+        }
+
+        const session = await getOrInitBaileysSession(sessionId);
+        const clean = phone.replace(/\D/g, '');
+        const code = await session.sock.requestPairingCode(clean);
+        session.pairingCode = code;
+
+        console.log(`[Baileys - ${sessionId}] 🔢 Código 8-dígitos: ${code}`);
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, code }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 3. Query Session Status & QR
   if (pathname === '/api/wa-session/status' && req.method === 'GET') {
     const sessionId = urlObj.searchParams.get('sessionId') || 'agency_hq';
     const session = activeSessions[sessionId];
 
     if (!session) {
-      // Auto-start session if not started
       getOrInitBaileysSession(sessionId)
         .then(s => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -231,6 +298,7 @@ const server = http.createServer((req, res) => {
             status: s.status,
             phone: s.phone,
             qr: s.qrImage,
+            pairingCode: s.pairingCode,
             userName: s.userName
           }));
         })
@@ -247,12 +315,13 @@ const server = http.createServer((req, res) => {
       status: session.status,
       phone: session.phone,
       qr: session.qrImage,
+      pairingCode: session.pairingCode,
       userName: session.userName
     }));
     return;
   }
 
-  // 3. Logout / Disconnect Baileys Session
+  // 4. Logout Session
   if (pathname === '/api/wa-session/logout' && req.method === 'POST') {
     const sessionId = urlObj.searchParams.get('sessionId') || 'agency_hq';
     const session = activeSessions[sessionId];
@@ -273,7 +342,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 4. Send Real WhatsApp message (Tries Baileys first, then Meta Graph API)
+  // 5. Send Real WhatsApp message
   if (pathname === '/api/send-whatsapp' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -284,7 +353,6 @@ const server = http.createServer((req, res) => {
         const activeSessionId = sessionId || 'agency_hq';
         const session = activeSessions[activeSessionId];
 
-        // If Baileys is connected, send directly through the paired phone!
         if (session && session.connected && session.sock) {
           const cleanPhone = to.replace(/\D/g, '');
           const jid = `${cleanPhone}@s.whatsapp.net`;
@@ -295,7 +363,6 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        // Fallback to Meta Cloud API if provided
         if (token) META_TOKEN = token;
         if (phoneId) META_PHONE_ID = phoneId;
 
@@ -310,7 +377,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 5. Meta Webhook Verification (GET)
+  // 6. Meta Webhooks
   if (pathname === '/api/webhook' && req.method === 'GET') {
     const mode = urlObj.searchParams.get('hub.mode');
     const token = urlObj.searchParams.get('hub.verify_token');
@@ -327,7 +394,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 6. Meta Webhook Incoming Message (POST)
   if (pathname === '/api/webhook' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);

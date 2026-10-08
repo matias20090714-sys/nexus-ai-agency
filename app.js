@@ -1047,6 +1047,72 @@ function setConnectionMode(mode) {
   }
 }
 
+function setPairMethod(method) {
+  const btnQr = document.getElementById('btnPairMethodQr');
+  const btnCode = document.getElementById('btnPairMethodCode');
+  const boxQr = document.getElementById('pairMethodQrBox');
+  const boxCode = document.getElementById('pairMethodCodeBox');
+
+  if (!btnQr || !btnCode || !boxQr || !boxCode) return;
+
+  if (method === 'qr') {
+    btnQr.classList.add('active');
+    btnCode.classList.remove('active');
+    boxQr.style.display = 'flex';
+    boxCode.style.display = 'none';
+    startRealQrListener(`agency_${currentAgencyId}`);
+  } else {
+    btnCode.classList.add('active');
+    btnQr.classList.remove('active');
+    boxCode.style.display = 'flex';
+    boxQr.style.display = 'none';
+  }
+}
+
+async function request8DigitPairingCode() {
+  const phoneInput = document.getElementById('pairingPhoneInput');
+  const phone = phoneInput ? phoneInput.value.trim() : '';
+
+  if (!phone || phone.length < 8) {
+    showToast('Ingresa un número de WhatsApp válido con código de país', 'error');
+    return;
+  }
+
+  showToast('Generando código de 8 dígitos con WhatsApp...', 'info');
+
+  try {
+    const sessionId = `agency_${currentAgencyId}`;
+    const res = await fetch('/api/wa-session/pairing-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, phone })
+    });
+
+    const data = await res.json();
+    if (data.success && data.code) {
+      const displayBox = document.getElementById('pairingCodeDisplayBox');
+      const textElem = document.getElementById('pairingCodeText');
+      if (displayBox && textElem) {
+        textElem.innerText = data.code;
+        displayBox.style.display = 'block';
+      }
+      showToast('¡Código generado! Ingrésalo en WhatsApp > Dispositivos Vinculados', 'success');
+      startRealQrListener(sessionId);
+    } else {
+      showToast(data.error || 'Error solicitando código', 'error');
+    }
+  } catch (e) {
+    showToast('Error de conexión con el servidor', 'error');
+  }
+}
+
+function refreshWhatsAppQR() {
+  const sessionId = `agency_${currentAgencyId}`;
+  showToast('Regenerando código QR oficial...', 'info');
+  fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' })
+    .then(() => startRealQrListener(sessionId));
+}
+
 async function startRealQrListener(sessionId = 'agency_hq') {
   stopRealQrListener();
   
@@ -1085,8 +1151,7 @@ async function startRealQrListener(sessionId = 'agency_hq') {
         if (paired) paired.style.display = 'none';
         if (qrContainer) {
           qrContainer.innerHTML = `
-            <div class="qr-scan-line"></div>
-            <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" alt="Código QR Real de WhatsApp">
+            <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 4px;" alt="Código QR Real de WhatsApp">
           `;
         }
       }
