@@ -1020,8 +1020,9 @@ function openPublicShareModal() {
   alert(`🌐 ENLACE PÚBLICO DE TU AGENCIA:\n\n${shareUrl}\n\n¡Enlace copiado al portapapeles! Tus compradores pueden enviar este enlace a cualquier empresa para mostrar sus 4 servicios de IA y paquetes mensuales.`);
 }
 
-// ==================== QR CODE & ZERO-CONFIG GATEWAY ====================
+// ==================== REAL BAILEYS WHATSAPP QR ENGINE ====================
 let activeQrClientId = null;
+let qrPollInterval = null;
 
 function setConnectionMode(mode) {
   const btnQr = document.getElementById('btnModeQr');
@@ -1036,58 +1037,99 @@ function setConnectionMode(mode) {
     btnMeta.classList.remove('active');
     secQr.style.display = 'grid';
     secMeta.style.display = 'none';
+    startRealQrListener(`agency_${currentAgencyId}`);
   } else {
     btnMeta.classList.add('active');
     btnQr.classList.remove('active');
     secMeta.style.display = 'grid';
     secQr.style.display = 'none';
+    stopRealQrListener();
   }
 }
 
-function pairWhatsAppQRInstant() {
-  const unpaired = document.getElementById('qrUnpairedView');
-  const paired = document.getElementById('qrPairedView');
+async function startRealQrListener(sessionId = 'agency_hq') {
+  stopRealQrListener();
   
-  showToast('📱 Escaneando código QR con WhatsApp...', 'info');
-  
-  setTimeout(() => {
-    if (unpaired && paired) {
-      unpaired.style.display = 'none';
-      paired.style.display = 'flex';
-    }
-    localStorage.setItem(`nexus_qr_paired_${currentAgencyId}`, 'true');
-    showToast('🎉 ¡WhatsApp vinculado con éxito! Tu Agente de IA está activo 24/7', 'success');
-  }, 1000);
+  // Call backend to trigger/start session
+  try {
+    await fetch(`/api/wa-session/start?sessionId=${sessionId}`, { method: 'POST' });
+  } catch (e) {}
+
+  // Poll status every 2 seconds
+  qrPollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/wa-session/status?sessionId=${sessionId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const unpaired = document.getElementById('qrUnpairedView');
+      const paired = document.getElementById('qrPairedView');
+      const qrContainer = document.getElementById('qrRealImageContainer');
+
+      if (data.connected) {
+        if (unpaired) unpaired.style.display = 'none';
+        if (paired) paired.style.display = 'flex';
+        
+        const phoneDisplay = document.getElementById('qrConnectedPhoneDisplay');
+        if (phoneDisplay && data.phone) {
+          phoneDisplay.innerText = `+${data.phone}`;
+        }
+        const sidebarPhone = document.getElementById('sidebarPhoneDisplay');
+        if (sidebarPhone && data.phone) {
+          sidebarPhone.innerText = `Línea: +${data.phone}`;
+        }
+        localStorage.setItem(`nexus_qr_paired_${currentAgencyId}`, 'true');
+        stopRealQrListener();
+      } else if (data.qr) {
+        if (unpaired) unpaired.style.display = 'flex';
+        if (paired) paired.style.display = 'none';
+        if (qrContainer) {
+          qrContainer.innerHTML = `
+            <div class="qr-scan-line"></div>
+            <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" alt="Código QR Real de WhatsApp">
+          `;
+        }
+      }
+    } catch (err) {}
+  }, 2000);
 }
 
-function unpairWhatsAppQR() {
+function stopRealQrListener() {
+  if (qrPollInterval) {
+    clearInterval(qrPollInterval);
+    qrPollInterval = null;
+  }
+}
+
+async function pairWhatsAppQRInstant() {
+  showToast('🔄 Conectando con servidor de WhatsApp...', 'info');
+  startRealQrListener(`agency_${currentAgencyId}`);
+}
+
+async function unpairWhatsAppQR() {
+  const sessionId = `agency_${currentAgencyId}`;
+  try {
+    await fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' });
+  } catch (e) {}
+
   const unpaired = document.getElementById('qrUnpairedView');
   const paired = document.getElementById('qrPairedView');
-  
   if (unpaired && paired) {
     paired.style.display = 'none';
     unpaired.style.display = 'flex';
   }
   localStorage.removeItem(`nexus_qr_paired_${currentAgencyId}`);
   showToast('Dispositivo WhatsApp desvinculado', 'info');
+  startRealQrListener(sessionId);
 }
 
 function checkQrConnectionState() {
-  const isPaired = localStorage.getItem(`nexus_qr_paired_${currentAgencyId}`) === 'true';
-  const unpaired = document.getElementById('qrUnpairedView');
-  const paired = document.getElementById('qrPairedView');
-  if (unpaired && paired) {
-    if (isPaired) {
-      unpaired.style.display = 'none';
-      paired.style.display = 'flex';
-    } else {
-      unpaired.style.display = 'flex';
-      paired.style.display = 'none';
-    }
-  }
+  startRealQrListener(`agency_${currentAgencyId}`);
 }
 
-function openQrPairModalForClient(clientId) {
+let clientQrPollInterval = null;
+
+async function openQrPairModalForClient(clientId) {
   activeQrClientId = clientId;
   const client = agencyClients.find(c => c.id === clientId);
   if (client) {
@@ -1095,18 +1137,41 @@ function openQrPairModalForClient(clientId) {
     if (title) title.innerText = `Vincular: ${client.name}`;
   }
   document.getElementById('qrClientPairModal').classList.add('active');
+
+  const sessionId = `client_${clientId}`;
+  try {
+    await fetch(`/api/wa-session/start?sessionId=${sessionId}`, { method: 'POST' });
+  } catch (e) {}
+
+  if (clientQrPollInterval) clearInterval(clientQrPollInterval);
+  clientQrPollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/wa-session/status?sessionId=${sessionId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      
+      const container = document.getElementById('qrRealClientImageContainer');
+      if (data.connected) {
+        if (client) {
+          client.phone = data.phone ? `+${data.phone}` : client.phone;
+          saveAgencyClients(agencyClients);
+          renderClientsList();
+        }
+        clearInterval(clientQrPollInterval);
+        closeModal('qrClientPairModal');
+        showToast(`🎉 ¡WhatsApp de ${client.name} vinculado con éxito! (+${data.phone})`, 'success');
+      } else if (data.qr && container) {
+        container.innerHTML = `
+          <div class="qr-scan-line"></div>
+          <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" alt="Código QR Real de WhatsApp">
+        `;
+      }
+    } catch (e) {}
+  }, 2000);
 }
 
 function confirmClientQrPair() {
-  if (activeQrClientId) {
-    const client = agencyClients.find(c => c.id === activeQrClientId);
-    if (client) {
-      client.phone = client.phone && client.phone !== 'Línea no vinculada' ? client.phone : '+54 9 11 4892-3310';
-      saveAgencyClients(agencyClients);
-      renderClientsList();
-      showToast(`✅ WhatsApp de ${client.name} vinculado con éxito.`, 'success');
-    }
-  }
+  if (clientQrPollInterval) clearInterval(clientQrPollInterval);
   closeModal('qrClientPairModal');
 }
 
