@@ -162,8 +162,21 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
 }
 
 // ==================== TAB NAVIGATION ====================
+function toggleMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    sidebar.classList.toggle('mobile-open');
+  }
+}
+
 function switchTab(tabName) {
   if (!tabName) return;
+
+  // Auto-close sidebar on mobile upon tab selection
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar && sidebar.classList.contains('mobile-open')) {
+    sidebar.classList.remove('mobile-open');
+  }
 
   // Update nav items directly by matching exact data-tab attribute
   document.querySelectorAll('.nav-item').forEach(item => {

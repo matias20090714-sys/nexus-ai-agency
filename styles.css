@@ -1537,6 +1537,26 @@ textarea.form-control {
 @keyframes fadeInMsg {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+/* Mobile Menu Toggle Button */
+.mobile-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: all var(--transition-fast);
+}
+
+.mobile-menu-toggle:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: var(--accent-indigo);
 }
 
 /* Responsive Breakpoints */
@@ -1556,26 +1576,84 @@ textarea.form-control {
 }
 
 @media (max-width: 768px) {
+  .mobile-menu-toggle {
+    display: inline-flex;
+  }
+
   .app-container {
     flex-direction: column;
+    position: relative;
   }
+
   .sidebar {
-    width: 100%;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border-subtle);
+    position: fixed;
+    top: 0;
+    left: -290px;
+    width: 280px;
+    height: 100vh;
+    z-index: 1000;
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    background: #0b0f24;
   }
+
+  .sidebar.mobile-open {
+    left: 0;
+  }
+
+  .main-wrapper {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .top-header {
+    padding: 0 14px;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 900;
+  }
+
+  .page-title {
+    font-size: 14px;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .content-body {
+    padding: 12px;
+  }
+
+  /* Grid Fallbacks for Mobile */
+  .grid-2, .grid-3, .grid-4,
+  div[style*="grid-template-columns: 1fr 1fr"],
+  div[style*="grid-template-columns: 1fr 1fr 1fr"],
+  div[style*="grid-template-columns: 2fr 1fr"],
+  div[style*="grid-template-columns: 1fr 2fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
   .chat-workspace {
     grid-template-columns: 1fr;
-    height: auto;
+    height: calc(100vh - 120px);
   }
+
   .chat-contacts-col {
     display: none;
   }
-  .top-header {
-    padding: 0 16px;
+
+  .qr-code-frame {
+    width: 260px !important;
+    height: 260px !important;
   }
-  .content-body {
-    padding: 16px;
+
+  .modal-content {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
   }
 }
