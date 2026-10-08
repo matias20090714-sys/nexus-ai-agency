@@ -956,8 +956,59 @@ function switchAgencyDirectly(agencyId) {
 }
 
 // ==================== PUBLIC PORTAL HELPERS ====================
+function simulatePortalReply(type) {
+  const container = document.getElementById('portalSimChatBody');
+  if (!container) return;
+
+  const profile = getAgencyProfile();
+  const agencyName = profile ? profile.name : 'NEXUS AI';
+  const priceStarter = profile ? (profile.priceStarter || '290') : '290';
+  const pricePro = profile ? (profile.pricePro || '690') : '690';
+
+  const userMessages = {
+    'turnos': '🦷 Hola, ¿tienen turnos disponibles para hoy?',
+    'precios': '💵 Hola, ¿cuánto cuesta el servicio y qué planes tienen?',
+    'ubicacion': '📍 ¿Dónde están ubicados y cuáles son sus horarios de atención?'
+  };
+
+  const agentReplies = {
+    'turnos': `¡Hola! Con gusto te ayudo 📅 Sí, para el día de hoy tenemos los siguientes espacios libres:<br><br>• <strong>15:30 hs</strong><br>• <strong>18:00 hs</strong><br><br>¿Cuál de estos horarios te queda más cómodo para reservarte el turno a tu nombre?`,
+    'precios': `¡Hola! En <strong>${agencyName}</strong> contamos con 2 planes según tu necesidad:<br><br>• <strong>Plan Starter:</strong> $${priceStarter} USD/mes (Agente WhatsApp 24/7)<br>• <strong>Plan Growth Pro:</strong> $${pricePro} USD/mes (Agente + Agenda Calendar + CRM de Leads)<br><br>Ambos sin contratos de permanencia. ¿Te gustaría activar el tuyo hoy?`,
+    'ubicacion': `¡Hola! 📍 Nuestra sede central atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong> y <strong>Sábados de 10:00 a 14:00 hs</strong>.<br><br>Sin embargo, ¡nuestro Asistente de IA te atiende por aquí las <strong>24 horas del día</strong> sin interrupciones! ¿En qué más te puedo colaborar?`
+  };
+
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Add User Message
+  const userMsgEl = document.createElement('div');
+  userMsgEl.className = 'chat-sim-msg user';
+  userMsgEl.innerHTML = `${userMessages[type]}<div style="font-size: 10px; color: rgba(255,255,255,0.6); text-align: right; margin-top: 4px;">${now}</div>`;
+  container.appendChild(userMsgEl);
+  container.scrollTop = container.scrollHeight;
+
+  // Add Typing Indicator
+  const typingEl = document.createElement('div');
+  typingEl.className = 'chat-sim-msg agent';
+  typingEl.id = 'tempSimTyping';
+  typingEl.innerHTML = `<i class="fa-solid fa-ellipsis fa-fade"></i> <em>Escribiendo respuesta...</em>`;
+  container.appendChild(typingEl);
+  container.scrollTop = container.scrollHeight;
+
+  // Render Real Agent Reply after short delay
+  setTimeout(() => {
+    const typing = document.getElementById('tempSimTyping');
+    if (typing) typing.remove();
+
+    const agentMsgEl = document.createElement('div');
+    agentMsgEl.className = 'chat-sim-msg agent';
+    agentMsgEl.innerHTML = `${agentReplies[type]}<div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">${now}</div>`;
+    container.appendChild(agentMsgEl);
+    container.scrollTop = container.scrollHeight;
+  }, 600);
+}
+
 function openContactDemoModal(plan = 'Sesión Estratégica') {
-  alert(`📅 SOLICITUD DE DIAGNÓSTICO (${plan}):\n\nEl cliente final completa su nombre y teléfono para agendar una demostración en vivo con tu agencia.`);
+  openAgencyRealCheckout('pro');
 }
 
 function openPublicShareModal() {

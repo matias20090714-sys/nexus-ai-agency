@@ -268,12 +268,61 @@
                 En <strong style="color: white;" id="portalAgencyName">NEXUS AI Agency</strong> implementamos Agentes Inteligentes autónomos en WhatsApp, Instagram y Web que responden en 2 segundos, califican prospectos y agendan citas en tu calendario.
               </p>
               <div style="display: flex; justify-content: center; gap: 14px;">
-                <button class="btn btn-primary" onclick="openContactDemoModal()">
-                  <i class="fa-solid fa-calendar-check"></i> Agendar Diagnóstico Gratuito
+                <button class="btn btn-primary" onclick="openAgencyRealCheckout('pro')">
+                  <i class="fa-solid fa-bolt"></i> Contratar Asistente de IA
                 </button>
-                <button class="btn btn-secondary" onclick="switchTab('inbox')">
-                  <i class="fa-brands fa-whatsapp"></i> Probar Asistente en WhatsApp
+                <button class="btn btn-secondary" onclick="document.getElementById('liveChatSimAnchor').scrollIntoView({behavior:'smooth'})">
+                  <i class="fa-brands fa-whatsapp"></i> Ver Demostración en Vivo
                 </button>
+              </div>
+            </div>
+
+            <!-- Interactive Live WhatsApp Chat Simulator -->
+            <div id="liveChatSimAnchor" style="margin-bottom: 60px;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <span class="brand-badge" style="background: rgba(37,211,102,0.15); color: #25d366; font-size: 11px; padding: 4px 14px;">⚡ EXPERIENCIA EN VIVO</span>
+                <h3 style="font-size: 22px; font-weight: 800; color: white; margin-top: 8px;">Prueba Cómo Responde Nuestro Agente en Tiempo Real</h3>
+                <p style="font-size: 13.5px; color: var(--text-muted);">Haz clic en cualquier pregunta para ver la velocidad y empatía de la Inteligencia Artificial:</p>
+              </div>
+
+              <div class="portal-chat-simulator">
+                <!-- Phone Header -->
+                <div class="chat-sim-header">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: #128c7e; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;">
+                      <i class="fa-solid fa-robot"></i>
+                    </div>
+                    <div>
+                      <div style="font-size: 14px; font-weight: 700; color: white;">Asistente Virtual IA • 24/7</div>
+                      <div style="font-size: 11px; color: #a7f3d0;">🟢 En línea • Responde en 1s</div>
+                    </div>
+                  </div>
+                  <div style="font-size: 18px; color: rgba(255,255,255,0.7); display: flex; gap: 14px;">
+                    <i class="fa-solid fa-phone"></i>
+                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                  </div>
+                </div>
+
+                <!-- Chat Body with messages -->
+                <div class="chat-sim-body" id="portalSimChatBody">
+                  <div class="chat-sim-msg agent">
+                    👋 ¡Hola! Bienvenido/a a nuestro canal oficial de atención. ¿En qué te puedo ayudar hoy? Selecciona una opción o escribe tu consulta:
+                    <div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">10:42 AM</div>
+                  </div>
+                </div>
+
+                <!-- Interactive Chips Footer -->
+                <div style="background: #1e293b; padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-wrap: wrap; gap: 8px;">
+                  <button class="quick-chip" onclick="simulatePortalReply('turnos')">
+                    🦷 ¿Tienen turnos disponibles para hoy?
+                  </button>
+                  <button class="quick-chip" onclick="simulatePortalReply('precios')">
+                    💵 ¿Cuáles son los precios y planes?
+                  </button>
+                  <button class="quick-chip" onclick="simulatePortalReply('ubicacion')">
+                    📍 ¿Dónde están ubicados y qué horario tienen?
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -323,8 +372,61 @@
               </div>
             </div>
 
+            <!-- Comparison Table: Recepcionista Humano vs Agente IA -->
+            <div style="margin-bottom: 54px;">
+              <div style="text-align: center; margin-bottom: 28px;">
+                <span class="brand-badge" style="background: rgba(99,102,241,0.2); color: #a5b4fc; font-size: 11px; padding: 4px 14px;">⚖️ ANÁLISIS DE COSTO / BENEFICIO</span>
+                <h2 style="font-size: 24px; font-weight: 800; color: white; margin-top: 8px;">Recepcionista Tradicional vs. Agente de IA</h2>
+                <p style="font-size: 14px; color: var(--text-muted);">Compara por qué las empresas líderes están migrando a atención automática con Inteligencia Artificial:</p>
+              </div>
+
+              <div class="comparison-table-wrapper">
+                <table class="comparison-table">
+                  <thead>
+                    <tr>
+                      <th>Factor Clave</th>
+                      <th style="color: #f87171;"><i class="fa-solid fa-user-xmark"></i> Recepcionista Humano</th>
+                      <th style="color: #34d399; background: rgba(16,185,129,0.1);"><i class="fa-solid fa-robot"></i> Agente Inteligente IA</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Costo Mensual Total</strong></td>
+                      <td style="color: #fca5a5;">$800 a $1,400 USD/mes + impuestos</td>
+                      <td style="color: #6ee7b7; font-weight: 800; background: rgba(16,185,129,0.05);">$290 a $690 USD/mes (Ahorro del 60%)</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Horario de Cobertura</strong></td>
+                      <td>8 horas al día (Lunes a Viernes)</td>
+                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">24 horas, 7 días, feriados y madrugadas</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Velocidad de Respuesta</strong></td>
+                      <td>15 a 45 minutos (se pierden ventas)</td>
+                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">2 segundos instantáneos</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Capacidad Simultánea</strong></td>
+                      <td>1 cliente a la vez (línea ocupada)</td>
+                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">100+ personas al mismo tiempo</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Faltas o Vacaciones</strong></td>
+                      <td>Licencias, ausencias y rotación</td>
+                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">0% faltas • 99.9% disponibilidad</td>
+                    </tr>
+                    <tr>
+                      <td><strong>Permanencia & Contrato</strong></td>
+                      <td>Indemnizaciones y contratos laborales</td>
+                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">Sin ataduras • Cancela cuando quieras</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <!-- Pricing Packages -->
-            <div style="margin-bottom: 40px;">
+            <div style="margin-bottom: 20px;">
               <div style="text-align: center; margin-bottom: 32px;">
                 <h2 style="font-size: 24px; font-weight: 800; color: white;">Planes de Suscripción para Empresas</h2>
                 <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Sin contratos de permanencia. Mantenimiento, servidor y actualizaciones continuas de IA incluidas.</p>
@@ -369,6 +471,20 @@
                 </div>
 
               </div>
+
+              <!-- Guarantee Box -->
+              <div class="guarantee-box" style="max-width: 950px; margin: 32px auto 0 auto;">
+                <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); display: flex; align-items: center; justify-content: center; font-size: 28px; color: #34d399; flex-shrink: 0;">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 4px;">Garantía de Activación en 48 Horas • Cero Riesgo</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">
+                    Instalamos y calibramos el Asistente en tu número de WhatsApp en menos de 48 horas. Sin contratos de permanencia forzada: puedes pausar o cancelar el servicio en cualquier momento con 1 clic.
+                  </p>
+                </div>
+              </div>
+
             </div>
 
           </div>
