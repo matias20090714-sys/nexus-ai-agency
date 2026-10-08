@@ -164,8 +164,16 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
 // ==================== TAB NAVIGATION ====================
 function toggleMobileSidebar() {
   const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
   if (sidebar) {
     sidebar.classList.toggle('mobile-open');
+    if (overlay) {
+      if (sidebar.classList.contains('mobile-open')) {
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
   }
 }
 
@@ -174,9 +182,11 @@ function switchTab(tabName) {
 
   // Auto-close sidebar on mobile upon tab selection
   const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
   if (sidebar && sidebar.classList.contains('mobile-open')) {
     sidebar.classList.remove('mobile-open');
   }
+  if (overlay) overlay.classList.remove('active');
 
   // Update nav items directly by matching exact data-tab attribute
   document.querySelectorAll('.nav-item').forEach(item => {

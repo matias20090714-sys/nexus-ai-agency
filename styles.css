@@ -1537,6 +1537,43 @@ textarea.form-control {
 @keyframes fadeInMsg {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+/* Mobile Backdrop Overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(5px);
+  z-index: 998;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+}
+
+/* Mobile Close Button in Sidebar Header */
+.mobile-close-sidebar-btn {
+  display: none;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: 22px;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  margin-left: auto;
+}
+
 /* Mobile Menu Toggle Button */
 .mobile-menu-toggle {
   display: none;
@@ -1550,7 +1587,8 @@ textarea.form-control {
   color: white;
   font-size: 16px;
   cursor: pointer;
-  margin-right: 12px;
+  margin-right: 10px;
+  flex-shrink: 0;
   transition: all var(--transition-fast);
 }
 
@@ -1575,55 +1613,68 @@ textarea.form-control {
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
   .mobile-menu-toggle {
     display: inline-flex;
   }
 
+  .mobile-close-sidebar-btn {
+    display: flex;
+  }
+
   .app-container {
-    flex-direction: column;
+    display: block !important;
+    height: 100vh;
+    overflow: hidden;
     position: relative;
   }
 
   .sidebar {
-    position: fixed;
-    top: 0;
-    left: -290px;
-    width: 280px;
-    height: 100vh;
-    z-index: 1000;
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
-    transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    background: #0b0f24;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 290px !important;
+    max-width: 85vw !important;
+    height: 100vh !important;
+    z-index: 1000 !important;
+    transform: translateX(-105%) !important;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    background: #0b0f24 !important;
+    box-shadow: 15px 0 40px rgba(0, 0, 0, 0.9) !important;
+    overflow-y: auto !important;
   }
 
   .sidebar.mobile-open {
-    left: 0;
+    transform: translateX(0) !important;
   }
 
   .main-wrapper {
-    width: 100%;
-    margin-left: 0;
+    width: 100% !important;
+    height: 100vh !important;
+    overflow-y: auto !important;
+    margin-left: 0 !important;
   }
 
   .top-header {
     padding: 0 14px;
-    height: 60px;
+    height: 58px;
     position: sticky;
     top: 0;
     z-index: 900;
+    background: rgba(13, 16, 33, 0.95);
+    backdrop-filter: blur(15px);
   }
 
   .page-title {
-    font-size: 14px;
+    font-size: 13.5px !important;
   }
 
-  .header-actions {
-    gap: 6px;
+  .top-header .header-actions {
+    display: none;
   }
 
   .content-body {
-    padding: 12px;
+    padding: 12px 10px 80px 10px !important;
   }
 
   /* Grid Fallbacks for Mobile */
