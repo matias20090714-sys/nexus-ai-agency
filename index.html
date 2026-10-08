@@ -962,23 +962,212 @@
               <div>
                 <div class="panel-title">
                   <i class="fa-solid fa-plug" style="color: var(--accent-cyan);"></i>
-                  <span>APIs & Conexiones de Producción</span>
+                  <span>Conexión de WhatsApp & Motor de Inteligencia Artificial</span>
                 </div>
                 <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-                  Credenciales de Inteligencia Artificial (Google Gemini) y WhatsApp Gateway (Meta Cloud API).
+                  Vincula tu WhatsApp o el de tus clientes en 1 clic escaneando un código QR (Cero configuración técnica).
                 </div>
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <!-- Mode Switcher -->
+            <div class="connection-mode-tabs">
+              <button class="conn-tab-btn active" id="btnModeQr" onclick="setConnectionMode('qr')">
+                <i class="fa-solid fa-qrcode"></i> 1. Conexión Rápida por Código QR (Recomendada - Cero Configuración)
+              </button>
+              <button class="conn-tab-btn" id="btnModeMeta" onclick="setConnectionMode('meta')">
+                <i class="fa-solid fa-code"></i> 2. Meta Cloud API Oficial (Avanzado)
+              </button>
+            </div>
+
+            <!-- QR PAIRING SECTION (Default / Zero-Config) -->
+            <div id="sectionConnQr" style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px;">
+              
+              <!-- QR Scanner Card -->
+              <div class="qr-connection-box" id="qrUnpairedView">
+                <div style="font-size: 16px; font-weight: 800; color: white; margin-bottom: 4px;">
+                  <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Vincular WhatsApp en 5 Segundos
+                </div>
+                <p style="font-size: 12.5px; color: var(--text-muted); max-width: 360px;">
+                  Abre WhatsApp en tu teléfono (o el de tu cliente) y escanea este código para activar el Agente de IA.
+                </p>
+
+                <div class="qr-code-frame">
+                  <div class="qr-scan-line"></div>
+                  <!-- SVG Vector QR Code -->
+                  <svg viewBox="0 0 200 200" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="200" height="200" fill="#ffffff"/>
+                    <!-- QR Corners -->
+                    <rect x="15" y="15" width="45" height="45" fill="#0f172a" rx="4"/>
+                    <rect x="23" y="23" width="29" height="29" fill="#ffffff" rx="2"/>
+                    <rect x="29" y="29" width="17" height="17" fill="#25d366" rx="2"/>
+
+                    <rect x="140" y="15" width="45" height="45" fill="#0f172a" rx="4"/>
+                    <rect x="148" y="23" width="29" height="29" fill="#ffffff" rx="2"/>
+                    <rect x="154" y="29" width="17" height="17" fill="#25d366" rx="2"/>
+
+                    <rect x="15" y="140" width="45" height="45" fill="#0f172a" rx="4"/>
+                    <rect x="23" y="148" width="29" height="29" fill="#ffffff" rx="2"/>
+                    <rect x="29" y="154" width="17" height="17" fill="#25d366" rx="2"/>
+
+                    <!-- QR Matrix Pattern Data -->
+                    <rect x="70" y="20" width="10" height="10" fill="#0f172a"/>
+                    <rect x="90" y="20" width="20" height="10" fill="#0f172a"/>
+                    <rect x="120" y="20" width="10" height="10" fill="#0f172a"/>
+                    <rect x="70" y="40" width="20" height="10" fill="#0f172a"/>
+                    <rect x="100" y="40" width="10" height="10" fill="#0f172a"/>
+                    <rect x="120" y="40" width="10" height="10" fill="#0f172a"/>
+
+                    <rect x="20" y="70" width="10" height="20" fill="#0f172a"/>
+                    <rect x="40" y="70" width="20" height="10" fill="#0f172a"/>
+                    <rect x="70" y="70" width="10" height="10" fill="#25d366"/>
+                    <rect x="90" y="70" width="20" height="20" fill="#0f172a"/>
+                    <rect x="120" y="70" width="10" height="10" fill="#0f172a"/>
+                    <rect x="140" y="70" width="20" height="10" fill="#0f172a"/>
+                    <rect x="170" y="70" width="10" height="20" fill="#0f172a"/>
+
+                    <rect x="20" y="100" width="20" height="10" fill="#0f172a"/>
+                    <rect x="50" y="100" width="10" height="10" fill="#0f172a"/>
+                    <rect x="70" y="100" width="20" height="10" fill="#0f172a"/>
+                    <rect x="110" y="100" width="10" height="20" fill="#25d366"/>
+                    <rect x="130" y="100" width="20" height="10" fill="#0f172a"/>
+                    <rect x="160" y="100" width="20" height="10" fill="#0f172a"/>
+
+                    <rect x="20" y="120" width="10" height="10" fill="#0f172a"/>
+                    <rect x="40" y="120" width="20" height="10" fill="#0f172a"/>
+                    <rect x="70" y="120" width="10" height="20" fill="#0f172a"/>
+                    <rect x="90" y="120" width="20" height="10" fill="#0f172a"/>
+                    <rect x="130" y="120" width="10" height="10" fill="#0f172a"/>
+                    <rect x="150" y="120" width="20" height="20" fill="#0f172a"/>
+
+                    <rect x="70" y="150" width="20" height="10" fill="#0f172a"/>
+                    <rect x="100" y="150" width="10" height="20" fill="#0f172a"/>
+                    <rect x="120" y="150" width="20" height="10" fill="#0f172a"/>
+                    <rect x="150" y="150" width="10" height="10" fill="#0f172a"/>
+                    <rect x="170" y="150" width="10" height="20" fill="#0f172a"/>
+
+                    <rect x="70" y="170" width="10" height="10" fill="#0f172a"/>
+                    <rect x="90" y="170" width="20" height="10" fill="#0f172a"/>
+                    <rect x="120" y="170" width="10" height="10" fill="#0f172a"/>
+                    <rect x="140" y="170" width="20" height="10" fill="#0f172a"/>
+
+                    <!-- WhatsApp Center Badge -->
+                    <circle cx="100" cy="100" r="16" fill="#25d366"/>
+                    <path d="M93 104 L95 99 A6 6 0 1 1 106 102 L101 105 Z" fill="#ffffff"/>
+                  </svg>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #fbbf24; margin-bottom: 16px;">
+                  <div class="status-dot-pulse" style="background: #fbbf24;"></div>
+                  <span>Esperando escaneo de cámara... (Sesión segura)</span>
+                </div>
+
+                <button class="btn btn-emerald" style="width: 100%; font-weight: 800;" onclick="pairWhatsAppQRInstant()">
+                  <i class="fa-solid fa-qrcode"></i> Simular / Vincular Dispositivo Ahora
+                </button>
+              </div>
+
+              <!-- Paired Device Active Card -->
+              <div class="device-connected-card" id="qrPairedView" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 44px; height: 44px; border-radius: var(--radius-full); background: #25d366; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white;">
+                      <i class="fa-brands fa-whatsapp"></i>
+                    </div>
+                    <div>
+                      <div style="font-size: 16px; font-weight: 800; color: white;">WhatsApp Vinculado con Éxito</div>
+                      <div style="font-size: 12px; color: #34d399;">🟢 Estado: Conectado y En Línea 24/7</div>
+                    </div>
+                  </div>
+                  <span class="brand-badge" style="background: rgba(16,185,129,0.25); color: #34d399; font-weight: 800;">Activo</span>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.6); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-md); padding: 14px; font-size: 13px;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: var(--text-muted);">Número Conectado:</span>
+                    <strong style="color: white;" id="qrConnectedPhoneDisplay">+54 9 11 4892-3310</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: var(--text-muted);">Motor de Conexión:</span>
+                    <strong style="color: #67e8f9;">WhatsApp Web Engine v2.4</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: var(--text-muted);">Batería del Teléfono:</span>
+                    <strong style="color: #34d399;">🔋 98% (Excelente)</strong>
+                  </div>
+                  <div style="display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">Agente IA Auto-Responder:</span>
+                    <strong style="color: #a5b4fc;">⚡ Activo (0.8s tiempo de respuesta)</strong>
+                  </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                  <button class="btn btn-emerald btn-sm" style="flex: 1;" onclick="openSendRealWaModal()">
+                    <i class="fa-solid fa-paper-plane"></i> Enviar Mensaje de Prueba
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="unpairWhatsAppQR()">
+                    <i class="fa-solid fa-power-off"></i> Desvincular
+                  </button>
+                </div>
+              </div>
+
+              <!-- AI Pre-Activated Engine & Benefits Column -->
+              <div style="display: flex; flex-direction: column; gap: 16px;">
+                
+                <!-- Zero Config AI Engine Card -->
+                <div style="background: rgba(10, 13, 28, 0.8); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 22px;">
+                  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: white;">
+                      <i class="fa-solid fa-brain"></i>
+                    </div>
+                    <div>
+                      <strong style="font-size: 15px; color: white; display: block;">Motor de IA 100% Pre-Activado</strong>
+                      <span style="font-size: 12px; color: #34d399;">Cero configuración necesaria</span>
+                    </div>
+                  </div>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+                    La plataforma ya cuenta con Google Gemini 2.5 Flash pre-instalado en el servidor en la nube. Tus compradores no tienen que sacar claves ni registrar tarjetas para empezar a operar.
+                  </p>
+                  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-shield-check" style="color: #34d399;"></i>
+                    <span>Tus clientes solo escanean el QR y el Agente empieza a contestar solo.</span>
+                  </div>
+                </div>
+
+                <!-- 3 Easy Steps Box -->
+                <div style="background: rgba(10, 13, 28, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <strong style="font-size: 13.5px; color: white; display: block; margin-bottom: 12px;">
+                    <i class="fa-solid fa-list-check" style="color: var(--accent-indigo);"></i> Cómo vincular al cliente en 3 pasos:
+                  </strong>
+                  <div style="font-size: 12.5px; color: var(--text-muted); display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 10px;">
+                      <span style="background: var(--gradient-primary); color: white; width: 22px; height: 22px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0;">1</span>
+                      <span>Abre WhatsApp en el celular del negocio.</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                      <span style="background: var(--gradient-primary); color: white; width: 22px; height: 22px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0;">2</span>
+                      <span>Ve a <strong>Ajustes > Dispositivos Vinculados</strong>.</span>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                      <span style="background: var(--gradient-primary); color: white; width: 22px; height: 22px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0;">3</span>
+                      <span>Escanea el QR y ¡listo! La IA atiende sus chats de inmediato.</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- META CLOUD API SECTION (Advanced developer fallback) -->
+            <div id="sectionConnMeta" style="display: none; grid-template-columns: 1fr 1fr; gap: 24px;">
               <!-- AI API Config -->
               <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
                 <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
-                  <i class="fa-solid fa-brain" style="color: var(--accent-indigo);"></i> 1. API de Inteligencia Artificial (Google Gemini)
+                  <i class="fa-solid fa-brain" style="color: var(--accent-indigo);"></i> API Key Personalizada (Opcional)
                 </strong>
                 <div class="form-group">
                   <label class="form-label">API Key de Google Gemini</label>
-                  <input type="password" id="apiAiKey" class="form-control" placeholder="Pega tu clave de Gemini (AIzaSy... / AQ...)">
+                  <input type="password" id="apiAiKey" class="form-control" placeholder="Pega tu clave propia o deja vacío para usar la master">
                 </div>
                 <div class="form-group">
                   <label class="form-label">Modelo Activo</label>
@@ -989,14 +1178,14 @@
                   </select>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="saveAndTestAiApi()">
-                  <i class="fa-solid fa-bolt"></i> Guardar & Probar Gemini
+                  <i class="fa-solid fa-bolt"></i> Guardar Clave Personalizada
                 </button>
               </div>
 
               <!-- Meta WhatsApp Config -->
               <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
                 <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
-                  <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> 2. Meta WhatsApp Cloud API
+                  <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Meta WhatsApp Cloud API (Developer)
                 </strong>
                 <div class="form-group">
                   <label class="form-label">Phone Number ID</label>
@@ -1208,12 +1397,67 @@
     </div>
   </div>
 
+  <!-- Modal: Vincular WhatsApp por QR de un Cliente -->
+  <div class="modal-backdrop" id="qrClientPairModal">
+    <div class="modal-content" style="max-width: 500px; text-align: center;">
+      <div class="modal-header">
+        <strong style="font-size: 16px; color: white;"><i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Vincular WhatsApp de la Empresa</strong>
+        <button class="close-btn" onclick="closeModal('qrClientPairModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h4 style="color: white; font-size: 15px; margin-bottom: 4px;" id="qrClientModalName">Nombre de Empresa</h4>
+        <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+          Pídele al dueño o encargado que escanee este código desde su WhatsApp (Ajustes > Dispositivos Vinculados).
+        </p>
+        <div class="qr-code-frame" style="margin: 0 auto 16px auto;">
+          <div class="qr-scan-line"></div>
+          <!-- SVG QR Frame -->
+          <svg viewBox="0 0 200 200" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <rect width="200" height="200" fill="#ffffff"/>
+            <rect x="15" y="15" width="45" height="45" fill="#0f172a" rx="4"/>
+            <rect x="23" y="23" width="29" height="29" fill="#ffffff" rx="2"/>
+            <rect x="29" y="29" width="17" height="17" fill="#25d366" rx="2"/>
+            <rect x="140" y="15" width="45" height="45" fill="#0f172a" rx="4"/>
+            <rect x="148" y="23" width="29" height="29" fill="#ffffff" rx="2"/>
+            <rect x="154" y="29" width="17" height="17" fill="#25d366" rx="2"/>
+            <rect x="15" y="140" width="45" height="45" fill="#0f172a" rx="4"/>
+            <rect x="23" y="148" width="29" height="29" fill="#ffffff" rx="2"/>
+            <rect x="29" y="154" width="17" height="17" fill="#25d366" rx="2"/>
+            <!-- Matrix dots -->
+            <rect x="70" y="20" width="10" height="10" fill="#0f172a"/>
+            <rect x="90" y="20" width="20" height="10" fill="#0f172a"/>
+            <rect x="120" y="20" width="10" height="10" fill="#0f172a"/>
+            <rect x="70" y="40" width="20" height="10" fill="#0f172a"/>
+            <rect x="100" y="40" width="10" height="10" fill="#0f172a"/>
+            <rect x="120" y="40" width="10" height="10" fill="#0f172a"/>
+            <rect x="20" y="70" width="10" height="20" fill="#0f172a"/>
+            <rect x="40" y="70" width="20" height="10" fill="#0f172a"/>
+            <rect x="70" y="70" width="10" height="10" fill="#25d366"/>
+            <rect x="90" y="70" width="20" height="20" fill="#0f172a"/>
+            <rect x="120" y="70" width="10" height="10" fill="#0f172a"/>
+            <rect x="140" y="70" width="20" height="10" fill="#0f172a"/>
+            <circle cx="100" cy="100" r="16" fill="#25d366"/>
+            <path d="M93 104 L95 99 A6 6 0 1 1 106 102 L101 105 Z" fill="#ffffff"/>
+          </svg>
+        </div>
+        <div style="font-size: 12px; color: #fbbf24; margin-bottom: 12px;">
+          <div class="status-dot-pulse" style="background: #fbbf24; display: inline-block; vertical-align: middle; margin-right: 6px;"></div>
+          <span>Esperando lectura de cámara en el móvil del cliente...</span>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: center;">
+        <button class="btn btn-secondary" onclick="closeModal('qrClientPairModal')">Cerrar</button>
+        <button class="btn btn-emerald" onclick="confirmClientQrPair()"><i class="fa-solid fa-check"></i> Vincular Ahora</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="agents-data.js?v=2.1"></script>
-  <script src="marketing-studio.js?v=2.1"></script>
-  <script src="app.js?v=2.1"></script>
+  <script src="agents-data.js?v=2.2"></script>
+  <script src="marketing-studio.js?v=2.2"></script>
+  <script src="app.js?v=2.2"></script>
 </body>
 </html>

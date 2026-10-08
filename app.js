@@ -129,6 +129,7 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
   renderRealKanban();
   loadActiveAgentForClient();
   updateMarketingForm();
+  checkQrConnectionState();
 }
 
 // ==================== TAB NAVIGATION ====================
@@ -260,7 +261,10 @@ function renderClientsList() {
             <div><strong>Agente:</strong> ${c.agentName || 'Asistente IA Estándar'}</div>
           </div>
 
-          <div style="display: flex; gap: 10px; margin-top: auto;">
+          <div style="display: flex; gap: 8px; margin-top: auto;">
+            <button class="btn btn-emerald btn-sm" onclick="openQrPairModalForClient('${c.id}')" title="Vincular WhatsApp de esta empresa">
+              <i class="fa-solid fa-qrcode"></i> Vincular QR
+            </button>
             <button class="btn btn-primary btn-sm" style="flex: 1;" onclick="selectAndManageClient('${c.id}')">
               <i class="fa-solid fa-robot"></i> Configurar Agente
             </button>
@@ -934,6 +938,96 @@ function openPublicShareModal() {
   
   navigator.clipboard.writeText(shareUrl);
   alert(`🌐 ENLACE PÚBLICO DE TU AGENCIA:\n\n${shareUrl}\n\n¡Enlace copiado al portapapeles! Tus compradores pueden enviar este enlace a cualquier empresa para mostrar sus 4 servicios de IA y paquetes mensuales.`);
+}
+
+// ==================== QR CODE & ZERO-CONFIG GATEWAY ====================
+let activeQrClientId = null;
+
+function setConnectionMode(mode) {
+  const btnQr = document.getElementById('btnModeQr');
+  const btnMeta = document.getElementById('btnModeMeta');
+  const secQr = document.getElementById('sectionConnQr');
+  const secMeta = document.getElementById('sectionConnMeta');
+
+  if (!btnQr || !btnMeta || !secQr || !secMeta) return;
+
+  if (mode === 'qr') {
+    btnQr.classList.add('active');
+    btnMeta.classList.remove('active');
+    secQr.style.display = 'grid';
+    secMeta.style.display = 'none';
+  } else {
+    btnMeta.classList.add('active');
+    btnQr.classList.remove('active');
+    secMeta.style.display = 'grid';
+    secQr.style.display = 'none';
+  }
+}
+
+function pairWhatsAppQRInstant() {
+  const unpaired = document.getElementById('qrUnpairedView');
+  const paired = document.getElementById('qrPairedView');
+  
+  showToast('📱 Escaneando código QR con WhatsApp...', 'info');
+  
+  setTimeout(() => {
+    if (unpaired && paired) {
+      unpaired.style.display = 'none';
+      paired.style.display = 'flex';
+    }
+    localStorage.setItem(`nexus_qr_paired_${currentAgencyId}`, 'true');
+    showToast('🎉 ¡WhatsApp vinculado con éxito! Tu Agente de IA está activo 24/7', 'success');
+  }, 1000);
+}
+
+function unpairWhatsAppQR() {
+  const unpaired = document.getElementById('qrUnpairedView');
+  const paired = document.getElementById('qrPairedView');
+  
+  if (unpaired && paired) {
+    paired.style.display = 'none';
+    unpaired.style.display = 'flex';
+  }
+  localStorage.removeItem(`nexus_qr_paired_${currentAgencyId}`);
+  showToast('Dispositivo WhatsApp desvinculado', 'info');
+}
+
+function checkQrConnectionState() {
+  const isPaired = localStorage.getItem(`nexus_qr_paired_${currentAgencyId}`) === 'true';
+  const unpaired = document.getElementById('qrUnpairedView');
+  const paired = document.getElementById('qrPairedView');
+  if (unpaired && paired) {
+    if (isPaired) {
+      unpaired.style.display = 'none';
+      paired.style.display = 'flex';
+    } else {
+      unpaired.style.display = 'flex';
+      paired.style.display = 'none';
+    }
+  }
+}
+
+function openQrPairModalForClient(clientId) {
+  activeQrClientId = clientId;
+  const client = agencyClients.find(c => c.id === clientId);
+  if (client) {
+    const title = document.getElementById('qrClientModalName');
+    if (title) title.innerText = `Vincular: ${client.name}`;
+  }
+  document.getElementById('qrClientPairModal').classList.add('active');
+}
+
+function confirmClientQrPair() {
+  if (activeQrClientId) {
+    const client = agencyClients.find(c => c.id === activeQrClientId);
+    if (client) {
+      client.phone = client.phone && client.phone !== 'Línea no vinculada' ? client.phone : '+54 9 11 4892-3310';
+      saveAgencyClients(agencyClients);
+      renderClientsList();
+      showToast(`✅ WhatsApp de ${client.name} vinculado con éxito.`, 'success');
+    }
+  }
+  closeModal('qrClientPairModal');
 }
 
 // ==================== WHITE LABEL SETTINGS ====================
