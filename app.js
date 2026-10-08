@@ -66,6 +66,15 @@ const DEFAULT_PHONE_ID = localStorage.getItem('nexus_meta_phone_id') || '1342311
 // Initialize context on load
 document.addEventListener('DOMContentLoaded', () => {
   loadAgencyWorkspace(currentAgencyId);
+
+  // Setup robust click listeners on all nav-items
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tab = item.getAttribute('data-tab');
+      if (tab) switchTab(tab);
+    });
+  });
 });
 
 // Load and isolate an agency workspace
@@ -124,6 +133,8 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
 
 // ==================== TAB NAVIGATION ====================
 function switchTab(tabName) {
+  if (!tabName) return;
+
   // Update nav items directly by matching exact data-tab attribute
   document.querySelectorAll('.nav-item').forEach(item => {
     if (item.getAttribute('data-tab') === tabName) {
@@ -134,9 +145,13 @@ function switchTab(tabName) {
   });
 
   // Update tab views
-  document.querySelectorAll('.tab-view').forEach(view => view.classList.remove('active'));
-  const targetView = document.getElementById(`tab-${tabName}`);
-  if (targetView) targetView.classList.add('active');
+  document.querySelectorAll('.tab-view').forEach(view => {
+    if (view.id === `tab-${tabName}`) {
+      view.classList.add('active');
+    } else {
+      view.classList.remove('active');
+    }
+  });
 
   const titles = {
     'dashboard': '<i class="fa-solid fa-chart-pie" style="color: var(--accent-indigo);"></i> Dashboard de tu Agencia de IA',
@@ -153,7 +168,8 @@ function switchTab(tabName) {
     'whitelabel': '<i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i> Personalización Marca Blanca'
   };
   if (titles[tabName]) {
-    document.getElementById('pageTitle').innerHTML = titles[tabName];
+    const pageTitleElem = document.getElementById('pageTitle');
+    if (pageTitleElem) pageTitleElem.innerHTML = titles[tabName];
   }
 }
 
