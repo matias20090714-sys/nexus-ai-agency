@@ -1137,26 +1137,37 @@
                 </div>
 
                 <!-- Method B: 8-Digit Pairing Code (Phone Number) -->
-                <div id="pairMethodCodeBox" style="width: 100%; display: none; flex-direction: column; gap: 10px; text-align: left; padding: 10px 0;">
-                  <p style="font-size: 12.5px; color: var(--text-muted);">
-                    Si tu cámara no enfoca bien, puedes vincular directamente por número de teléfono:
-                  </p>
-                  <div class="form-group" style="margin-bottom: 8px;">
-                    <label class="form-label" style="font-size: 12px;">Tu Número de WhatsApp (con código de país sin + ni espacios)</label>
-                    <input type="text" id="pairingPhoneInput" class="form-control" placeholder="Ej: 5491148923310 o 5215512345678">
+                <div id="pairMethodCodeBox" style="width: 100%; display: none; flex-direction: column; gap: 12px; text-align: left; padding: 10px 0;">
+                  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+                    <div style="font-weight: 800; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                      <i class="fa-solid fa-circle-info"></i> ¿Cómo funciona la vinculación por código?
+                    </div>
+                    <strong>El código aparecerá aquí mismo en esta pantalla</strong> (WhatsApp no te enviará SMS). Luego lo escribes en tu celular.
                   </div>
-                  <button class="btn btn-emerald" style="width: 100%; font-weight: 800;" onclick="request8DigitPairingCode()">
-                    <i class="fa-solid fa-key"></i> Obtener Código de 8 Dígitos
+
+                  <div class="form-group" style="margin-bottom: 4px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Tu Número de WhatsApp (con código de país sin + ni espacios)</label>
+                    <input type="text" id="pairingPhoneInput" class="form-control" placeholder="Ej: 5491148923310 o 5215512345678" style="font-size: 15px; font-weight: 700; letter-spacing: 0.5px;">
+                  </div>
+
+                  <button class="btn btn-emerald" id="btnGetPairingCode" style="width: 100%; font-weight: 800; padding: 12px;" onclick="request8DigitPairingCode()">
+                    <i class="fa-solid fa-key"></i> Generar Código de 8 Dígitos en Pantalla
                   </button>
 
-                  <div id="pairingCodeDisplayBox" style="display: none; background: #0f172a; border: 2px dashed #25d366; border-radius: 12px; padding: 14px; text-align: center; margin-top: 10px;">
-                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 800;">Tu Código de Vinculación:</div>
-                    <div style="font-size: 28px; font-weight: 900; letter-spacing: 4px; color: #25d366; margin: 6px 0;" id="pairingCodeText">---- ----</div>
-                    <div style="font-size: 11.5px; color: #94a3b8; line-height: 1.4;">
-                      En tu celular: Abre WhatsApp > <strong>Dispositivos Vinculados</strong> > <strong>Vincular con el número de teléfono</strong> e ingresa este código.
+                  <div id="pairingCodeDisplayBox" style="display: none; background: #0b1329; border: 2px solid #25d366; border-radius: 14px; padding: 18px; text-align: center; margin-top: 6px; box-shadow: 0 0 25px rgba(37,211,102,0.2);">
+                    <div style="font-size: 12px; text-transform: uppercase; color: #94a3b8; font-weight: 800; margin-bottom: 4px;">Código para ingresar en tu teléfono:</div>
+                    <div style="font-size: 34px; font-weight: 900; letter-spacing: 6px; color: #25d366; margin: 8px 0; font-family: monospace; background: rgba(37,211,102,0.1); padding: 8px 16px; border-radius: 8px; display: inline-block;" id="pairingCodeText">---- ----</div>
+                    
+                    <div style="text-align: left; background: rgba(15,23,42,0.8); padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 12px; color: white; line-height: 1.6;">
+                      <strong style="color: #34d399; display: block; margin-bottom: 4px;">📱 Pasos para vincularlo en tu celular ahora:</strong>
+                      1. Abre <strong>WhatsApp</strong> en tu teléfono.<br>
+                      2. Ve a <strong>Ajustes</strong> (o 3 puntos arriba) > <strong>Dispositivos vinculados</strong>.<br>
+                      3. Toca <strong>Vincular un dispositivo</strong>.<br>
+                      4. Toca abajo la opción <strong>"Vincular con el número de teléfono"</strong>.<br>
+                      5. Escribe en tu celular el código de 8 letras/números mostrado arriba.
+                    </div>
                   </div>
                 </div>
-              </div>
 
               <!-- Paired Device Active Card -->
               <div class="device-connected-card" id="qrPairedView" style="display: none;">

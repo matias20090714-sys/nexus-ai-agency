@@ -1074,14 +1074,21 @@ function setPairMethod(method) {
 
 async function request8DigitPairingCode() {
   const phoneInput = document.getElementById('pairingPhoneInput');
+  const btn = document.getElementById('btnGetPairingCode');
   const phone = phoneInput ? phoneInput.value.trim() : '';
 
-  if (!phone || phone.length < 8) {
-    showToast('Ingresa un número de WhatsApp válido con código de país', 'error');
+  if (!phone || phone.replace(/\D/g, '').length < 8) {
+    showToast('Ingresa tu número con código de país (Ej: 5491148923310 o 5215512345678)', 'error');
     return;
   }
 
-  showToast('Generando código de 8 dígitos con WhatsApp...', 'info');
+  const origBtnHtml = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando código con WhatsApp...';
+  }
+
+  showToast('Conectando con servidores de WhatsApp...', 'info');
 
   try {
     const sessionId = `agency_${currentAgencyId}`;
@@ -1096,16 +1103,25 @@ async function request8DigitPairingCode() {
       const displayBox = document.getElementById('pairingCodeDisplayBox');
       const textElem = document.getElementById('pairingCodeText');
       if (displayBox && textElem) {
-        textElem.innerText = data.code;
+        // Format with space in middle if 8 characters (e.g. ABCD-1234 or ABCD 1234)
+        const rawCode = data.code.replace(/[^a-zA-Z0-9]/g, '');
+        const formatted = rawCode.length === 8 ? `${rawCode.slice(0, 4)} - ${rawCode.slice(4)}` : data.code;
+        textElem.innerText = formatted;
         displayBox.style.display = 'block';
+        displayBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
-      showToast('¡Código generado! Ingrésalo en WhatsApp > Dispositivos Vinculados', 'success');
+      showToast('¡Código generado con éxito! Ingrésalo en tu celular ahora.', 'success');
       startRealQrListener(sessionId);
     } else {
-      showToast(data.error || 'Error solicitando código', 'error');
+      showToast(data.error || 'Error solicitando código de vinculación', 'error');
     }
   } catch (e) {
     showToast('Error de conexión con el servidor', 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origBtnHtml;
+    }
   }
 }
 
