@@ -1255,7 +1255,6 @@ async function openQrPairModalForClient(clientId) {
         showToast(`🎉 ¡WhatsApp de ${client.name} vinculado con éxito! (+${data.phone})`, 'success');
       } else if (data.qr && container) {
         container.innerHTML = `
-          <div class="qr-scan-line"></div>
           <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" alt="Código QR Real de WhatsApp">
         `;
       }
