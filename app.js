@@ -196,6 +196,8 @@ function switchTab(tabName) {
     'marketing': '<i class="fa-solid fa-wand-magic-sparkles" style="color: #ec4899;"></i> AI Marketing Studio',
     'connections': '<i class="fa-solid fa-plug" style="color: var(--accent-cyan);"></i> APIs & WhatsApp Gateway',
     'whitelabel': '<i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i> Personalización Marca Blanca'
+  };
+
   if (titles[tabName]) {
     const pageTitleElem = document.getElementById('pageTitle');
     if (pageTitleElem) pageTitleElem.innerHTML = titles[tabName];
