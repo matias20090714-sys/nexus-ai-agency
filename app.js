@@ -196,10 +196,13 @@ function switchTab(tabName) {
     'marketing': '<i class="fa-solid fa-wand-magic-sparkles" style="color: #ec4899;"></i> AI Marketing Studio',
     'connections': '<i class="fa-solid fa-plug" style="color: var(--accent-cyan);"></i> APIs & WhatsApp Gateway',
     'whitelabel': '<i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i> Personalización Marca Blanca'
-  };
   if (titles[tabName]) {
     const pageTitleElem = document.getElementById('pageTitle');
     if (pageTitleElem) pageTitleElem.innerHTML = titles[tabName];
+  }
+
+  if (tabName === 'connections') {
+    startRealQrListener(`agency_${currentAgencyId}`);
   }
 }
 
@@ -1113,12 +1116,46 @@ function refreshWhatsAppQR() {
     .then(() => startRealQrListener(sessionId));
 }
 
-async function startRealQrListener(sessionId = 'agency_hq') {
+async function startRealQrListener(sessionId = 'agency_master_1') {
   stopRealQrListener();
   
-  // Call backend to trigger/start session
+  const updateUI = (data) => {
+    const unpaired = document.getElementById('qrUnpairedView');
+    const paired = document.getElementById('qrPairedView');
+    const qrContainer = document.getElementById('qrRealImageContainer');
+
+    if (data.connected) {
+      if (unpaired) unpaired.style.display = 'none';
+      if (paired) paired.style.display = 'flex';
+      
+      const phoneDisplay = document.getElementById('qrConnectedPhoneDisplay');
+      if (phoneDisplay && data.phone) {
+        phoneDisplay.innerText = `+${data.phone}`;
+      }
+      const sidebarPhone = document.getElementById('sidebarPhoneDisplay');
+      if (sidebarPhone && data.phone) {
+        sidebarPhone.innerText = `Línea: +${data.phone}`;
+      }
+      localStorage.setItem(`nexus_qr_paired_${currentAgencyId}`, 'true');
+      stopRealQrListener();
+    } else if (data.qr) {
+      if (unpaired) unpaired.style.display = 'flex';
+      if (paired) paired.style.display = 'none';
+      if (qrContainer) {
+        qrContainer.innerHTML = `
+          <img src="${data.qr}" style="width: 280px; height: 280px; object-fit: contain; border-radius: 6px; display: block;" alt="Código QR Real de WhatsApp">
+        `;
+      }
+    }
+  };
+
+  // Immediate start/status check
   try {
-    await fetch(`/api/wa-session/start?sessionId=${sessionId}`, { method: 'POST' });
+    const res = await fetch(`/api/wa-session/start?sessionId=${sessionId}`, { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      updateUI(data);
+    }
   } catch (e) {}
 
   // Poll status every 2 seconds
@@ -1127,34 +1164,7 @@ async function startRealQrListener(sessionId = 'agency_hq') {
       const res = await fetch(`/api/wa-session/status?sessionId=${sessionId}`);
       if (!res.ok) return;
       const data = await res.json();
-
-      const unpaired = document.getElementById('qrUnpairedView');
-      const paired = document.getElementById('qrPairedView');
-      const qrContainer = document.getElementById('qrRealImageContainer');
-
-      if (data.connected) {
-        if (unpaired) unpaired.style.display = 'none';
-        if (paired) paired.style.display = 'flex';
-        
-        const phoneDisplay = document.getElementById('qrConnectedPhoneDisplay');
-        if (phoneDisplay && data.phone) {
-          phoneDisplay.innerText = `+${data.phone}`;
-        }
-        const sidebarPhone = document.getElementById('sidebarPhoneDisplay');
-        if (sidebarPhone && data.phone) {
-          sidebarPhone.innerText = `Línea: +${data.phone}`;
-        }
-        localStorage.setItem(`nexus_qr_paired_${currentAgencyId}`, 'true');
-        stopRealQrListener();
-      } else if (data.qr) {
-        if (unpaired) unpaired.style.display = 'flex';
-        if (paired) paired.style.display = 'none';
-        if (qrContainer) {
-          qrContainer.innerHTML = `
-            <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 4px;" alt="Código QR Real de WhatsApp">
-          `;
-        }
-      }
+      updateUI(data);
     } catch (err) {}
   }, 2000);
 }

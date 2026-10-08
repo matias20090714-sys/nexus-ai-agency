@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const QRCode = require('qrcode');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 
 const PORT = 5180;
@@ -27,7 +27,7 @@ if (!fs.existsSync(SESSIONS_DIR)) {
 }
 
 // WhatsApp Multi-Device Session Initializer (Baileys)
-async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingCode = null) {
+async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPairingCode = null) {
   if (activeSessions[sessionId] && activeSessions[sessionId].sock) {
     if (phoneForPairingCode && !activeSessions[sessionId].connected) {
       try {
@@ -36,7 +36,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingC
         activeSessions[sessionId].pairingCode = code;
         return activeSessions[sessionId];
       } catch (e) {
-        console.error('Error pidiendo pairing code en sesion existente:', e);
+        console.error(`[Baileys - ${sessionId}] Error solicitando pairing code en sesión activa:`, e.message);
       }
     }
     return activeSessions[sessionId];
@@ -48,8 +48,19 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingC
   }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
+  
+  // Get latest WhatsApp Web version to prevent 408/401 rejections
+  let waVersion = [2, 3000, 1043857760];
+  try {
+    const versionData = await fetchLatestBaileysVersion();
+    if (versionData && versionData.version) {
+      waVersion = versionData.version;
+    }
+  } catch (err) {
+    console.log(`[Baileys - ${sessionId}] Usando versión WA fallback.`);
+  }
 
-  const sessionData = {
+  const sessionData = activeSessions[sessionId] || {
     sock: null,
     qr: null,
     qrImage: null,
@@ -62,13 +73,16 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingC
   activeSessions[sessionId] = sessionData;
 
   const sock = makeWASocket({
+    version: waVersion,
     auth: state,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: Browsers.ubuntu('Chrome'),
+    browser: Browsers.windows('Desktop'),
+    syncFullHistory: false,
+    generateHighQualityLinkPreview: false,
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 25000,
+    keepAliveIntervalMs: 30000,
     emitOwnEvents: true
   });
   sessionData.sock = sock;
@@ -82,17 +96,16 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingC
       sessionData.qr = qr;
       sessionData.status = 'qr_ready';
       try {
-        // High contrast, standard pure black/white QR code for perfect mobile camera reading
         sessionData.qrImage = await QRCode.toDataURL(qr, {
-          width: 320,
-          margin: 3,
+          width: 360,
+          margin: 2,
           errorCorrectionLevel: 'M',
           color: {
             dark: '#000000',
             light: '#ffffff'
           }
         });
-        console.log(`[Baileys - ${sessionId}] ⚡ Código QR de WhatsApp Web 100% oficial generado.`);
+        console.log(`[Baileys - ${sessionId}] ⚡ Código QR de WhatsApp Web Oficial generado (Listo para escanear).`);
       } catch (err) {
         console.error('Error generando QR Image:', err);
       }
@@ -108,9 +121,9 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingC
       const userJid = sock.user ? sock.user.id : '';
       const cleanPhone = userJid.split(':')[0] || userJid.split('@')[0];
       sessionData.phone = cleanPhone;
-      sessionData.userName = (sock.user && sock.user.name) || 'Empresa Vinculada';
+      sessionData.userName = (sock.user && sock.user.name) || 'WhatsApp Empresa';
       
-      console.log(`[Baileys - ${sessionId}] 🎉 ¡WhatsApp Real Vinculado con éxito! Número: +${cleanPhone}`);
+      console.log(`[Baileys - ${sessionId}] 🎉 ¡WhatsApp Real Vinculado con éxito! Línea: +${cleanPhone}`);
     }
 
     if (connection === 'close') {
@@ -119,11 +132,11 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingC
       sessionData.connected = false;
       sessionData.status = shouldReconnect ? 'reconnecting' : 'logged_out';
 
-      console.log(`[Baileys - ${sessionId}] Conexión cerrada (${statusCode}). Reconectando: ${shouldReconnect}`);
+      console.log(`[Baileys - ${sessionId}] Conexión cerrada (${statusCode || 'unknown'}). Reconectando: ${shouldReconnect}`);
 
       if (shouldReconnect) {
-        activeSessions[sessionId].sock = null;
-        setTimeout(() => getOrInitBaileysSession(sessionId), 3000);
+        if (activeSessions[sessionId]) activeSessions[sessionId].sock = null;
+        setTimeout(() => getOrInitBaileysSession(sessionId), 2000);
       } else {
         try {
           fs.rmSync(sessionFolder, { recursive: true, force: true });
@@ -147,18 +160,17 @@ async function getOrInitBaileysSession(sessionId = 'agency_hq', phoneForPairingC
     }
   });
 
-  // If pairing code requested upon start
   if (phoneForPairingCode) {
     setTimeout(async () => {
       try {
         const clean = phoneForPairingCode.replace(/\D/g, '');
         const code = await sock.requestPairingCode(clean);
         sessionData.pairingCode = code;
-        console.log(`[Baileys - ${sessionId}] 🔢 Código de vinculación generado para +${clean}: ${code}`);
+        console.log(`[Baileys - ${sessionId}] 🔢 Código 8-dígitos generado para +${clean}: ${code}`);
       } catch (e) {
-        console.error('Error pidiendo pairing code:', e);
+        console.error(`[Baileys - ${sessionId}] Error solicitando pairing code:`, e.message);
       }
-    }, 2000);
+    }, 1500);
   }
 
   return sessionData;
@@ -426,10 +438,14 @@ const server = http.createServer((req, res) => {
   });
 });
 
-// Auto-initialize Default HQ Baileys Session on Start
+// Auto-initialize Default Agency Baileys Sessions on Start
+getOrInitBaileysSession('agency_master_1')
+  .then(() => console.log('🟢 Motor Baileys WhatsApp Multi-Device (agency_master_1) listo para generar códigos QR reales.'))
+  .catch(err => console.error('Error iniciando Baileys agency_master_1:', err));
+
 getOrInitBaileysSession('agency_hq')
-  .then(() => console.log('🟢 Motor Baileys WhatsApp Multi-Device listo para generar códigos QR reales.'))
-  .catch(err => console.error('Error iniciando Baileys:', err));
+  .then(() => console.log('🟢 Motor Baileys WhatsApp Multi-Device (agency_hq) listo.'))
+  .catch(err => console.error('Error iniciando Baileys agency_hq:', err));
 
 server.listen(PORT, () => {
   console.log(`NEXUS AI Agency Server running at http://localhost:${PORT}/`);
