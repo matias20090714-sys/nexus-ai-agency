@@ -27,7 +27,21 @@ if (!fs.existsSync(SESSIONS_DIR)) {
 }
 
 // WhatsApp Multi-Device Session Initializer (Baileys)
-async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPairingCode = null) {
+async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPairingCode = null, forceNew = false) {
+  const sessionFolder = path.join(SESSIONS_DIR, sessionId);
+  if (!fs.existsSync(sessionFolder)) {
+    fs.mkdirSync(sessionFolder, { recursive: true });
+  }
+
+  if (forceNew) {
+    if (activeSessions[sessionId]?.sock) {
+      try { activeSessions[sessionId].sock.end(); } catch (e) {}
+    }
+    try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) {}
+    fs.mkdirSync(sessionFolder, { recursive: true });
+    delete activeSessions[sessionId];
+  }
+
   if (activeSessions[sessionId] && activeSessions[sessionId].sock) {
     if (phoneForPairingCode && !activeSessions[sessionId].connected) {
       try {
@@ -40,11 +54,6 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
       }
     }
     return activeSessions[sessionId];
-  }
-
-  const sessionFolder = path.join(SESSIONS_DIR, sessionId);
-  if (!fs.existsSync(sessionFolder)) {
-    fs.mkdirSync(sessionFolder, { recursive: true });
   }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
@@ -128,21 +137,26 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
 
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      const wasConnected = sessionData.connected;
       sessionData.connected = false;
-      sessionData.status = shouldReconnect ? 'reconnecting' : 'logged_out';
 
-      console.log(`[Baileys - ${sessionId}] Conexión cerrada (${statusCode || 'unknown'}). Reconectando: ${shouldReconnect}`);
+      console.log(`[Baileys - ${sessionId}] Conexión cerrada (${statusCode || 'unknown'}).`);
 
-      if (shouldReconnect) {
-        if (activeSessions[sessionId]) activeSessions[sessionId].sock = null;
-        setTimeout(() => getOrInitBaileysSession(sessionId), 2000);
-      } else {
-        try {
-          fs.rmSync(sessionFolder, { recursive: true, force: true });
-        } catch (e) {}
-        delete activeSessions[sessionId];
+      if (activeSessions[sessionId]) {
+        activeSessions[sessionId].sock = null;
       }
+
+      if (statusCode === DisconnectReason.loggedOut) {
+        sessionData.status = 'logged_out';
+        try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) {}
+      } else {
+        sessionData.status = 'reconnecting';
+      }
+
+      // Automatically re-initialize to keep QR or pairing code always alive and ready
+      setTimeout(() => {
+        getOrInitBaileysSession(sessionId).catch(e => console.error('Error reiniciando sesión Baileys:', e.message));
+      }, 2000);
     }
   });
 
@@ -270,27 +284,46 @@ const server = http.createServer((req, res) => {
     req.on('end', async () => {
       try {
         const data = JSON.parse(body);
-        const sessionId = data.sessionId || 'agency_hq';
+        const sessionId = data.sessionId || 'agency_master_1';
         const phone = data.phone;
 
         if (!phone) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'Falta número de teléfono' }));
+          res.end(JSON.stringify({ success: false, error: 'Falta ingresar el número de teléfono' }));
           return;
         }
 
-        const session = await getOrInitBaileysSession(sessionId);
         const clean = phone.replace(/\D/g, '');
-        const code = await session.sock.requestPairingCode(clean);
-        session.pairingCode = code;
+        if (clean.length < 8) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Número de teléfono inválido' }));
+          return;
+        }
 
-        console.log(`[Baileys - ${sessionId}] 🔢 Código 8-dígitos: ${code}`);
+        let session = await getOrInitBaileysSession(sessionId);
+        let code;
+        try {
+          if (!session.sock) {
+            session = await getOrInitBaileysSession(sessionId, null, true);
+            await new Promise(r => setTimeout(r, 1200));
+          }
+          code = await session.sock.requestPairingCode(clean);
+        } catch (sockErr) {
+          console.log(`[Baileys - ${sessionId}] Reintentando generación de código con socket limpio...`);
+          session = await getOrInitBaileysSession(sessionId, null, true);
+          await new Promise(r => setTimeout(r, 1500));
+          code = await session.sock.requestPairingCode(clean);
+        }
+
+        session.pairingCode = code;
+        console.log(`[Baileys - ${sessionId}] 🔢 Código 8-dígitos generado con éxito: ${code}`);
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, code }));
       } catch (err) {
+        console.error('Error generando pairing code:', err.message);
         res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: err.message }));
+        res.end(JSON.stringify({ success: false, error: `Error conectando con WhatsApp: ${err.message}` }));
       }
     });
     return;
