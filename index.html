@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS AI - Sistema Operativo de Agencia de Inteligencia Artificial</title>
+  <meta name="description" content="Plataforma Marca Blanca para vender y gestionar soluciones de IA, Agentes de WhatsApp y automatizaciones para empresas.">
+  
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="sidebar">
+      <div class="brand-header">
+        <div class="brand-icon-wrapper">
+          <i class="fa-solid fa-brain" style="color: white;"></i>
+        </div>
+        <div>
+          <div class="brand-title" id="sidebarBrandName">NEXUS AI</div>
+          <span class="brand-badge">Agency OS Pro</span>
+        </div>
+      </div>
+
+      <!-- Sub-Account / Client Selector -->
+      <div class="tenant-selector-box">
+        <div class="tenant-label">
+          <span><i class="fa-solid fa-building-user"></i> Sub-Cuenta Activa</span>
+          <span style="color: var(--accent-cyan); cursor: pointer;" onclick="openNewClientModal()" title="Agregar nueva empresa cliente"><i class="fa-solid fa-plus"></i></span>
+        </div>
+        <select class="tenant-select" id="tenantSelector" onchange="switchClientAccount(this.value)">
+          <option value="agency_hq">🏢 Mi Agencia (Vista Global HQ)</option>
+          <!-- Dynamically populated with real clients -->
+        </select>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-menu">
+        <div class="nav-section-title">Tu Agencia de IA</div>
+        <a class="nav-item active" onclick="switchTab('dashboard')">
+          <span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span>
+          <span>Dashboard & MRR</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('agency-portal')">
+          <span class="nav-icon"><i class="fa-solid fa-globe"></i></span>
+          <span>Mi Web Comercial de Agencia</span>
+          <span class="nav-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">Pública</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('reactivation')">
+          <span class="nav-icon"><i class="fa-solid fa-fire"></i></span>
+          <span>Reactivador de Clientes (Oferta Irresistible)</span>
+          <span class="nav-badge" style="background: rgba(245,158,11,0.2); color: #fbbf24;">Top Venta</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('clients')">
+          <span class="nav-icon"><i class="fa-solid fa-users-gear"></i></span>
+          <span>Empresas & Sub-Cuentas</span>
+          <span class="nav-badge" id="clientsCountBadge">0</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('agents-builder')">
+          <span class="nav-icon"><i class="fa-solid fa-robot"></i></span>
+          <span>Agentes & Base de Conocimiento</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('inbox')">
+          <span class="nav-icon"><i class="fa-brands fa-whatsapp"></i></span>
+          <span>Bandeja WhatsApp Real</span>
+          <span class="nav-badge" id="liveMessagesBadge" style="background: rgba(16,185,129,0.2); color: #34d399;">Live</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('pipeline')">
+          <span class="nav-icon"><i class="fa-solid fa-bars-progress"></i></span>
+          <span>Pipeline & Leads Reales</span>
+        </a>
+
+        <div class="nav-section-title">Herramientas de Cierre & Venta</div>
+        <a class="nav-item" onclick="switchTab('playbook')">
+          <span class="nav-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+          <span>Manual de Ventas & Cierre B2B</span>
+          <span class="nav-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">Guía Paso a Paso</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('prospecting')">
+          <span class="nav-icon"><i class="fa-solid fa-crosshairs"></i></span>
+          <span>Prospección B2B & Demos</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('marketing')">
+          <span class="nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+          <span>AI Marketing Studio</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('connections')">
+          <span class="nav-icon"><i class="fa-solid fa-plug"></i></span>
+          <span>APIs & WhatsApp Gateway</span>
+          <span class="nav-badge" id="apiStatusBadge" style="background: rgba(16,185,129,0.2); color: #34d399;">Conectada</span>
+        </a>
+        <a class="nav-item" onclick="switchTab('whitelabel')">
+          <span class="nav-icon"><i class="fa-solid fa-gem"></i></span>
+          <span>Personalización Marca Blanca</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Status -->
+      <div class="sidebar-footer">
+        <div class="wa-status-card">
+          <div class="status-dot-pulse"></div>
+          <div>
+            <div class="wa-status-text">Meta WhatsApp Cloud API</div>
+            <div class="wa-status-sub" id="sidebarPhoneDisplay">Phone ID: 1342311562300304</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN APP WRAPPER -->
+    <main class="main-wrapper">
+      
+      <!-- Top Bar Header -->
+      <header class="top-header">
+        <div class="header-left">
+          <h1 class="page-title" id="pageTitle">
+            <i class="fa-solid fa-chart-pie" style="color: var(--accent-indigo);"></i>
+            <span>Dashboard de tu Agencia de IA</span>
+          </h1>
+        </div>
+        <div class="header-actions">
+          <!-- Active Agency Account Badge & Switcher -->
+          <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: white;" id="topAgencyAvatar">
+              N
+            </div>
+            <div>
+              <div style="font-size: 12.5px; font-weight: 800; color: white;" id="topAgencyName">Mi Agencia de IA</div>
+              <div style="font-size: 10.5px; color: #34d399;" id="topAgencyId">ID: #AG-PRINCIPAL</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="openSwitchAgencyModal()" style="margin-left: 8px; padding: 4px 8px; font-size: 11px;">
+              <i class="fa-solid fa-repeat"></i> Cambiar Agencia
+            </button>
+          </div>
+
+          <button class="btn btn-primary btn-sm" onclick="openNewAgencyWorkspaceModal()">
+            <i class="fa-solid fa-plus"></i> Nueva Agencia
+          </button>
+          <button class="btn btn-emerald btn-sm" onclick="openSendRealWaModal()">
+            <i class="fa-brands fa-whatsapp"></i> WhatsApp Real
+          </button>
+        </div>
+      </header>
+
+      <!-- CONTENT BODY -->
+      <div class="content-body">
+
+        <!-- ==================== TAB 1: DASHBOARD REAL DE LA AGENCIA ==================== -->
+        <div id="tab-dashboard" class="tab-view active">
+          <!-- Real Agency Metrics -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                <i class="fa-solid fa-building-user"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="dashTotalClients">0</div>
+                <div class="stat-label">Empresas Clientes Activas</div>
+                <div class="stat-growth" style="color: var(--accent-cyan);">Subcuentas en tu agencia</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <i class="fa-solid fa-dollar-sign"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="dashTotalMRR">$0 USD</div>
+                <div class="stat-label">Ingresos Mensuales Recurrentes (MRR)</div>
+                <div class="stat-growth"><i class="fa-solid fa-arrow-up"></i> Facturación de suscripciones</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee;">
+                <i class="fa-brands fa-whatsapp"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="dashTotalMessages">0</div>
+                <div class="stat-label">Mensajes de WhatsApp Procesados</div>
+                <div class="stat-growth" style="color: #60a5fa;">Conexión Meta Cloud API activa</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                <i class="fa-solid fa-robot"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="dashTotalAgents">0</div>
+                <div class="stat-label">Agentes de IA Desplegados</div>
+                <div class="stat-growth" style="color: #34d399;">Atendiendo 24/7 sin parar</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Action Banner & Clients Overview -->
+          <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.12) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-xl); padding: 26px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div style="font-size: 18px; font-weight: 800; color: white; margin-bottom: 6px;">
+                🚀 Tu Sistema Operativo de Agencia está 100% Listo para Operar
+              </div>
+              <div style="font-size: 13.5px; color: #cbd5e1; max-width: 650px; line-height: 1.5;">
+                Registra a tus empresas clientes, asígnales un agente con sus reglas de negocio y precios, y conéctales su WhatsApp para empezar a cobrar suscripciones mensuales de $290 a $990 USD.
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="openNewClientModal()">
+              <i class="fa-solid fa-plus"></i> Registrar Primer Cliente
+            </button>
+          </div>
+
+          <!-- Active Clients Table / Empty State -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-solid fa-users" style="color: var(--accent-indigo);"></i>
+                <span>Empresas Administradas por tu Agencia</span>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="switchTab('clients')">Ver Todas</button>
+            </div>
+            <div id="dashboardClientsList">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB: WEB COMERCIAL & PORTAL DE SERVICIOS DE LA AGENCIA ==================== -->
+        <div id="tab-agency-portal" class="tab-view">
+          
+          <!-- Public Agency Preview Bar -->
+          <div style="background: rgba(13, 16, 33, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px 22px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="brand-badge" style="background: rgba(16,185,129,0.2); color:#34d399;">Página Web Activa</span>
+              <span style="font-size: 13px; color: var(--text-muted);">Esta es la página comercial que tus compradores le muestran a sus empresas clientes:</span>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn btn-secondary btn-sm" onclick="switchTab('whitelabel')">
+                <i class="fa-solid fa-paintbrush"></i> Editar Colores y Precios
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="openPublicShareModal()">
+                <i class="fa-solid fa-share-nodes"></i> Compartir Enlace con Cliente
+              </button>
+            </div>
+          </div>
+
+          <!-- The Beautiful Agency Landing Page Structure -->
+          <div style="background: radial-gradient(circle at top center, rgba(99, 102, 241, 0.15) 0%, rgba(8, 9, 17, 0.95) 70%); border: 1px solid var(--border-glow); border-radius: var(--radius-xl); padding: 48px 36px; box-shadow: var(--shadow-glow);">
+            
+            <!-- Hero Section -->
+            <div style="text-align: center; max-width: 800px; margin: 0 auto 54px auto;">
+              <div class="brand-badge" style="margin-bottom: 16px; font-size: 12px; padding: 6px 16px;">
+                ✨ Soluciones de Inteligencia Artificial para Empresas
+              </div>
+              <h1 style="font-size: 38px; font-weight: 900; line-height: 1.2; margin-bottom: 18px; letter-spacing: -1px; background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;" id="portalHeroTitle">
+                Duplica las Ventas y Automatiza la Atención de tu Negocio con IA 24/7
+              </h1>
+              <p style="font-size: 16px; color: var(--text-muted); line-height: 1.6; margin-bottom: 28px;">
+                En <strong style="color: white;" id="portalAgencyName">NEXUS AI Agency</strong> implementamos Agentes Inteligentes autónomos en WhatsApp, Instagram y Web que responden en 2 segundos, califican prospectos y agendan citas en tu calendario.
+              </p>
+              <div style="display: flex; justify-content: center; gap: 14px;">
+                <button class="btn btn-primary" onclick="openContactDemoModal()">
+                  <i class="fa-solid fa-calendar-check"></i> Agendar Diagnóstico Gratuito
+                </button>
+                <button class="btn btn-secondary" onclick="switchTab('inbox')">
+                  <i class="fa-brands fa-whatsapp"></i> Probar Asistente en WhatsApp
+                </button>
+              </div>
+            </div>
+
+            <!-- 4 Core Services Grid -->
+            <div style="margin-bottom: 54px;">
+              <div style="text-align: center; margin-bottom: 32px;">
+                <h2 style="font-size: 24px; font-weight: 800; color: white;">Nuestros 4 Servicios de Inteligencia Artificial</h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Soluciones llave en mano listas para implementar en tu empresa en menos de 72 horas.</p>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
+                <!-- Service 1 -->
+                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(37, 211, 102, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #25d366; margin-bottom: 16px;">
+                    <i class="fa-brands fa-whatsapp"></i>
+                  </div>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">1. Agentes de WhatsApp 24/7</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">Atención inmediata en menos de 2 segundos. Resuelve preguntas frecuentes, dudas de stock, precios y horarios sin intervención de tu personal.</p>
+                </div>
+
+                <!-- Service 2 -->
+                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #818cf8; margin-bottom: 16px;">
+                    <i class="fa-regular fa-calendar-check"></i>
+                  </div>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">2. Agendamiento Automático de Citas</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">La IA sincroniza turnos en tiempo real con Google Calendar o tu CRM y envía recordatorios automáticos reduciendo las faltas a 0%.</p>
+                </div>
+
+                <!-- Service 3 -->
+                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(6, 182, 212, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #22d3ee; margin-bottom: 16px;">
+                    <i class="fa-solid fa-bullseye"></i>
+                  </div>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">3. Calificación & Scoring de Leads</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">Filtra a los curiosos y detecta qué prospectos tienen el presupuesto y la intención lista para comprar, derivándolos a tu equipo de ventas.</p>
+                </div>
+
+                <!-- Service 4 -->
+                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(236, 72, 153, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #f472b6; margin-bottom: 16px;">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  </div>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">4. Automatización de Marketing</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">Redacción de copies publicitarios para anuncios, mensajes masivos de WhatsApp y respuestas automáticas a reseñas de Google Maps.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Pricing Packages -->
+            <div style="margin-bottom: 40px;">
+              <div style="text-align: center; margin-bottom: 32px;">
+                <h2 style="font-size: 24px; font-weight: 800; color: white;">Planes de Suscripción para Empresas</h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Sin contratos de permanencia. Mantenimiento, servidor y actualizaciones continuas de IA incluidas.</p>
+              </div>
+
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 950px; margin: 0 auto;">
+                
+                <!-- Plan Starter -->
+                <div style="background: rgba(10, 13, 28, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 28px; display: flex; flex-direction: column;">
+                  <span class="agent-category">Ideal Negocios Locales</span>
+                  <div style="font-size: 20px; font-weight: 800; color: white; margin: 4px 0 12px 0;">Plan Starter IA</div>
+                  <div style="font-size: 36px; font-weight: 900; color: white; margin-bottom: 16px;" id="portalPriceStarter">$290 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
+                  
+                  <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #cbd5e1; margin-bottom: 24px; flex: 1;">
+                    <div>✅ 1 Agente de WhatsApp 24/7 entrenado a medida</div>
+                    <div>✅ Respuestas a consultas y precios instantáneos</div>
+                    <div>✅ Base de conocimiento con hasta 50 preguntas frecuentes</div>
+                    <div>✅ Soporte técnico y servidor incluido</div>
+                  </div>
+                  <button class="btn btn-secondary" onclick="openContactDemoModal('Plan Starter')">Contratar Plan Starter</button>
+                </div>
+
+                <!-- Plan Pro (Featured) -->
+                <div style="background: linear-gradient(180deg, rgba(30, 35, 75, 0.9) 0%, rgba(15, 20, 42, 0.9) 100%); border: 2px solid var(--accent-indigo); border-radius: var(--radius-lg); padding: 28px; display: flex; flex-direction: column; position: relative; box-shadow: var(--shadow-glow);">
+                  <div style="position: absolute; top: -12px; right: 20px; background: var(--gradient-primary); color: white; font-size: 11px; font-weight: 800; padding: 3px 12px; border-radius: var(--radius-full);">MÁS POPULAR</div>
+                  <span class="agent-category" style="color: #a5b4fc;">Clínicas & Empresas en Crecimiento</span>
+                  <div style="font-size: 20px; font-weight: 800; color: white; margin: 4px 0 12px 0;">Plan Growth Pro</div>
+                  <div style="font-size: 36px; font-weight: 900; color: #34d399; margin-bottom: 16px;" id="portalPricePro">$690 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
+                  
+                  <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #f1f5f9; margin-bottom: 24px; flex: 1;">
+                    <div>✅ Todo lo del Plan Starter</div>
+                    <div>✅ <strong>Agendamiento Automático en Google Calendar</strong></div>
+                    <div>✅ <strong>Calificación Inteligente de Leads y CRM</strong></div>
+                    <div>✅ Recordatorios anti-ausentismo por WhatsApp</div>
+                    <div>✅ Generador de Anuncios y Marketing Studio</div>
+                  </div>
+                  <button class="btn btn-primary" onclick="openContactDemoModal('Plan Growth Pro')">Contratar Plan Growth Pro</button>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ==================== TAB: REACTIVADOR DE BASE DE DATOS & SERVICIOS IRRESISTIBLES ==================== -->
+        <div id="tab-reactivation" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-fire" style="color: #f59e0b;"></i>
+                  <span>Servicio Estrella: Reactivador de Base de Datos & Clientes Antiguos</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  El servicio más fácil de vender a cualquier negocio: generar ventas inmediatas reactivando contactos antiguos que ya tienen guardados en su WhatsApp.
+                </div>
+              </div>
+              <span class="brand-badge" style="background: rgba(245,158,11,0.2); color: #fbbf24;">Oferta Irresistible (High-Ticket)</span>
+            </div>
+
+            <!-- Pitch Banner: Why this is irresistible -->
+            <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(239, 68, 68, 0.12) 100%); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <strong style="color: white; font-size: 15px; display: block; margin-bottom: 4px;">
+                  💡 La Propuesta que Ningún Dueño de Negocio Puede Rechazar:
+                </strong>
+                <p style="font-size: 13px; color: #fed7aa; max-width: 750px; line-height: 1.5; margin: 0;">
+                  <em>"No tienes que invertir en anuncios. Danos la lista de personas que te consultaron o compraron en el último año y nuestra IA les escribirá por WhatsApp con una oferta relámpago personalizada. Te generamos dinero en 48 horas sin costo inicial de riesgo."</em>
+                </p>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              <!-- Reactivation Campaign Engine -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  <i class="fa-solid fa-bolt" style="color: #fbbf24;"></i> 1. Diseñador de Campaña de Reactivación Relámpago
+                </strong>
+
+                <div class="form-group">
+                  <label class="form-label">Nombre del Negocio Cliente</label>
+                  <input type="text" id="reactBizName" class="form-control" placeholder="Ej: Clínica Dental San Lucas">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Motivo u Oferta Irresistible para Reactivar</label>
+                  <input type="text" id="reactOffer" class="form-control" placeholder="Ej: Voucher de $50 USD de regalo exclusivo para clientes antiguos solo esta semana">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Cantidad de Contactos Antiguos a Reactivar</label>
+                  <input type="number" id="reactContactsCount" class="form-control" value="500" placeholder="500">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Ticket Promedio del Negocio ($ USD)</label>
+                  <input type="number" id="reactAvgTicket" class="form-control" value="80" placeholder="80">
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="calculateAndGenerateReactivation()">
+                  <i class="fa-solid fa-calculator"></i> Calcular Ganancia Estimada & Generar Guión IA
+                </button>
+              </div>
+
+              <!-- Output & Revenue Projection Box -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px; display: flex; flex-direction: column;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  <i class="fa-solid fa-chart-line" style="color: #34d399;"></i> 2. Dinero Oculto que le Generas al Cliente
+                </strong>
+
+                <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 18px; text-align: center; margin-bottom: 16px;">
+                  <div style="font-size: 12px; text-transform: uppercase; font-weight: 800; color: #6ee7b7;">Ventas Proyectadas en 48 Horas con IA</div>
+                  <div style="font-size: 32px; font-weight: 900; color: #34d399;" id="reactProjectedRevenue">$3,200 USD</div>
+                  <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Estimando una tasa de respuesta y compra del 8% al 12%</div>
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; flex: 1;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 12.5px; font-weight: 700; color: #a5b4fc;">Guión de WhatsApp Anti-Spam</span>
+                    <button class="btn btn-secondary btn-sm" onclick="copyReactivationScript()">
+                      <i class="fa-regular fa-copy"></i> Copiar
+                    </button>
+                  </div>
+                  <pre class="output-code" id="reactScriptBox" style="font-size: 12px; max-height: 140px; overflow-y: auto;">Haz clic en 'Calcular Ganancia Estimada' para redactar el mensaje de reactivación.</pre>
+                </div>
+
+                <button class="btn btn-emerald" style="width: 100%; margin-top: 14px;" onclick="downloadReactivationProposal()">
+                  <i class="fa-solid fa-file-pdf"></i> Descargar Propuesta "Cero Riesgo" en PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 2: GESTIÓN DE CLIENTES & SUBCUENTAS ==================== -->
+        <div id="tab-clients" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-users-gear" style="color: var(--accent-cyan);"></i>
+                  <span>Empresas & Sub-Cuentas de Clientes</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Crea y administra los entornos individuales para cada empresa a la que le vendes la solución de IA.
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="openNewClientModal()">
+                <i class="fa-solid fa-plus"></i> Crear Sub-Cuenta de Empresa
+              </button>
+            </div>
+
+            <div id="clientsCardsContainer">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 3: AGENTES & BASE DE CONOCIMIENTO ==================== -->
+        <div id="tab-agents-builder" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-robot" style="color: var(--accent-indigo);"></i>
+                  <span>Configuración del Agente & Base de Conocimiento Real</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Define el comportamiento, reglas de venta, horarios y lista de precios para la empresa activa.
+                </div>
+              </div>
+              <button class="btn btn-primary" onclick="saveActiveAgentConfig()">
+                <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios del Agente
+              </button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              <!-- Left: System Prompt & Personality -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <div class="form-group">
+                  <label class="form-label">Plantilla de Industria (Cargar base)</label>
+                  <select id="blueprintSelector" class="form-control" onchange="loadBlueprintPrompt(this.value)">
+                    <option value="">-- Seleccionar Plantilla de Rubro --</option>
+                    <option value="salud_clinicas">🏥 Salud & Clínicas Odontológicas</option>
+                    <option value="inmobiliarias">🏢 Bienes Raíces & Inmobiliarias</option>
+                    <option value="belleza_barberias">✂️ Belleza & Barberías</option>
+                    <option value="gastronomia">🍽️ Restaurantes & Gastronomía</option>
+                    <option value="servicios_b2b">⚖️ Empresas & Servicios B2B</option>
+                    <option value="ecommerce_retail">🛍️ E-Commerce & Retail</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Nombre del Asistente Virtual</label>
+                  <input type="text" id="agentEditorName" class="form-control" placeholder="Ej: Sofía - Asistente Oficial">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Prompt de Sistema (Instrucciones de la IA)</label>
+                  <textarea id="agentEditorPrompt" class="form-control" rows="8" placeholder="Escribe aquí las instrucciones exactas de cómo debe atender, qué tono utilizar y qué preguntas hacer para calificar y cerrar la venta..."></textarea>
+                </div>
+              </div>
+
+              <!-- Right: Knowledge Base & Services / Prices -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <div class="form-group">
+                  <label class="form-label">Base de Conocimiento (Servicios, Precios & Horarios)</label>
+                  <textarea id="agentEditorKnowledge" class="form-control" rows="8" placeholder="Ingresa los datos del negocio:&#10;- Horarios de atención: Lun a Sáb de 09:00 a 20:00&#10;- Servicios y Precios:&#10;  * Consulta general: $30 USD&#10;  * Tratamiento completo: $150 USD&#10;- Dirección: Av. Principal 123&#10;- Políticas de reserva: Se solicita 10 min de anticipación"></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Objetivo Principal del Agente</label>
+                  <select id="agentEditorGoal" class="form-control">
+                    <option value="appointments">📅 Agendar Cita o Reserva en Calendario</option>
+                    <option value="sales">💰 Calificar Lead y Cerrar Venta</option>
+                    <option value="support">❓ Soporte y Preguntas Frecuentes</option>
+                    <option value="custom">⚡ Diagnóstico Personalizado</option>
+                  </select>
+                </div>
+
+                <button class="btn btn-emerald" style="width: 100%; margin-top: 10px;" onclick="testAgentLiveDialog()">
+                  <i class="fa-solid fa-play"></i> Probar Diálogo del Agente con Gemini IA
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 4: BANDEJA WHATSAPP REAL ==================== -->
+        <div id="tab-inbox" class="tab-view">
+          <div class="chat-workspace">
+            <!-- Left: Real Conversations List -->
+            <div class="chat-contacts-col">
+              <div class="contacts-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <strong style="font-size: 14px; color: white;"><i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Mensajes Reales</strong>
+                  <span class="brand-badge" id="realInboxBadge">0 Chats</span>
+                </div>
+              </div>
+              <div class="contacts-list" id="realContactsList">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- Center: WhatsApp Chat View -->
+            <div class="chat-conversation-col">
+              <div class="conversation-header">
+                <div class="conversation-user-details">
+                  <div class="contact-avatar" id="activeInboxAvatar" style="background: var(--gradient-primary);">--</div>
+                  <div>
+                    <div style="font-size: 15px; font-weight: 800; color: white;" id="activeInboxName">Selecciona una conversación</div>
+                    <div style="font-size: 12px; color: #34d399;" id="activeInboxSubtitle">
+                      WhatsApp Gateway Conectado
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <button class="btn btn-emerald btn-sm" onclick="openSendRealWaModal()">
+                    <i class="fa-brands fa-whatsapp"></i> Enviar Mensaje Real
+                  </button>
+                </div>
+              </div>
+
+              <!-- Messages Stream -->
+              <div class="messages-container" id="realMessagesContainer">
+                <div style="text-align: center; margin: auto; padding: 40px 20px; color: var(--text-dim);">
+                  <i class="fa-brands fa-whatsapp" style="font-size: 48px; color: rgba(255,255,255,0.1); margin-bottom: 14px; display: block;"></i>
+                  <strong style="color: white; font-size: 15px; display: block; margin-bottom: 6px;">Bandeja en Tiempo Real</strong>
+                  <p style="font-size: 13px; max-width: 400px; margin: 0 auto;">Cuando un cliente escriba a tu número de WhatsApp o envíes un mensaje real, aparecerá aquí automáticamente con el historial completo.</p>
+                </div>
+              </div>
+
+              <!-- Input bar for real replies -->
+              <div class="chat-input-bar">
+                <input type="text" id="realChatInput" class="chat-input-field" placeholder="Escribe un mensaje para responder por WhatsApp real al cliente..." onkeydown="handleRealChatKey(event)">
+                <button class="btn btn-primary btn-sm" onclick="sendRealReplyFromInbox()">
+                  <i class="fa-solid fa-paper-plane"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right: Lead Details Sidebar -->
+            <div class="chat-lead-info-col">
+              <div style="font-size: 14px; font-weight: 800; color: white;">
+                <i class="fa-solid fa-user-check" style="color: var(--accent-cyan);"></i> Información del Contacto
+              </div>
+
+              <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                <div><span style="color: var(--text-muted);">Nombre:</span> <strong id="inboxDetailName" style="color: white;">--</strong></div>
+                <div><span style="color: var(--text-muted);">Teléfono:</span> <strong id="inboxDetailPhone" style="color: white;">--</strong></div>
+                <div><span style="color: var(--text-muted);">Canal:</span> <span class="brand-badge">WhatsApp Cloud API</span></div>
+                <div><span style="color: var(--text-muted);">Empresa Asignada:</span> <strong id="inboxDetailCompany" style="color: #818cf8;">--</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 5: PIPELINE KANBAN ==================== -->
+        <div id="tab-pipeline" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-bars-progress" style="color: var(--accent-indigo);"></i>
+                  <span>Pipeline de Leads de tu Agencia</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Seguimiento de leads reales capturados a través de las líneas de WhatsApp.
+                </div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="openNewLeadModal()">
+                <i class="fa-solid fa-plus"></i> Registrar Lead Manual
+              </button>
+            </div>
+
+            <div class="kanban-board" id="realKanbanContainer">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB: MANUAL DE VENTAS & PLAYBOOK DE CIERRE B2B ==================== -->
+        <div id="tab-playbook" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-graduation-cap" style="color: #34d399;"></i>
+                  <span>Manual Maestro de Presentación & Cierre B2B para tu Agencia</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Sigue esta guía paso a paso personalizada con el nombre de tu agencia para contactar dueños de empresas y cerrar contratos mensuales.
+                </div>
+              </div>
+              <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">Playbook Oficial</span>
+            </div>
+
+            <!-- Personalized Agency Header Card -->
+            <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-lg); padding: 22px 28px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <div style="font-size: 12px; text-transform: uppercase; font-weight: 800; color: #a5b4fc; letter-spacing: 1px;">GUÍA PERSONALIZADA PARA TI</div>
+                <div style="font-size: 22px; font-weight: 900; color: white; margin-top: 2px;">
+                  Estrategia Comercial de <span id="pbOwnerName" style="color: #34d399;">Tu Nombre</span> en <span id="pbAgencyName" style="color: #818cf8;">Tu Agencia</span>
+                </div>
+                <div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">
+                  Aprende exactamente cómo presentarte, qué decir por WhatsApp y cómo cerrar clientes de $490 a $990 USD/mes.
+                </div>
+              </div>
+              <button class="btn btn-emerald btn-sm" onclick="switchTab('prospecting')">
+                <i class="fa-solid fa-bolt"></i> Ir a Generar Demos
+              </button>
+            </div>
+
+            <!-- 4-Step Interactive Sales System -->
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+              
+              <!-- STEP 1 -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="width: 32px; height: 32px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: white;">1</span>
+                    <strong style="font-size: 16px; color: white;">Paso 1: El Mensaje "Caballo de Troya" (Para Contactar al Dueño)</strong>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="copyStep1Script()">
+                    <i class="fa-regular fa-copy"></i> Copiar Mensaje
+                  </button>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                  Busca empresas en Google Maps o Instagram (clínicas, barberías, inmobiliarias, restaurantes) y envía este mensaje exacto por WhatsApp:
+                </p>
+                <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; font-size: 13px; color: #e2e8f0; line-height: 1.6;" id="step1ScriptText">
+                  "Hola [Nombre del Dueño/Encargado] 👋 Te saluda [Nombre], Director de [Agencia]. Estuve viendo el perfil de [Empresa] y noté que tienen una demanda altísima de consultas por WhatsApp.<br><br>
+                  Hicimos una prueba rápida y vimos que si alguien escribe fuera del horario comercial o un fin de semana, se pierden ventas potenciales frente a la competencia.<br><br>
+                  Les armamos un asistente con IA exclusivo para [Empresa] que responde precios en 2 segundos y agenda turnos en el calendario automáticamente.<br><br>
+                  ¿Te gustaría que te mande un video de 1 minuto mostrándote cómo funciona sin ningún compromiso?"
+                </div>
+              </div>
+
+              <!-- STEP 2 -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+                  <span style="width: 32px; height: 32px; border-radius: 50%; background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid #22d3ee; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">2</span>
+                  <strong style="font-size: 16px; color: white;">Paso 2: El Video Demostración de 60 Segundos (Grabar con el Celular)</strong>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                  Cuando el dueño te responda <em>"Dale, envíamelo"</em>, abre la plataforma en tu pantalla y graba un video de 1 minuto con esta estructura exacta:
+                </p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; font-size: 12.5px;">
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+                    <strong style="color: #60a5fa; display: block; margin-bottom: 4px;">0 a 15 segundos</strong>
+                    "Mira [Nombre del Dueño], aquí un cliente te escribe a las 11 de la noche preguntando precios y disponibilidad."
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+                    <strong style="color: #34d399; display: block; margin-bottom: 4px;">15 a 45 segundos</strong>
+                    Muestras cómo el Agente responde con los precios exactos del negocio y solicita los datos para agendar la cita.
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+                    <strong style="color: #f59e0b; display: block; margin-bottom: 4px;">45 a 60 segundos</strong>
+                    "La cita queda guardada en tu calendario. Si quieres activarlo en tu WhatsApp esta semana, tengamos una llamada de 10 min."
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 3 -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+                  <span style="width: 32px; height: 32px; border-radius: 50%; background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #fbbf24; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">3</span>
+                  <strong style="font-size: 16px; color: white;">Paso 3: Las 3 Preguntas de la Reunión de Cierre (15 Minutos)</strong>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">
+                  En la reunión por Zoom/Google Meet o presencial, haz estas 3 preguntas en este orden:
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 16px;">
+                    <strong style="color: #a5b4fc;">1. Pregunta de Diagnóstico:</strong> "¿Cuántas personas calculas que te escriben por semana y tardan en ser atendidas porque el personal está ocupado?"
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 16px;">
+                    <strong style="color: #34d399;">2. Pregunta de Dinero:</strong> "Si cada cliente promedio te deja $50 USD y recuperamos solo 10 ventas al mes con la IA, son $500 USD extra sin contratar más personal. ¿Tiene sentido para ti?"
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 16px;">
+                    <strong style="color: #f43f5e;">3. La Demostración de ROI:</strong> Le abres la pestaña de Calculadora de ROI en tu pantalla y le muestras cómo la inversión de $490 USD se paga sola.
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 4 -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="width: 32px; height: 32px; border-radius: 50%; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #34d399; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">4</span>
+                    <strong style="font-size: 16px; color: white;">Paso 4: El Pitch de Cierre de la Suscripción</strong>
+                  </div>
+                  <button class="btn btn-emerald btn-sm" onclick="switchTab('prospecting')">
+                    <i class="fa-solid fa-file-signature"></i> Descargar Contrato
+                  </button>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; font-size: 13px; color: #e2e8f0; line-height: 1.6;" id="step4ScriptText">
+                  "El servicio completo de [Agencia] tiene una cuota de $490 USD al mes. Comparado con pagarle el sueldo a un recepcionista ($800 a $1,200 USD), te ahorras más del 50% y la IA trabaja las 24 horas, fines de semana y feriados sin faltar jamás.<br><br>
+                  Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema instalado en tu número y funcionando en las próximas 48 horas. ¿Te preparo el acuerdo de activación para arrancar hoy mismo?"
+                </div>
+              </div>
+
+              <!-- Handling Objections -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  🛡️ Cómo Responder a las 3 Objeciones más Frecuentes:
+                </strong>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+                    <strong style="color: #fbbf24;">❓ Objeción 1: "¿Y si la IA le responde algo inventado o equivocado a un cliente?"</strong>
+                    <p style="color: #cbd5e1; margin-top: 4px;">👉 <em>"Excelente pregunta. La IA opera bajo una Base de Conocimiento estricta con tus reglas. Si alguien pregunta algo fuera de lo autorizado, la IA responde educadamente que consultará con el equipo y te deriva la conversación a tu teléfono para que tomes el control."</em></p>
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+                    <strong style="color: #fbbf24;">❓ Objeción 2: "Está un poco caro para mí en este momento."</strong>
+                    <p style="color: #cbd5e1; margin-top: 4px;">👉 <em>"Lo entiendo totalmente. Sin embargo, no es un gasto, es un generador de ingresos. Con solo 3 citas o ventas que la IA recupere fuera de horario, el servicio ya se pagó solo y el resto es ganancia neta para ti."</em></p>
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+                    <strong style="color: #fbbf24;">❓ Objeción 3: "Déjame pensarlo y te aviso la semana que viene."</strong>
+                    <p style="color: #cbd5e1; margin-top: 4px;">👉 <em>"Perfecto. Solo ten en cuenta que para garantizar la calidad del entrenamiento solo aceptamos 2 implementaciones nuevas por semana. Si reservamos tu lugar hoy, te bonificamos el 100% del costo de instalación técnica."</em></p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ==================== TAB: PROSPECCIÓN B2B, DEMOS & CONTRATOS ==================== -->
+        <div id="tab-prospecting" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-crosshairs" style="color: var(--accent-indigo);"></i>
+                  <span>Generador de Demos, Prospección B2B & Contratos de Venta</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Herramientas diseñadas para que tu agencia contacte negocios, les muestre una demo personalizada y cierre contratos mensuales.
+                </div>
+              </div>
+            </div>
+
+            <!-- Grid: 3 Sales Weapons -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+              
+              <!-- Weapon 1: Shareable Demo Link Generator -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <strong style="font-size: 15px; color: white;">
+                    <i class="fa-solid fa-link" style="color: var(--accent-cyan);"></i> 1. Generador de Demo Personalizada
+                  </strong>
+                  <span class="brand-badge" style="background: rgba(16,185,129,0.2); color:#34d399;">Cierra 80% más</span>
+                </div>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+                  Genera una demostración con el nombre de tu cliente potencial para enviársela por WhatsApp antes de la reunión.
+                </p>
+
+                <div class="form-group">
+                  <label class="form-label">Nombre del Negocio Prospecto</label>
+                  <input type="text" id="demoProspectName" class="form-control" placeholder="Ej: Clínica Dental San Lucas">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Rubro</label>
+                  <select id="demoProspectNiche" class="form-control">
+                    <option value="Salud & Clínicas">🏥 Salud & Clínicas</option>
+                    <option value="Bienes Raíces & Inmobiliarias">🏢 Inmobiliarias & Bienes Raíces</option>
+                    <option value="Belleza & Barberías">✂️ Barberías & Salones</option>
+                    <option value="Restaurantes & Gastronomía">🍽️ Restaurantes & Bares</option>
+                    <option value="Empresas & Servicios B2B">⚖️ Consultoría & B2B</option>
+                    <option value="E-Commerce & Retail">🛍️ Tiendas Online</option>
+                  </select>
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; margin-top: 6px;" onclick="generatePersonalizedDemoPitch()">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Crear Pitch de Demo Personalizado
+                </button>
+              </div>
+
+              <!-- Weapon 2: Contract & Service Agreement Generator -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <strong style="font-size: 15px; color: white;">
+                    <i class="fa-solid fa-file-signature" style="color: #f59e0b;"></i> 2. Generador de Contrato de Servicios B2B
+                  </strong>
+                  <span class="brand-badge" style="background: rgba(245,158,11,0.2); color:#fbbf24;">Formalidad</span>
+                </div>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px;">
+                  Descarga un contrato legal formal de prestación de servicios de automatización con IA listo para firmar.
+                </p>
+
+                <div class="form-group">
+                  <label class="form-label">Precio Mensual Acordado ($ USD/mes)</label>
+                  <input type="number" id="contractFeeInput" class="form-control" value="490">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Tiempo de Entrega / Activación</label>
+                  <input type="text" id="contractSetupTime" class="form-control" value="48 a 72 horas hábiles">
+                </div>
+
+                <button class="btn btn-emerald" style="width: 100%; margin-top: 6px;" onclick="downloadAgencyClientContract()">
+                  <i class="fa-solid fa-file-arrow-down"></i> Descargar Contrato de Prestación de Servicios
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Output Box for Outreach Scripts -->
+            <div class="glass-panel" style="margin-bottom: 0;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <strong style="font-size: 15px; color: white;">
+                  <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Guión de Apertura por WhatsApp para Contactar al Dueño
+                </strong>
+                <button class="btn btn-secondary btn-sm" onclick="copyProspectScript()">
+                  <i class="fa-regular fa-copy"></i> Copiar Mensaje
+                </button>
+              </div>
+              <pre class="output-code" id="prospectScriptOutput" style="min-height: 140px;">Selecciona los datos del negocio arriba y haz clic en 'Crear Pitch de Demo Personalizado' para generar un mensaje irresistible que abre puertas con dueños de empresas.</pre>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ==================== TAB 6: AI MARKETING STUDIO ==================== -->
+        <div id="tab-marketing" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-wand-magic-sparkles" style="color: #ec4899;"></i>
+                  <span>AI Marketing Studio (Generador para tus Clientes)</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Genera campañas y estrategias publicitarias para las empresas que contratan tu agencia.
+                </div>
+              </div>
+            </div>
+
+            <div class="studio-grid">
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <div class="form-group">
+                  <label class="form-label">Tipo de Contenido a Generar</label>
+                  <select id="mktFormat" class="form-control" onchange="updateMarketingForm()">
+                    <option value="ads">🎯 Anuncio Meta Ads / Google Ads (Alta Conversión)</option>
+                    <option value="reels">🎬 Guión Viral para Reels / TikTok / Shorts</option>
+                    <option value="cold_email">📧 Email B2B para Vender tu Agencia de IA</option>
+                    <option value="whatsapp_broadcast">📱 Campaña Masiva WhatsApp (Flash Promo)</option>
+                    <option value="google_reviews">⭐ Respuesta a Reseña de Google Maps</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Nombre del Negocio o Empresa</label>
+                  <input type="text" id="mktBusiness" class="form-control" placeholder="Ej: Clínica Dental San Lucas">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Rubro / Nicho</label>
+                  <input type="text" id="mktNiche" class="form-control" placeholder="Ej: Odontología y Estética Dental">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" id="mktExtraLabel">Oferta o Gancho Principal</label>
+                  <input type="text" id="mktExtra" class="form-control" placeholder="Ej: Diagnóstico 3D Gratis + 20% OFF en Implantes">
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="generateMarketingContent()">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Generar Contenido con Gemini IA
+                </button>
+              </div>
+
+              <div>
+                <div class="generated-output-box">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                    <span style="font-size: 13px; font-weight: 700; color: #a5b4fc;" id="mktOutputTitle">Resultado Generado</span>
+                    <button class="btn btn-secondary btn-sm" onclick="copyMarketingOutput()">
+                      <i class="fa-regular fa-copy"></i> Copiar Texto
+                    </button>
+                  </div>
+                  <pre class="output-code" id="mktOutputContent">Haz clic en 'Generar Contenido con Gemini IA' para redactar el material para tu cliente.</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 7: APIS & CONEXIONES ==================== -->
+        <div id="tab-connections" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-plug" style="color: var(--accent-cyan);"></i>
+                  <span>APIs & Conexiones de Producción</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Credenciales de Inteligencia Artificial (Google Gemini) y WhatsApp Gateway (Meta Cloud API).
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              <!-- AI API Config -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  <i class="fa-solid fa-brain" style="color: var(--accent-indigo);"></i> 1. API de Inteligencia Artificial (Google Gemini)
+                </strong>
+                <div class="form-group">
+                  <label class="form-label">API Key de Google Gemini</label>
+                  <input type="password" id="apiAiKey" class="form-control" placeholder="Pega tu clave de Gemini (AIzaSy... / AQ...)">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Modelo Activo</label>
+                  <select id="apiAiModel" class="form-control">
+                    <option value="gemini-2.5-flash">gemini-2.5-flash (Ultra Rápido)</option>
+                    <option value="gemini-3.7-flash">gemini-3.7-flash (Última Generación)</option>
+                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                  </select>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="saveAndTestAiApi()">
+                  <i class="fa-solid fa-bolt"></i> Guardar & Probar Gemini
+                </button>
+              </div>
+
+              <!-- Meta WhatsApp Config -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> 2. Meta WhatsApp Cloud API
+                </strong>
+                <div class="form-group">
+                  <label class="form-label">Phone Number ID</label>
+                  <input type="text" id="apiWaPhoneId" class="form-control" value="1342311562300304">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Access Token</label>
+                  <input type="password" id="apiWaToken" class="form-control" placeholder="Pega tu Meta WhatsApp Access Token">
+                </div>
+                <button class="btn btn-emerald btn-sm" onclick="openSendRealWaModal()">
+                  <i class="fa-brands fa-whatsapp"></i> Enviar Mensaje Real
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ==================== TAB 8: PERSONALIZACIÓN MARCA BLANCA ==================== -->
+        <div id="tab-whitelabel" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i>
+                  <span>Personalización de Marca Blanca (Vender tu Agencia)</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Personaliza el nombre de la plataforma, colores y precios para revenderla como tu propio software.
+                </div>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <div class="form-group">
+                  <label class="form-label">Nombre Comercial de tu Agencia</label>
+                  <input type="text" id="wlBrandName" class="form-control" value="NEXUS AI Agency">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Color de Acento Corporativo</label>
+                  <input type="color" id="wlColorPicker" value="#6366f1" style="height: 40px; width: 60px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); cursor: pointer;" onchange="updateBrandColor(this.value)">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Precio Sugerido del Plan Starter ($ USD/mes)</label>
+                  <input type="number" id="wlPriceStarter" class="form-control" value="290">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Precio Sugerido del Plan Pro ($ USD/mes)</label>
+                  <input type="number" id="wlPricePro" class="form-control" value="690">
+                </div>
+                <button class="btn btn-primary" onclick="saveWhiteLabelSettings()">
+                  <i class="fa-solid fa-floppy-disk"></i> Guardar Ajustes de Marca
+                </button>
+              </div>
+
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 10px;">
+                  <i class="fa-solid fa-globe" style="color: #38bdf8;"></i> Instrucciones de Dominio Propio (CNAME)
+                </strong>
+                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+                  Para que tus clientes ingresen a <strong>app.tuagencia.com</strong> en lugar de localhost:
+                </p>
+                <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12px; font-family: monospace; color: #a5b4fc; margin-bottom: 14px;">
+                  Tipo: CNAME<br>
+                  Host: app<br>
+                  Valor: cname.nexus-ai.agency
+                </div>
+                <div style="font-size: 12.5px; color: #34d399;">
+                  ✅ Soporte Multi-Tenant habilitado: cada cliente accede a su propio panel aislado.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Modal: Crear Nueva Agencia Independiente (Para Compradores) -->
+  <div class="modal-backdrop" id="newAgencyModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong style="font-size: 17px; color: white;"><i class="fa-solid fa-store" style="color: var(--accent-purple);"></i> Crear Nueva Agencia Independiente</strong>
+        <button class="close-btn" onclick="closeModal('newAgencyModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nombre Comercial de la Nueva Agencia</label>
+          <input type="text" id="newAgencyNameInput" class="form-control" placeholder="Ej: Nova AI Automation / Apex Soluciones">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre del Dueño / Comprador</label>
+          <input type="text" id="newAgencyOwnerInput" class="form-control" placeholder="Ej: Juan Pérez">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Correo Electrónico del Administrador</label>
+          <input type="email" id="newAgencyEmailInput" class="form-control" placeholder="juan@tuagencia.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Moneda de Facturación</label>
+          <select id="newAgencyCurrency" class="form-control">
+            <option value="USD">Dólares ($ USD)</option>
+            <option value="EUR">Euros (€ EUR)</option>
+            <option value="ARS">Pesos Argentinos ($ ARS)</option>
+            <option value="MXN">Pesos Mexicanos ($ MXN)</option>
+            <option value="COP">Pesos Colombianos ($ COP)</option>
+          </select>
+        </div>
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 12px; font-size: 12px; color: #6ee7b7;">
+          🔒 <strong>Aislamiento 100% Garantizado:</strong> Esta agencia tendrá su propio entorno aislado, sus propios clientes, sus propios agentes y su propia facturación independiente.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('newAgencyModal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="createIndependentAgency()"><i class="fa-solid fa-check"></i> Crear & Abrir Entorno de Agencia</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cambiar de Cuenta de Agencia -->
+  <div class="modal-backdrop" id="switchAgencyModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong style="font-size: 17px; color: white;"><i class="fa-solid fa-repeat" style="color: var(--accent-indigo);"></i> Cuentas de Agencia en este Sistema</strong>
+        <button class="close-btn" onclick="closeModal('switchAgencyModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          Selecciona una agencia para acceder a su espacio de trabajo aislado o crea una nueva cuenta independiente.
+        </p>
+        <div id="agencyAccountsListContainer" style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary btn-sm" onclick="closeModal('switchAgencyModal'); openNewAgencyWorkspaceModal();">
+          <i class="fa-solid fa-plus"></i> Crear Nueva Agencia
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="closeModal('switchAgencyModal')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Crear Nueva Sub-Cuenta de Empresa -->
+  <div class="modal-backdrop" id="newClientModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong style="font-size: 17px; color: white;"><i class="fa-solid fa-building-user" style="color: var(--accent-cyan);"></i> Registrar Nueva Empresa Cliente</strong>
+        <button class="close-btn" onclick="closeModal('newClientModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nombre de la Empresa o Negocio</label>
+          <input type="text" id="newClientName" class="form-control" placeholder="Ej: Clínica Odontológica San Lucas">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Rubro / Industria</label>
+          <select id="newClientIndustry" class="form-control">
+            <option value="Salud & Clínicas">🏥 Salud & Clínicas</option>
+            <option value="Bienes Raíces & Inmobiliarias">🏢 Bienes Raíces & Inmobiliarias</option>
+            <option value="Belleza & Barberías">✂️ Belleza, Barberías & Salones</option>
+            <option value="Restaurantes & Gastronomía">🍽️ Restaurantes & Gastronomía</option>
+            <option value="Empresas & Servicios B2B">⚖️ Empresas & Servicios B2B</option>
+            <option value="E-Commerce & Retail">🛍️ E-Commerce & Tiendas Online</option>
+            <option value="Otro Rubro">⚡ Otro Rubro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Número de WhatsApp del Negocio</label>
+          <input type="text" id="newClientPhone" class="form-control" placeholder="+54 9 11 0000-0000">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cuota de Suscripción Mensual que le cobrarás ($ USD/mes)</label>
+          <input type="number" id="newClientFee" class="form-control" value="490" placeholder="490">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('newClientModal')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveNewAgencyClient()"><i class="fa-solid fa-check"></i> Crear Sub-Cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Enviar WhatsApp Real -->
+  <div class="modal-backdrop" id="sendRealWaModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <strong style="font-size: 17px; color: white;"><i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Enviar Mensaje de WhatsApp Real</strong>
+        <button class="close-btn" onclick="closeModal('sendRealWaModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Número de Teléfono Destino (con código de país sin espacios)</label>
+          <input type="text" id="modalWaPhone" class="form-control" placeholder="Ej: 5491148923310">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mensaje a Enviar</label>
+          <textarea id="modalWaMessage" class="form-control" rows="4">🚀 ¡Hola! Te escribimos desde tu Agencia de IA NEXUS. Tu Agente Inteligente está 100% activo y respondiendo consultas.</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('sendRealWaModal')">Cancelar</button>
+        <button class="btn btn-emerald" onclick="submitModalRealWhatsApp()"><i class="fa-solid fa-paper-plane"></i> Enviar a WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script src="agents-data.js"></script>
+  <script src="marketing-studio.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
