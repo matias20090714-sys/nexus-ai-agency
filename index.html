@@ -344,7 +344,9 @@
                     <div>✅ Base de conocimiento con hasta 50 preguntas frecuentes</div>
                     <div>✅ Soporte técnico y servidor incluido</div>
                   </div>
-                  <button class="btn btn-secondary" onclick="openContactDemoModal('Plan Starter')">Contratar Plan Starter</button>
+                  <button class="btn btn-secondary" onclick="openAgencyRealCheckout('starter')">
+                    <i class="fa-solid fa-cart-shopping"></i> Contratar Plan Starter
+                  </button>
                 </div>
 
                 <!-- Plan Pro (Featured) -->
@@ -361,7 +363,9 @@
                     <div>✅ Recordatorios anti-ausentismo por WhatsApp</div>
                     <div>✅ Generador de Anuncios y Marketing Studio</div>
                   </div>
-                  <button class="btn btn-primary" onclick="openContactDemoModal('Plan Growth Pro')">Contratar Plan Growth Pro</button>
+                  <button class="btn btn-primary" onclick="openAgencyRealCheckout('pro')">
+                    <i class="fa-solid fa-lock"></i> Contratar Plan Growth Pro
+                  </button>
                 </div>
 
               </div>
@@ -1203,60 +1207,102 @@
           </div>
         </div>
 
-        <!-- ==================== TAB 8: PERSONALIZACIÓN MARCA BLANCA ==================== -->
+        <!-- ==================== TAB 8: PERSONALIZACIÓN MARCA BLANCA & COBROS ==================== -->
         <div id="tab-whitelabel" class="tab-view">
           <div class="glass-panel">
             <div class="panel-header">
               <div>
                 <div class="panel-title">
                   <i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i>
-                  <span>Personalización de Marca Blanca (Vender tu Agencia)</span>
+                  <span>Marca Blanca & Pasarelas de Cobro Real</span>
                 </div>
                 <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-                  Personaliza el nombre de la plataforma, colores y precios para revenderla como tu propio software.
+                  Configura tus precios, enlaces de Stripe / PayPal / Mercado Pago y datos bancarios para cobrar directamente desde tu Web Comercial.
                 </div>
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+              
+              <!-- Column 1: Precios & Links de Pago Online -->
               <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  <i class="fa-solid fa-credit-card" style="color: #34d399;"></i> 1. Precios & Pasarelas de Pago Online
+                </strong>
+
                 <div class="form-group">
                   <label class="form-label">Nombre Comercial de tu Agencia</label>
                   <input type="text" id="wlBrandName" class="form-control" value="NEXUS AI Agency">
                 </div>
+
                 <div class="form-group">
                   <label class="form-label">Color de Acento Corporativo</label>
                   <input type="color" id="wlColorPicker" value="#6366f1" style="height: 40px; width: 60px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); cursor: pointer;" onchange="updateBrandColor(this.value)">
                 </div>
-                <div class="form-group">
-                  <label class="form-label">Precio Sugerido del Plan Starter ($ USD/mes)</label>
-                  <input type="number" id="wlPriceStarter" class="form-control" value="290">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div class="form-group">
+                    <label class="form-label">Precio Plan Starter ($/mes)</label>
+                    <input type="number" id="wlPriceStarter" class="form-control" value="290">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Precio Plan Pro ($/mes)</label>
+                    <input type="number" id="wlPricePro" class="form-control" value="690">
+                  </div>
                 </div>
+
                 <div class="form-group">
-                  <label class="form-label">Precio Sugerido del Plan Pro ($ USD/mes)</label>
-                  <input type="number" id="wlPricePro" class="form-control" value="690">
+                  <label class="form-label">Link de Pago Plan Starter (Stripe / Mercado Pago / PayPal)</label>
+                  <input type="url" id="wlPaymentLinkStarter" class="form-control" placeholder="https://buy.stripe.com/... o https://mpago.la/...">
                 </div>
-                <button class="btn btn-primary" onclick="saveWhiteLabelSettings()">
-                  <i class="fa-solid fa-floppy-disk"></i> Guardar Ajustes de Marca
+
+                <div class="form-group">
+                  <label class="form-label">Link de Pago Plan Pro (Stripe / Mercado Pago / PayPal)</label>
+                  <input type="url" id="wlPaymentLinkPro" class="form-control" placeholder="https://buy.stripe.com/... o https://mpago.la/...">
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; margin-top: 8px;" onclick="saveWhiteLabelSettings()">
+                  <i class="fa-solid fa-floppy-disk"></i> Guardar Ajustes de Marca & Pasarelas
                 </button>
               </div>
 
-              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
-                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 10px;">
-                  <i class="fa-solid fa-globe" style="color: #38bdf8;"></i> Instrucciones de Dominio Propio (CNAME)
+              <!-- Column 2: Transferencia Bancaria Directa & WhatsApp de Cobros -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px; display: flex; flex-direction: column;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  <i class="fa-solid fa-building-columns" style="color: #67e8f9;"></i> 2. Cobros por Transferencia Bancaria & Facturación
                 </strong>
-                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
-                  Para que tus clientes ingresen a <strong>app.tuagencia.com</strong> en lugar de localhost:
-                </p>
-                <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12px; font-family: monospace; color: #a5b4fc; margin-bottom: 14px;">
-                  Tipo: CNAME<br>
-                  Host: app<br>
-                  Valor: cname.nexus-ai.agency
+
+                <div class="form-group">
+                  <label class="form-label">Banco / Entidad Financiera</label>
+                  <input type="text" id="wlBankName" class="form-control" placeholder="Ej: Santander / BBVA / Chase / Mercado Pago">
                 </div>
-                <div style="font-size: 12.5px; color: #34d399;">
-                  ✅ Soporte Multi-Tenant habilitado: cada cliente accede a su propio panel aislado.
+
+                <div class="form-group">
+                  <label class="form-label">Titular de la Cuenta / Razón Social</label>
+                  <input type="text" id="wlBankHolder" class="form-control" placeholder="Ej: Tu Nombre o Empresa S.A.">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">CBU / IBAN / Alias / CLABE / Número de Cuenta</label>
+                  <input type="text" id="wlBankCbu" class="form-control" placeholder="Ej: 00000031000123456789 o ALIAS.AGENCIA.IA">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Identificación Fiscal (CUIT / RFC / Tax ID / NIF)</label>
+                  <input type="text" id="wlBankTaxId" class="form-control" placeholder="Ej: 20-39485921-9">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">WhatsApp Oficial para Envío de Comprobantes & Factura</label>
+                  <input type="text" id="wlBillingPhone" class="form-control" placeholder="Ej: 5491148923310 (con código de país sin +)">
+                </div>
+
+                <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; font-size: 12px; color: #a5b4fc; margin-top: auto;">
+                  <i class="fa-solid fa-circle-check" style="color: #34d399;"></i>
+                  <span>Al hacer clic en 'Contratar', tus clientes verán estas opciones reales de pago de inmediato.</span>
                 </div>
               </div>
+
             </div>
           </div>
         </div>
@@ -1452,12 +1498,101 @@
     </div>
   </div>
 
+  <!-- Modal: Checkout y Pago Real de Suscripción -->
+  <div class="modal-backdrop" id="agencyCheckoutModal">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <div>
+          <strong style="font-size: 17px; color: white;" id="checkoutModalTitle">Contratar Plan de Inteligencia Artificial</strong>
+          <div style="font-size: 12px; color: #34d399; margin-top: 2px;" id="checkoutModalSubtitle">Suscripción Activa sin Contratos de Permanencia</div>
+        </div>
+        <button class="close-btn" onclick="closeModal('agencyCheckoutModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Summary Card -->
+        <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(16, 185, 129, 0.15)); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 18px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <div style="font-size: 12px; text-transform: uppercase; font-weight: 800; color: #a5b4fc;" id="checkoutSummaryPlan">PLAN GROWTH PRO</div>
+            <div style="font-size: 13.5px; color: white; font-weight: 700;">Agente WhatsApp 24/7 + Calendario + CRM</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 28px; font-weight: 900; color: #34d399;" id="checkoutSummaryPrice">$690</div>
+            <div style="font-size: 11px; color: var(--text-dim);">USD / mes</div>
+          </div>
+        </div>
+
+        <strong style="font-size: 14px; color: white; display: block; margin-bottom: 12px;">Selecciona tu Método de Pago Seguro:</strong>
+
+        <!-- Payment Option 1: Stripe / Mercado Pago / PayPal Direct Link -->
+        <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px;" id="checkoutCardGatewayBox">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.2); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #818cf8;">
+                <i class="fa-solid fa-credit-card"></i>
+              </div>
+              <div>
+                <strong style="font-size: 14px; color: white; display: block;">Tarjeta de Crédito / Débito (Online)</strong>
+                <span style="font-size: 12px; color: var(--text-muted);">Stripe • Mercado Pago • PayPal (Procesamiento Seguro)</span>
+              </div>
+            </div>
+            <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">Inmediato</span>
+          </div>
+          <button class="btn btn-emerald" style="width: 100%; font-weight: 800;" id="btnCheckoutPayGateway" onclick="executeGatewayPayment()">
+            <i class="fa-solid fa-lock"></i> Pagar con Tarjeta Ahora
+          </button>
+        </div>
+
+        <!-- Payment Option 2: Direct Bank Wire -->
+        <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: rgba(6, 182, 212, 0.2); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #22d3ee;">
+              <i class="fa-solid fa-building-columns"></i>
+            </div>
+            <div>
+              <strong style="font-size: 14px; color: white; display: block;">Transferencia Bancaria Directa (0% Comisión)</strong>
+              <span style="font-size: 12px; color: var(--text-muted);">Transfiere directo a la cuenta oficial de la agencia</span>
+            </div>
+          </div>
+          
+          <div style="background: rgba(10, 13, 28, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; font-size: 12.5px; color: #cbd5e1; margin-bottom: 10px;" id="checkoutBankDetails">
+            <!-- Dynamically populated with agency bank details -->
+          </div>
+          
+          <button class="btn btn-secondary btn-sm" style="width: 100%;" onclick="copyBankDetails()">
+            <i class="fa-regular fa-copy"></i> Copiar Datos Bancarios
+          </button>
+        </div>
+
+        <!-- Payment Option 3: WhatsApp Direct Activation & Invoice -->
+        <div style="background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: var(--radius-md); background: rgba(37, 211, 102, 0.2); display: flex; align-items: center; justify-content: center; font-size: 18px; color: #25d366;">
+              <i class="fa-brands fa-whatsapp"></i>
+            </div>
+            <div>
+              <strong style="font-size: 14px; color: white; display: block;">Pagar o Solicitar Factura por WhatsApp</strong>
+              <span style="font-size: 12px; color: var(--text-muted);">Envía comprobante o solicita datos fiscales a nuestro equipo</span>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width: 100%; font-weight: 700;" onclick="sendCheckoutWhatsApp()">
+            <i class="fa-brands fa-whatsapp"></i> Coordinar Pago & Activación por WhatsApp
+          </button>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('agencyCheckoutModal')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Scripts -->
-  <script src="agents-data.js?v=2.2"></script>
-  <script src="marketing-studio.js?v=2.2"></script>
-  <script src="app.js?v=2.2"></script>
+  <script src="agents-data.js?v=2.3"></script>
+  <script src="marketing-studio.js?v=2.3"></script>
+  <script src="app.js?v=2.3"></script>
 </body>
 </html>

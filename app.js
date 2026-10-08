@@ -96,11 +96,40 @@ function loadAgencyWorkspace(agencyId) {
   document.getElementById('sidebarBrandName').innerText = profile.name;
   document.getElementById('wlBrandName').value = profile.name;
 
-  // Update Playbook personalized elements
+  // Update Playbook & Pricing personalized elements
+  const starterPrice = profile.priceStarter || '290';
+  const proPrice = profile.pricePro || '690';
+  
   const pbOwner = document.getElementById('pbOwnerName');
   const pbAgency = document.getElementById('pbAgencyName');
   if (pbOwner) pbOwner.innerText = profile.owner || 'Tu Nombre';
   if (pbAgency) pbAgency.innerText = profile.name || 'Tu Agencia';
+
+  const portalStarter = document.getElementById('portalPriceStarter');
+  const portalPro = document.getElementById('portalPricePro');
+  if (portalStarter) portalStarter.innerHTML = `$${starterPrice} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span>`;
+  if (portalPro) portalPro.innerHTML = `$${proPrice} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span>`;
+
+  // Update WhiteLabel & Payments inputs
+  const wlStarter = document.getElementById('wlPriceStarter');
+  const wlPro = document.getElementById('wlPricePro');
+  const wlLinkStarter = document.getElementById('wlPaymentLinkStarter');
+  const wlLinkPro = document.getElementById('wlPaymentLinkPro');
+  const wlBName = document.getElementById('wlBankName');
+  const wlBHolder = document.getElementById('wlBankHolder');
+  const wlBCbu = document.getElementById('wlBankCbu');
+  const wlBTax = document.getElementById('wlBankTaxId');
+  const wlBPhone = document.getElementById('wlBillingPhone');
+
+  if (wlStarter) wlStarter.value = starterPrice;
+  if (wlPro) wlPro.value = proPrice;
+  if (wlLinkStarter) wlLinkStarter.value = profile.paymentLinkStarter || '';
+  if (wlLinkPro) wlLinkPro.value = profile.paymentLinkPro || '';
+  if (wlBName) wlBName.value = profile.bankName || '';
+  if (wlBHolder) wlBHolder.value = profile.bankHolder || '';
+  if (wlBCbu) wlBCbu.value = profile.bankCbu || '';
+  if (wlBTax) wlBTax.value = profile.bankTaxId || '';
+  if (wlBPhone) wlBPhone.value = profile.billingPhone || '';
 
   const step1 = document.getElementById('step1ScriptText');
   if (step1) {
@@ -1030,16 +1059,137 @@ function confirmClientQrPair() {
   closeModal('qrClientPairModal');
 }
 
-// ==================== WHITE LABEL SETTINGS ====================
+// ==================== WHITE LABEL & REAL PAYMENTS ====================
+let activeCheckoutPlan = 'pro';
+
 function updateBrandColor(color) {
   document.documentElement.style.setProperty('--accent-indigo', color);
   showToast(`Color actualizado a ${color}`, 'success');
 }
 
 function saveWhiteLabelSettings() {
-  const name = document.getElementById('wlBrandName').value;
+  const profile = getAgencyProfile();
+  if (!profile) return;
+
+  const name = document.getElementById('wlBrandName').value.trim() || profile.name;
+  const color = document.getElementById('wlColorPicker').value;
+  const priceStarter = document.getElementById('wlPriceStarter').value.trim() || '290';
+  const pricePro = document.getElementById('wlPricePro').value.trim() || '690';
+  const paymentLinkStarter = document.getElementById('wlPaymentLinkStarter').value.trim();
+  const paymentLinkPro = document.getElementById('wlPaymentLinkPro').value.trim();
+  const bankName = document.getElementById('wlBankName').value.trim();
+  const bankHolder = document.getElementById('wlBankHolder').value.trim();
+  const bankCbu = document.getElementById('wlBankCbu').value.trim();
+  const bankTaxId = document.getElementById('wlBankTaxId').value.trim();
+  const billingPhone = document.getElementById('wlBillingPhone').value.trim();
+
+  profile.name = name;
+  profile.brandColor = color;
+  profile.priceStarter = priceStarter;
+  profile.pricePro = pricePro;
+  profile.paymentLinkStarter = paymentLinkStarter;
+  profile.paymentLinkPro = paymentLinkPro;
+  profile.bankName = bankName;
+  profile.bankHolder = bankHolder;
+  profile.bankCbu = bankCbu;
+  profile.bankTaxId = bankTaxId;
+  profile.billingPhone = billingPhone;
+
+  saveAgencyProfile(profile);
+
+  // Update DOM elements
   document.getElementById('sidebarBrandName').innerText = name;
-  showToast('¡Ajustes de Marca Blanca guardados!', 'success');
+  document.getElementById('topAgencyName').innerText = name;
+  const portalAgency = document.getElementById('portalAgencyName');
+  if (portalAgency) portalAgency.innerText = name;
+
+  const portalStarter = document.getElementById('portalPriceStarter');
+  const portalPro = document.getElementById('portalPricePro');
+  if (portalStarter) portalStarter.innerHTML = `$${priceStarter} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span>`;
+  if (portalPro) portalPro.innerHTML = `$${pricePro} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span>`;
+
+  showToast('¡Ajustes de Marca Blanca y Pasarelas de Pago guardados con éxito!', 'success');
+}
+
+function openAgencyRealCheckout(planKey) {
+  activeCheckoutPlan = planKey;
+  const profile = getAgencyProfile();
+  const isPro = planKey === 'pro';
+
+  const planName = isPro ? 'Plan Growth Pro' : 'Plan Starter IA';
+  const price = isPro ? (profile.pricePro || '690') : (profile.priceStarter || '290');
+  const gatewayLink = isPro ? profile.paymentLinkPro : profile.paymentLinkStarter;
+
+  document.getElementById('checkoutSummaryPlan').innerText = planName.toUpperCase();
+  document.getElementById('checkoutSummaryPrice').innerText = `$${price}`;
+  document.getElementById('checkoutModalTitle').innerHTML = `<i class="fa-solid fa-lock" style="color: #34d399;"></i> Contratar ${planName}`;
+
+  // Populate Bank Details
+  const bankDetailsContainer = document.getElementById('checkoutBankDetails');
+  if (bankDetailsContainer) {
+    if (profile.bankName || profile.bankCbu) {
+      bankDetailsContainer.innerHTML = `
+        <div><strong>Banco:</strong> ${profile.bankName || 'A coordinar'}</div>
+        <div><strong>Titular:</strong> ${profile.bankHolder || profile.name}</div>
+        <div><strong>CBU/IBAN/Alias:</strong> <span style="color: #67e8f9; font-weight: 800;">${profile.bankCbu || 'Consultar por WhatsApp'}</span></div>
+        <div><strong>Identificación Fiscal:</strong> ${profile.bankTaxId || 'Consumidor Final'}</div>
+        <div><strong>Monto Exacto:</strong> $${price} USD</div>
+      `;
+    } else {
+      bankDetailsContainer.innerHTML = `
+        <div><strong>Banco:</strong> Transferencia Local / Internacional</div>
+        <div><strong>Titular:</strong> ${profile.name}</div>
+        <div><strong>CBU/IBAN/Alias:</strong> <span style="color: #67e8f9; font-weight: 800;">ALIAS.AGENCIA.IA</span></div>
+        <div><strong>Monto Exacto:</strong> $${price} USD / mes</div>
+      `;
+    }
+  }
+
+  // Update Gateway Button Text
+  const btnGateway = document.getElementById('btnCheckoutPayGateway');
+  if (btnGateway) {
+    if (gatewayLink) {
+      btnGateway.innerHTML = `<i class="fa-solid fa-lock"></i> Pagar $${price} USD con Tarjeta (Enlace Seguro)`;
+    } else {
+      btnGateway.innerHTML = `<i class="fa-solid fa-credit-card"></i> Pagar con Tarjeta (Configurar enlace en Marca Blanca)`;
+    }
+  }
+
+  document.getElementById('agencyCheckoutModal').classList.add('active');
+}
+
+function executeGatewayPayment() {
+  const profile = getAgencyProfile();
+  const isPro = activeCheckoutPlan === 'pro';
+  const gatewayLink = isPro ? profile.paymentLinkPro : profile.paymentLinkStarter;
+
+  if (gatewayLink && gatewayLink.startsWith('http')) {
+    window.open(gatewayLink, '_blank');
+    showToast('Abriendo pasarela de pago segura...', 'success');
+  } else {
+    alert(`ℹ️ PASARELA DE PAGO DIRECTA:\n\nEl dueño de la agencia aún no ha pegado el enlace de Stripe/Mercado Pago para este plan.\n\nPuedes pagar mediante Transferencia Bancaria o coordinar directamente por WhatsApp.`);
+  }
+}
+
+function copyBankDetails() {
+  const profile = getAgencyProfile();
+  const isPro = activeCheckoutPlan === 'pro';
+  const price = isPro ? (profile.pricePro || '690') : (profile.priceStarter || '290');
+  
+  const text = `DATOS DE TRANSFERENCIA (${profile.name}):\nBanco: ${profile.bankName || 'Santander/BBVA'}\nTitular: ${profile.bankHolder || profile.name}\nCBU/IBAN/Alias: ${profile.bankCbu || 'ALIAS.AGENCIA.IA'}\nMonto: $${price} USD`;
+  
+  navigator.clipboard.writeText(text);
+  showToast('📋 Datos bancarios copiados al portapapeles', 'success');
+}
+
+function sendCheckoutWhatsApp() {
+  const profile = getAgencyProfile();
+  const isPro = activeCheckoutPlan === 'pro';
+  const planName = isPro ? 'Plan Growth Pro ($' + (profile.pricePro || '690') + ' USD/mes)' : 'Plan Starter ($' + (profile.priceStarter || '290') + ' USD/mes)';
+  const phone = profile.billingPhone || '5491148923310';
+  
+  const msg = encodeURIComponent(`🚀 ¡Hola ${profile.name}! Quiero contratar el ${planName} para mi empresa.\n\n¿Me facilitan los datos de pago / factura para activar mi Agente de IA hoy mismo?`);
+  window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
 }
 
 function saveAndTestAiApi() {
