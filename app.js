@@ -124,23 +124,30 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
 
 // ==================== TAB NAVIGATION ====================
 function switchTab(tabName) {
-  document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-  const clickedIndex = ['dashboard', 'clients', 'agents-builder', 'inbox', 'pipeline', 'marketing', 'connections', 'whitelabel'].indexOf(tabName);
-  if (clickedIndex !== -1) {
-    const navItems = document.querySelectorAll('.nav-item');
-    if (navItems[clickedIndex]) navItems[clickedIndex].classList.add('active');
-  }
+  // Update nav items directly by matching onclick
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.remove('active');
+    const onclickAttr = item.getAttribute('onclick') || '';
+    if (onclickAttr.includes(`'${tabName}'`)) {
+      item.classList.add('active');
+    }
+  });
 
+  // Update tab views
   document.querySelectorAll('.tab-view').forEach(view => view.classList.remove('active'));
   const targetView = document.getElementById(`tab-${tabName}`);
   if (targetView) targetView.classList.add('active');
 
   const titles = {
     'dashboard': '<i class="fa-solid fa-chart-pie" style="color: var(--accent-indigo);"></i> Dashboard de tu Agencia de IA',
+    'agency-portal': '<i class="fa-solid fa-globe" style="color: #34d399;"></i> Mi Web Comercial de Agencia',
+    'reactivation': '<i class="fa-solid fa-fire" style="color: #f59e0b;"></i> Reactivador de Clientes (Oferta Irresistible)',
     'clients': '<i class="fa-solid fa-users-gear" style="color: var(--accent-cyan);"></i> Empresas & Sub-Cuentas de Clientes',
     'agents-builder': '<i class="fa-solid fa-robot" style="color: var(--accent-indigo);"></i> Configuración del Agente & Base de Conocimiento',
     'inbox': '<i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Bandeja de WhatsApp Real',
     'pipeline': '<i class="fa-solid fa-bars-progress" style="color: var(--accent-indigo);"></i> Pipeline de Leads Reales',
+    'playbook': '<i class="fa-solid fa-graduation-cap" style="color: #34d399;"></i> Manual Maestro de Ventas & Cierre B2B',
+    'prospecting': '<i class="fa-solid fa-crosshairs" style="color: var(--accent-indigo);"></i> Prospección B2B & Demos',
     'marketing': '<i class="fa-solid fa-wand-magic-sparkles" style="color: #ec4899;"></i> AI Marketing Studio',
     'connections': '<i class="fa-solid fa-plug" style="color: var(--accent-cyan);"></i> APIs & WhatsApp Gateway',
     'whitelabel': '<i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i> Personalización Marca Blanca'
