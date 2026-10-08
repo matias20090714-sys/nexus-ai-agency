@@ -384,10 +384,19 @@ function loadActiveAgentForClient() {
     document.getElementById('agentEditorName').value = client.agentName || `Asistente de ${client.name}`;
     document.getElementById('agentEditorPrompt').value = client.systemPrompt || '';
     document.getElementById('agentEditorKnowledge').value = client.knowledgeBase || '';
+    if (document.getElementById('agentCalendarLink')) document.getElementById('agentCalendarLink').value = client.calendarLink || '';
+    if (document.getElementById('agentGoogleCalendarEmail')) document.getElementById('agentGoogleCalendarEmail').value = client.googleCalendarEmail || '';
+    if (document.getElementById('agentScheduleStart')) document.getElementById('agentScheduleStart').value = client.scheduleStart || '09:00';
+    if (document.getElementById('agentScheduleEnd')) document.getElementById('agentScheduleEnd').value = client.scheduleEnd || '19:00';
+    if (document.getElementById('agentSlotDuration')) document.getElementById('agentSlotDuration').value = client.slotDuration || '30';
+    if (document.getElementById('agentReminderToggle')) document.getElementById('agentReminderToggle').checked = client.reminderEnabled !== false;
+    if (document.getElementById('agentReminderTemplate')) document.getElementById('agentReminderTemplate').value = client.reminderTemplate || 'Hola {nombre}, te recordamos tu cita de {servicio} mañana a las {hora}. ¿Confirmas tu asistencia?';
   } else {
     document.getElementById('agentEditorName').value = 'Asistente Global de Agencia';
     document.getElementById('agentEditorPrompt').value = 'Eres el asistente de inteligencia artificial de la agencia NEXUS AI. Tu misión es brindar atención profesional y calificar clientes potenciales.';
     document.getElementById('agentEditorKnowledge').value = 'Servicios de Automatización con IA:\n- Plan Starter: $290 USD/mes\n- Plan Pro: $690 USD/mes\n- Implementación técnica y soporte 24/7.';
+    if (document.getElementById('agentCalendarLink')) document.getElementById('agentCalendarLink').value = localStorage.getItem('nexus_global_cal_link') || '';
+    if (document.getElementById('agentGoogleCalendarEmail')) document.getElementById('agentGoogleCalendarEmail').value = localStorage.getItem('nexus_global_cal_email') || '';
   }
 }
 
@@ -409,15 +418,51 @@ function saveActiveAgentConfig() {
   const prompt = document.getElementById('agentEditorPrompt').value.trim();
   const knowledge = document.getElementById('agentEditorKnowledge').value.trim();
 
+  const calendarLink = document.getElementById('agentCalendarLink')?.value.trim() || '';
+  const googleEmail = document.getElementById('agentGoogleCalendarEmail')?.value.trim() || '';
+  const scheduleStart = document.getElementById('agentScheduleStart')?.value || '09:00';
+  const scheduleEnd = document.getElementById('agentScheduleEnd')?.value || '19:00';
+  const slotDuration = document.getElementById('agentSlotDuration')?.value || '30';
+  const reminderEnabled = document.getElementById('agentReminderToggle')?.checked !== false;
+  const reminderTemplate = document.getElementById('agentReminderTemplate')?.value.trim() || '';
+
   if (client) {
     client.agentName = agentName;
     client.systemPrompt = prompt;
     client.knowledgeBase = knowledge;
+    client.calendarLink = calendarLink;
+    client.googleCalendarEmail = googleEmail;
+    client.scheduleStart = scheduleStart;
+    client.scheduleEnd = scheduleEnd;
+    client.slotDuration = slotDuration;
+    client.reminderEnabled = reminderEnabled;
+    client.reminderTemplate = reminderTemplate;
     saveAgencyClients(agencyClients);
-    showToast(`Configuración del Agente guardada para ${client.name}`, 'success');
+    showToast(`Configuración de Agente y Calendario guardada para ${client.name}`, 'success');
   } else {
-    showToast('Configuración global del Agente guardada', 'success');
+    localStorage.setItem('nexus_global_cal_link', calendarLink);
+    localStorage.setItem('nexus_global_cal_email', googleEmail);
+    showToast('Configuración global del Agente y Calendario guardada', 'success');
   }
+}
+
+function testGoogleCalendarLink() {
+  const client = agencyClients.find(c => c.id === activeClientId);
+  const title = encodeURIComponent(`Cita con ${client ? client.name : 'NEXUS AI Agency'}`);
+  const details = encodeURIComponent('Cita agendada automáticamente por el Agente de Inteligencia Artificial.');
+  const location = encodeURIComponent(client?.address || 'Oficina / Enlace Virtual');
+  
+  // Format tomorrow date at 15:00
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const yyyy = tomorrow.getFullYear();
+  const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+  const dd = String(tomorrow.getDate()).padStart(2, '0');
+  const dates = `${yyyy}${mm}${dd}T180000Z/${yyyy}${mm}${dd}T183000Z`;
+
+  const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${dates}`;
+  window.open(url, '_blank');
+  showToast('Abriendo plantilla de evento en Google Calendar...', 'info');
 }
 
 async function testAgentLiveDialog() {

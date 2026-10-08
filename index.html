@@ -671,6 +671,90 @@
                 </button>
               </div>
             </div>
+
+            <!-- Calendar & Automated Appointment Scheduling Configuration -->
+            <div style="margin-top: 24px; background: rgba(10, 13, 28, 0.7); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: var(--radius-lg); padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div style="width: 40px; height: 40px; border-radius: var(--radius-sm); background: rgba(52, 211, 153, 0.15); border: 1px solid #34d399; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #34d399;">
+                    <i class="fa-solid fa-calendar-check"></i>
+                  </div>
+                  <div>
+                    <h3 style="font-size: 16px; font-weight: 800; color: white; margin: 0;">Motor de Agendamiento Inteligente & Google Calendar</h3>
+                    <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0 0;">El agente de IA detecta citas en WhatsApp, sincroniza con Google Calendar y envía recordatorios anti-ausentismo.</p>
+                  </div>
+                </div>
+                <span class="brand-badge" style="background: rgba(52,211,153,0.15); color: #34d399; font-weight: 800; padding: 6px 12px; border: 1px solid rgba(52,211,153,0.3);">
+                  <i class="fa-solid fa-bolt"></i> Sistema Híbrido Activo
+                </span>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px;">
+                <!-- Col 1: Integration URLs & Google Calendar -->
+                <div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px;">Enlace de Autocita (Calendly / Cal.com / Meet)</label>
+                    <input type="text" id="agentCalendarLink" class="form-control" placeholder="https://calendly.com/tu-empresa/cita" style="font-size: 13px;">
+                    <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px;">El agente entregará este enlace si el cliente pide elegir su horario en pantalla.</span>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px;">Email o ID de Google Calendar</label>
+                    <input type="email" id="agentGoogleCalendarEmail" class="form-control" placeholder="citas.empresa@gmail.com" style="font-size: 13px;">
+                    <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px;">Recibe las alertas directas en la app de calendario de tu teléfono.</span>
+                  </div>
+                </div>
+
+                <!-- Col 2: Schedules & Slot Durations -->
+                <div>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 12px;">Hora Apertura</label>
+                      <input type="time" id="agentScheduleStart" class="form-control" value="09:00">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 12px;">Hora Cierre</label>
+                      <input type="time" id="agentScheduleEnd" class="form-control" value="19:00">
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px;">Duración por Cita / Turno</label>
+                    <select id="agentSlotDuration" class="form-control">
+                      <option value="15">15 Minutos (Consultas rápidas)</option>
+                      <option value="30" selected>30 Minutos (Estándar)</option>
+                      <option value="45">45 Minutos (Tratamientos)</option>
+                      <option value="60">60 Minutos (1 Hora completa)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Col 3: Anti-NoShow WhatsApp Reminders -->
+                <div style="background: rgba(15, 23, 42, 0.6); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="font-size: 12.5px; color: white;"><i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Recordatorio WhatsApp</strong>
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #34d399; cursor: pointer;">
+                      <input type="checkbox" id="agentReminderToggle" checked style="accent-color: #25d366;"> Activo
+                    </label>
+                  </div>
+                  <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
+                    Envía mensaje automático por WhatsApp 24h y 2h antes de la cita para evitar ausencias.
+                  </p>
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <textarea id="agentReminderTemplate" class="form-control" rows="3" style="font-size: 11.5px;" placeholder="Hola {nombre}, te recordamos tu cita de {servicio} mañana a las {hora}. ¿Confirmas tu asistencia?"></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                <button class="btn btn-secondary btn-sm" onclick="testGoogleCalendarLink()">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Probar Enlace de Google Calendar
+                </button>
+                <button class="btn btn-emerald btn-sm" onclick="saveActiveAgentConfig()">
+                  <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración de Calendario
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
