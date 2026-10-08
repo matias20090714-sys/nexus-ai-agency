@@ -1633,12 +1633,12 @@ textarea.form-control {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
-    width: 290px !important;
-    max-width: 85vw !important;
+    width: 250px !important;
+    max-width: 72vw !important;
     height: 100vh !important;
     z-index: 1000 !important;
     transform: translateX(-105%) !important;
-    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
     background: #0b0f24 !important;
     box-shadow: 15px 0 40px rgba(0, 0, 0, 0.9) !important;
     overflow-y: auto !important;
@@ -1646,6 +1646,78 @@ textarea.form-control {
 
   .sidebar.mobile-open {
     transform: translateX(0) !important;
+  }
+
+  /* Compact Mobile Sidebar Elements */
+  .sidebar .brand-header {
+    padding: 12px 14px !important;
+  }
+
+  .sidebar .brand-icon-wrapper {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 16px !important;
+  }
+
+  .sidebar .brand-title {
+    font-size: 15px !important;
+  }
+
+  .sidebar .tenant-selector-box {
+    padding: 8px 10px !important;
+    margin: 6px 8px 2px 8px !important;
+  }
+
+  .sidebar .tenant-label {
+    font-size: 10px !important;
+    margin-bottom: 4px !important;
+  }
+
+  .sidebar .tenant-select {
+    padding: 6px 8px !important;
+    font-size: 11.5px !important;
+  }
+
+  .sidebar .nav-menu {
+    padding: 6px 6px !important;
+    gap: 2px !important;
+  }
+
+  .sidebar .nav-section-title {
+    font-size: 9.5px !important;
+    padding: 6px 8px 2px 8px !important;
+  }
+
+  .sidebar .nav-item {
+    padding: 7px 10px !important;
+    font-size: 12px !important;
+    gap: 8px !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .sidebar .nav-icon {
+    font-size: 13px !important;
+  }
+
+  .sidebar .nav-badge {
+    font-size: 9px !important;
+    padding: 1px 6px !important;
+  }
+
+  .sidebar .sidebar-footer {
+    padding: 8px !important;
+  }
+
+  .sidebar .wa-status-card {
+    padding: 8px 10px !important;
+  }
+
+  .sidebar .wa-status-text {
+    font-size: 11px !important;
+  }
+
+  .sidebar .wa-status-sub {
+    font-size: 9.5px !important;
   }
 
   .main-wrapper {
