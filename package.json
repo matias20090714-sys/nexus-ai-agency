@@ -1,4 +1,11 @@
 {
+  "name": "nexus-ai-agency",
+  "version": "1.0.0",
+  "description": "White-Label AI Agency Operating System with Real WhatsApp Multi-Device Gateway",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "pino": "^10.4.0",
