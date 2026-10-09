@@ -219,6 +219,11 @@ function switchTab(tabName) {
   }
   if (overlay) overlay.classList.remove('active');
 
+  // Reset scroll to top
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  const mc = document.querySelector('.main-content');
+  if (mc) mc.scrollTop = 0;
+
   // Update nav items directly by matching exact data-tab attribute
   document.querySelectorAll('.nav-item').forEach(item => {
     if (item.getAttribute('data-tab') === tabName) {
