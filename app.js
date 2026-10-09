@@ -157,6 +157,7 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
   renderRealInbox();
   renderRealKanban();
   loadActiveAgentForClient();
+  renderQuotesHistoryTable();
   updateMarketingForm();
   checkQrConnectionState();
 }
@@ -214,6 +215,7 @@ function switchTab(tabName) {
     'agents-builder': '<i class="fa-solid fa-robot" style="color: var(--accent-indigo);"></i> Configuración del Agente & Base de Conocimiento',
     'inbox': '<i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Bandeja de WhatsApp Real',
     'pipeline': '<i class="fa-solid fa-bars-progress" style="color: var(--accent-indigo);"></i> Pipeline de Leads Reales',
+    'quotes': '<i class="fa-solid fa-file-invoice-dollar" style="color: var(--accent-indigo);"></i> Cotizaciones & Facturación Inteligente',
     'playbook': '<i class="fa-solid fa-graduation-cap" style="color: #34d399;"></i> Manual Maestro de Ventas & Cierre B2B',
     'prospecting': '<i class="fa-solid fa-crosshairs" style="color: var(--accent-indigo);"></i> Prospección B2B & Demos',
     'marketing': '<i class="fa-solid fa-wand-magic-sparkles" style="color: #ec4899;"></i> AI Marketing Studio',
@@ -224,6 +226,10 @@ function switchTab(tabName) {
   if (titles[tabName]) {
     const pageTitleElem = document.getElementById('pageTitle');
     if (pageTitleElem) pageTitleElem.innerHTML = titles[tabName];
+  }
+
+  if (tabName === 'quotes') {
+    renderQuotesModule();
   }
 
   if (tabName === 'connections') {
@@ -400,13 +406,68 @@ function deleteClientAccount(clientId) {
   showToast('Sub-cuenta eliminada', 'info');
 }
 
-// ==================== AGENTS & KNOWLEDGE BASE ====================
+// ==================== AGENTS & MULTI-FLOW KNOWLEDGE BASE ====================
+function switchAgentSubtab(subtabId) {
+  document.querySelectorAll('.subtab-btn').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.subtab-view-content').forEach(view => view.classList.remove('active'));
+
+  const activeBtn = document.getElementById(`subtabBtn-${subtabId}`);
+  const activeView = document.getElementById(`subtabView-${subtabId}`);
+  if (activeBtn) activeBtn.classList.add('active');
+  if (activeView) activeView.classList.add('active');
+}
+
 function loadActiveAgentForClient() {
   const client = agencyClients.find(c => c.id === activeClientId);
+  const badge = document.getElementById('agentActiveCompanyBadge');
+  if (badge) badge.innerText = client ? client.name : 'NEXUS AI Agency HQ';
+
+  // Ensure client has catalog & multi-flows
   if (client) {
+    if (!client.catalog || !Array.isArray(client.catalog)) {
+      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
+      client.catalog = JSON.parse(JSON.stringify(bp.defaultCatalog || []));
+    }
+    if (!client.salesFlow) {
+      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
+      client.salesFlow = JSON.parse(JSON.stringify(bp.salesFlow || {}));
+    }
+    if (!client.supportFlow) {
+      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
+      client.supportFlow = JSON.parse(JSON.stringify(bp.supportFlow || {}));
+    }
+    if (!client.afterSalesFlow) {
+      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
+      client.afterSalesFlow = JSON.parse(JSON.stringify(bp.afterSalesFlow || {}));
+    }
+
+    // Populate Identity & Base
     document.getElementById('agentEditorName').value = client.agentName || `Asistente de ${client.name}`;
+    if (document.getElementById('agentEditorTone')) document.getElementById('agentEditorTone').value = client.tone || 'profesional_calido';
     document.getElementById('agentEditorPrompt').value = client.systemPrompt || '';
     document.getElementById('agentEditorKnowledge').value = client.knowledgeBase || '';
+    if (document.getElementById('agentEditorGoal')) document.getElementById('agentEditorGoal').value = client.goal || 'sales';
+
+    // Populate Sales Flow
+    if (document.getElementById('salesFlowQualification')) document.getElementById('salesFlowQualification').value = client.salesFlow.qualification || '';
+    if (document.getElementById('salesFlowBudget')) document.getElementById('salesFlowBudget').value = client.salesFlow.budget || '';
+    if (document.getElementById('salesFlowObjections')) document.getElementById('salesFlowObjections').value = client.salesFlow.objections || '';
+    if (document.getElementById('salesFlowClosing')) document.getElementById('salesFlowClosing').value = client.salesFlow.closing || '';
+
+    // Populate Support Flow
+    if (document.getElementById('supportFlowFaqs')) document.getElementById('supportFlowFaqs').value = client.supportFlow.faqs || '';
+    if (document.getElementById('supportFlowEmergency')) document.getElementById('supportFlowEmergency').value = client.supportFlow.emergency || '';
+    if (document.getElementById('supportFlowHumanPhone')) document.getElementById('supportFlowHumanPhone').value = client.supportFlow.humanPhone || client.phone || '';
+
+    // Populate After-Sales Flow
+    if (document.getElementById('aftersalesToggle')) document.getElementById('aftersalesToggle').checked = client.afterSalesFlow.enabled !== false;
+    if (document.getElementById('aftersalesDelay')) document.getElementById('aftersalesDelay').value = client.afterSalesFlow.surveyDelayHours || 4;
+    if (document.getElementById('aftersalesMessage')) document.getElementById('aftersalesMessage').value = client.afterSalesFlow.message || '';
+    if (document.getElementById('aftersalesGoogleUrl')) document.getElementById('aftersalesGoogleUrl').value = client.afterSalesFlow.googleReviewUrl || '';
+    if (document.getElementById('aftersalesGooglePrompt')) document.getElementById('aftersalesGooglePrompt').value = client.afterSalesFlow.googleReviewPrompt || '';
+    if (document.getElementById('aftersalesLoyalty')) document.getElementById('aftersalesLoyalty').value = client.afterSalesFlow.loyaltyDiscount || '';
+
+    // Populate Calendar & Booking
     if (document.getElementById('agentCalendarLink')) document.getElementById('agentCalendarLink').value = client.calendarLink || '';
     if (document.getElementById('agentGoogleCalendarEmail')) document.getElementById('agentGoogleCalendarEmail').value = client.googleCalendarEmail || '';
     if (document.getElementById('agentScheduleStart')) document.getElementById('agentScheduleStart').value = client.scheduleStart || '09:00';
@@ -414,13 +475,98 @@ function loadActiveAgentForClient() {
     if (document.getElementById('agentSlotDuration')) document.getElementById('agentSlotDuration').value = client.slotDuration || '30';
     if (document.getElementById('agentReminderToggle')) document.getElementById('agentReminderToggle').checked = client.reminderEnabled !== false;
     if (document.getElementById('agentReminderTemplate')) document.getElementById('agentReminderTemplate').value = client.reminderTemplate || 'Hola {nombre}, te recordamos tu cita de {servicio} mañana a las {hora}. ¿Confirmas tu asistencia?';
+
+    renderAgentCatalogTable();
   } else {
+    // Global Agency HQ Defaults
     document.getElementById('agentEditorName').value = 'Asistente Global de Agencia';
     document.getElementById('agentEditorPrompt').value = 'Eres el asistente de inteligencia artificial de la agencia NEXUS AI. Tu misión es brindar atención profesional y calificar clientes potenciales.';
     document.getElementById('agentEditorKnowledge').value = 'Servicios de Automatización con IA:\n- Plan Starter: $290 USD/mes\n- Plan Pro: $690 USD/mes\n- Implementación técnica y soporte 24/7.';
     if (document.getElementById('agentCalendarLink')) document.getElementById('agentCalendarLink').value = localStorage.getItem('nexus_global_cal_link') || '';
     if (document.getElementById('agentGoogleCalendarEmail')) document.getElementById('agentGoogleCalendarEmail').value = localStorage.getItem('nexus_global_cal_email') || '';
+    renderAgentCatalogTable();
   }
+}
+
+// Catalog CRUD Engine
+function renderAgentCatalogTable() {
+  const client = agencyClients.find(c => c.id === activeClientId);
+  const tbody = document.getElementById('agentCatalogTableBody');
+  if (!tbody) return;
+
+  const catalog = (client && client.catalog) ? client.catalog : [
+    { id: 'srv_std_1', name: 'Plan Starter de IA para WhatsApp', price: 290, duration: '48 hs', description: 'Bot conversacional 24/7, catálogo y respuestas ilimitadas.' },
+    { id: 'srv_std_2', name: 'Plan Growth Pro Multi-Flujo', price: 690, duration: '24 hs', description: 'Agendamiento con Google Calendar, CRM y Pasarelas de Pago.' }
+  ];
+
+  if (catalog.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: var(--text-dim);">No hay ítems en el catálogo de esta empresa. Haz clic en 'Agregar Nuevo Ítem'.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = catalog.map((item, idx) => `
+    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+      <td style="padding: 12px 16px; font-weight: 700; color: white;">${item.name}</td>
+      <td style="padding: 12px 16px; color: #cbd5e1; max-width: 320px;">${item.description || '--'}</td>
+      <td style="padding: 12px 16px;"><span class="brand-badge" style="background: rgba(6,182,212,0.15); color: #22d3ee;">${item.duration || 'Inmediato'}</span></td>
+      <td style="padding: 12px 16px; font-weight: 800; color: #34d399; font-size: 14px;">$${Number(item.price).toLocaleString()} USD</td>
+      <td style="padding: 12px 16px; text-align: right;">
+        <button class="btn btn-secondary btn-sm" onclick="deleteCatalogItem('${item.id || idx}')" style="padding: 4px 8px; font-size: 11px;">
+          <i class="fa-solid fa-trash" style="color: #f43f5e;"></i>
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openNewCatalogItemModal() {
+  document.getElementById('newCatItemName').value = '';
+  document.getElementById('newCatItemDesc').value = '';
+  document.getElementById('newCatItemPrice').value = '';
+  document.getElementById('newCatItemDuration').value = '';
+  document.getElementById('modalNewCatalogItem').classList.add('active');
+}
+
+function saveNewCatalogItem() {
+  const name = document.getElementById('newCatItemName').value.trim();
+  const desc = document.getElementById('newCatItemDesc').value.trim();
+  const price = parseFloat(document.getElementById('newCatItemPrice').value) || 0;
+  const duration = document.getElementById('newCatItemDuration').value.trim() || 'Estándar';
+
+  if (!name) {
+    showToast('Por favor escribe el nombre del servicio o producto', 'error');
+    return;
+  }
+
+  const client = agencyClients.find(c => c.id === activeClientId);
+  if (!client) {
+    showToast('Selecciona una empresa cliente primero para guardar en su catálogo', 'error');
+    return;
+  }
+
+  if (!client.catalog) client.catalog = [];
+  client.catalog.push({
+    id: 'srv_' + Date.now(),
+    name: name,
+    description: desc,
+    price: price,
+    duration: duration
+  });
+
+  saveAgencyClients(agencyClients);
+  closeModal('modalNewCatalogItem');
+  renderAgentCatalogTable();
+  showToast(`¡'${name}' agregado al catálogo de ${client.name}!`, 'success');
+}
+
+function deleteCatalogItem(itemId) {
+  const client = agencyClients.find(c => c.id === activeClientId);
+  if (!client || !client.catalog) return;
+
+  client.catalog = client.catalog.filter((it, idx) => it.id !== itemId && String(idx) !== String(itemId));
+  saveAgencyClients(agencyClients);
+  renderAgentCatalogTable();
+  showToast('Ítem eliminado del catálogo', 'info');
 }
 
 function loadBlueprintPrompt(blueprintId) {
@@ -431,16 +577,54 @@ function loadBlueprintPrompt(blueprintId) {
   const client = agencyClients.find(c => c.id === activeClientId);
   const companyName = client ? client.name : 'la empresa';
 
-  document.getElementById('agentEditorPrompt').value = bp.defaultSystemPrompt.replace('la clínica', companyName).replace('la empresa', companyName).replace('el salón', companyName);
-  showToast(`Plantilla '${bp.name}' cargada`, 'info');
+  document.getElementById('agentEditorPrompt').value = bp.defaultSystemPrompt.replace(/la clínica|la empresa|el salón/g, companyName);
+  
+  if (client) {
+    client.catalog = JSON.parse(JSON.stringify(bp.defaultCatalog));
+    client.salesFlow = JSON.parse(JSON.stringify(bp.salesFlow));
+    client.supportFlow = JSON.parse(JSON.stringify(bp.supportFlow));
+    client.afterSalesFlow = JSON.parse(JSON.stringify(bp.afterSalesFlow));
+    saveAgencyClients(agencyClients);
+    loadActiveAgentForClient();
+  }
+
+  showToast(`Plantilla '${bp.name}' y catálogo de ${bp.category} cargados con éxito`, 'success');
 }
 
 function saveActiveAgentConfig() {
   const client = agencyClients.find(c => c.id === activeClientId);
   const agentName = document.getElementById('agentEditorName').value.trim();
+  const tone = document.getElementById('agentEditorTone')?.value || 'profesional_calido';
   const prompt = document.getElementById('agentEditorPrompt').value.trim();
   const knowledge = document.getElementById('agentEditorKnowledge').value.trim();
+  const goal = document.getElementById('agentEditorGoal')?.value || 'sales';
 
+  // Sales Flow
+  const salesFlow = {
+    qualification: document.getElementById('salesFlowQualification')?.value.trim() || '',
+    budget: document.getElementById('salesFlowBudget')?.value.trim() || '',
+    objections: document.getElementById('salesFlowObjections')?.value.trim() || '',
+    closing: document.getElementById('salesFlowClosing')?.value.trim() || ''
+  };
+
+  // Support Flow
+  const supportFlow = {
+    faqs: document.getElementById('supportFlowFaqs')?.value.trim() || '',
+    emergency: document.getElementById('supportFlowEmergency')?.value.trim() || '',
+    humanPhone: document.getElementById('supportFlowHumanPhone')?.value.trim() || ''
+  };
+
+  // After-Sales Flow
+  const afterSalesFlow = {
+    enabled: document.getElementById('aftersalesToggle')?.checked !== false,
+    surveyDelayHours: parseInt(document.getElementById('aftersalesDelay')?.value) || 4,
+    message: document.getElementById('aftersalesMessage')?.value.trim() || '',
+    googleReviewUrl: document.getElementById('aftersalesGoogleUrl')?.value.trim() || '',
+    googleReviewPrompt: document.getElementById('aftersalesGooglePrompt')?.value.trim() || '',
+    loyaltyDiscount: document.getElementById('aftersalesLoyalty')?.value.trim() || ''
+  };
+
+  // Calendar
   const calendarLink = document.getElementById('agentCalendarLink')?.value.trim() || '';
   const googleEmail = document.getElementById('agentGoogleCalendarEmail')?.value.trim() || '';
   const scheduleStart = document.getElementById('agentScheduleStart')?.value || '09:00';
@@ -451,8 +635,13 @@ function saveActiveAgentConfig() {
 
   if (client) {
     client.agentName = agentName;
+    client.tone = tone;
     client.systemPrompt = prompt;
     client.knowledgeBase = knowledge;
+    client.goal = goal;
+    client.salesFlow = salesFlow;
+    client.supportFlow = supportFlow;
+    client.afterSalesFlow = afterSalesFlow;
     client.calendarLink = calendarLink;
     client.googleCalendarEmail = googleEmail;
     client.scheduleStart = scheduleStart;
@@ -460,13 +649,391 @@ function saveActiveAgentConfig() {
     client.slotDuration = slotDuration;
     client.reminderEnabled = reminderEnabled;
     client.reminderTemplate = reminderTemplate;
+
     saveAgencyClients(agencyClients);
-    showToast(`Configuración de Agente y Calendario guardada para ${client.name}`, 'success');
+    showToast(`¡Todos los flujos y reglas del Agente guardados para ${client.name}!`, 'success');
   } else {
     localStorage.setItem('nexus_global_cal_link', calendarLink);
     localStorage.setItem('nexus_global_cal_email', googleEmail);
-    showToast('Configuración global del Agente y Calendario guardada', 'success');
+    showToast('Configuración global del Agente guardada', 'success');
   }
+}
+
+// ==================== SMART QUOTATIONS & BILLING ENGINE ====================
+let currentQuoteItems = [
+  { name: 'Implementación de Agente IA WhatsApp Multi-Flujo', qty: 1, price: 490 }
+];
+
+function renderQuotesModule() {
+  // Populate Emitting Company Selector
+  const compSelect = document.getElementById('quoteCompanySelector');
+  if (compSelect) {
+    compSelect.innerHTML = `
+      <option value="agency_hq">NEXUS AI Agency HQ</option>
+      ${agencyClients.map(c => `<option value="${c.id}">${c.name} (${c.industry})</option>`).join('')}
+    `;
+    compSelect.value = activeClientId !== 'agency_hq' ? activeClientId : 'agency_hq';
+  }
+
+  // Populate Quick Catalog Select
+  populateQuickCatalogDropdown();
+
+  // Set Folio
+  const quotes = getStoredQuotes();
+  const nextNum = (quotes.length + 1).toString().padStart(3, '0');
+  const quoteNumElem = document.getElementById('quoteNumber');
+  if (quoteNumElem) quoteNumElem.value = `COT-2026-${nextNum}`;
+
+  // Render Items & Preview
+  renderQuoteItemsBuilder();
+  updateQuotePreview();
+
+  // Render Table & Top Stats
+  renderQuotesHistoryTable();
+}
+
+function populateQuickCatalogDropdown() {
+  const quickSelect = document.getElementById('quoteQuickCatalogSelect');
+  if (!quickSelect) return;
+
+  const compId = document.getElementById('quoteCompanySelector')?.value || activeClientId;
+  const client = agencyClients.find(c => c.id === compId);
+  const catalog = (client && client.catalog) ? client.catalog : (AGENCY_BLUEPRINTS[0].defaultCatalog || []);
+
+  quickSelect.innerHTML = `<option value="">-- Cargar del Catálogo --</option>` +
+    catalog.map(it => `<option value="${it.id}" data-name="${it.name}" data-price="${it.price}">🛍️ ${it.name} ($${it.price} USD)</option>`).join('');
+}
+
+function onQuoteCompanyChange(companyId) {
+  activeClientId = companyId;
+  populateQuickCatalogDropdown();
+  updateQuotePreview();
+}
+
+function renderQuoteItemsBuilder() {
+  const container = document.getElementById('quoteItemsListBuilder');
+  if (!container) return;
+
+  if (currentQuoteItems.length === 0) {
+    container.innerHTML = `<div style="font-size: 12px; color: var(--text-dim); text-align: center; padding: 10px;">No has agregado ítems a la cotización. Elige uno del catálogo o agrega uno manual.</div>`;
+    return;
+  }
+
+  container.innerHTML = currentQuoteItems.map((item, idx) => `
+    <div class="quote-line-item-row">
+      <input type="text" class="form-control" style="font-size: 12px;" value="${item.name}" placeholder="Descripción del servicio" oninput="updateQuoteItemField(${idx}, 'name', this.value)">
+      <input type="number" class="form-control" style="font-size: 12px; text-align: center;" value="${item.qty}" min="1" oninput="updateQuoteItemField(${idx}, 'qty', this.value)">
+      <input type="number" class="form-control" style="font-size: 12px; text-align: right;" value="${item.price}" min="0" oninput="updateQuoteItemField(${idx}, 'price', this.value)">
+      <div style="font-size: 12px; font-weight: 800; color: #34d399; text-align: right;">$${(item.qty * item.price).toFixed(2)}</div>
+      <button class="btn btn-secondary btn-sm" onclick="removeQuoteItem(${idx})" style="padding: 4px 6px; font-size: 10px;">
+        <i class="fa-solid fa-xmark" style="color: #f43f5e;"></i>
+      </button>
+    </div>
+  `).join('');
+}
+
+function addSelectedCatalogItemToQuote() {
+  const quickSelect = document.getElementById('quoteQuickCatalogSelect');
+  if (!quickSelect || !quickSelect.value) {
+    showToast('Selecciona un ítem de la lista del catálogo', 'error');
+    return;
+  }
+
+  const selectedOpt = quickSelect.options[quickSelect.selectedIndex];
+  const name = selectedOpt.getAttribute('data-name');
+  const price = parseFloat(selectedOpt.getAttribute('data-price')) || 0;
+
+  currentQuoteItems.push({ name: name, qty: 1, price: price });
+  quickSelect.value = '';
+  renderQuoteItemsBuilder();
+  updateQuotePreview();
+  showToast(`Ítem '${name}' añadido a la cotización`, 'success');
+}
+
+function addCustomItemToQuote() {
+  currentQuoteItems.push({ name: 'Servicio Personalizado Adicional', qty: 1, price: 100 });
+  renderQuoteItemsBuilder();
+  updateQuotePreview();
+}
+
+function removeQuoteItem(idx) {
+  currentQuoteItems.splice(idx, 1);
+  renderQuoteItemsBuilder();
+  updateQuotePreview();
+}
+
+function updateQuoteItemField(idx, field, val) {
+  if (!currentQuoteItems[idx]) return;
+  if (field === 'qty') currentQuoteItems[idx].qty = parseInt(val) || 1;
+  else if (field === 'price') currentQuoteItems[idx].price = parseFloat(val) || 0;
+  else currentQuoteItems[idx][field] = val;
+  updateQuotePreview();
+}
+
+function updateQuotePreview() {
+  const compId = document.getElementById('quoteCompanySelector')?.value || activeClientId;
+  const client = agencyClients.find(c => c.id === compId);
+  const profile = getAgencyProfile();
+
+  const compName = client ? client.name : profile.name;
+  const folio = document.getElementById('quoteNumber')?.value || 'COT-2026-001';
+  const clientName = document.getElementById('quoteClientName')?.value.trim() || 'Cliente Destinatario';
+  const clientPhone = document.getElementById('quoteClientPhone')?.value.trim() || '+1 555-000-0000';
+  const clientEmail = document.getElementById('quoteClientEmail')?.value.trim() || 'cliente@empresa.com';
+  const validity = document.getElementById('quoteValidity')?.value || '15 Días';
+  const notes = document.getElementById('quoteNotes')?.value.trim() || '50% de anticipo para reserva y 50% contra entrega. Facturación oficial inmediata.';
+
+  const discountPct = parseFloat(document.getElementById('quoteDiscountPercent')?.value) || 0;
+  const taxPct = parseFloat(document.getElementById('quoteTaxPercent')?.value) || 0;
+
+  // Calculate Math
+  const subtotal = currentQuoteItems.reduce((acc, it) => acc + (it.qty * it.price), 0);
+  const discountVal = (subtotal * (discountPct / 100));
+  const afterDiscount = subtotal - discountVal;
+  const taxVal = (afterDiscount * (taxPct / 100));
+  const grandTotal = afterDiscount + taxVal;
+
+  // Update Preview Card Fields
+  if (document.getElementById('prevQuoteCompanyName')) document.getElementById('prevQuoteCompanyName').innerText = compName;
+  if (document.getElementById('prevQuoteCompanySubtitle')) document.getElementById('prevQuoteCompanySubtitle').innerText = client ? `Especialistas en ${client.industry}` : 'Soluciones de Inteligencia Artificial & Automatización';
+  if (document.getElementById('prevQuoteFolio')) document.getElementById('prevQuoteFolio').innerText = `#${folio}`;
+  if (document.getElementById('prevQuoteDate')) document.getElementById('prevQuoteDate').innerText = `Fecha: ${new Date().toLocaleDateString()}`;
+  if (document.getElementById('prevQuoteClientName')) document.getElementById('prevQuoteClientName').innerText = clientName;
+  if (document.getElementById('prevQuoteClientPhone')) document.getElementById('prevQuoteClientPhone').innerText = clientPhone;
+  if (document.getElementById('prevQuoteClientEmail')) document.getElementById('prevQuoteClientEmail').innerText = clientEmail;
+  if (document.getElementById('prevQuoteValidity')) document.getElementById('prevQuoteValidity').innerText = validity;
+  if (document.getElementById('prevQuoteNotes')) document.getElementById('prevQuoteNotes').innerText = notes;
+
+  // Update Items Table Preview
+  const tbody = document.getElementById('prevQuoteItemsBody');
+  if (tbody) {
+    if (currentQuoteItems.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" style="padding: 12px; text-align: center; color: #94a3b8;">Sin ítems seleccionados</td></tr>`;
+    } else {
+      tbody.innerHTML = currentQuoteItems.map(it => `
+        <tr style="border-bottom: 1px solid #f1f5f9;">
+          <td style="padding: 8px 6px; font-weight: 600; color: #1e293b;">${it.name}</td>
+          <td style="padding: 8px 6px; text-align: center; color: #475569;">${it.qty}</td>
+          <td style="padding: 8px 6px; text-align: right; color: #475569;">$${Number(it.price).toFixed(2)}</td>
+          <td style="padding: 8px 6px; text-align: right; font-weight: 700; color: #0f172a;">$${(it.qty * it.price).toFixed(2)}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  // Update Totals
+  if (document.getElementById('prevQuoteSubtotal')) document.getElementById('prevQuoteSubtotal').innerText = `$${subtotal.toFixed(2)}`;
+  if (document.getElementById('prevQuoteDiscountLabel')) document.getElementById('prevQuoteDiscountLabel').innerText = `${discountPct}%`;
+  if (document.getElementById('prevQuoteDiscountVal')) document.getElementById('prevQuoteDiscountVal').innerText = `-$${discountVal.toFixed(2)}`;
+  if (document.getElementById('prevQuoteTaxLabel')) document.getElementById('prevQuoteTaxLabel').innerText = `${taxPct}%`;
+  if (document.getElementById('prevQuoteTaxVal')) document.getElementById('prevQuoteTaxVal').innerText = `+$${taxVal.toFixed(2)}`;
+  if (document.getElementById('prevQuoteTotal')) document.getElementById('prevQuoteTotal').innerText = `$${grandTotal.toFixed(2)} USD`;
+}
+
+function resetQuoteForm() {
+  document.getElementById('quoteClientName').value = '';
+  document.getElementById('quoteClientPhone').value = '';
+  document.getElementById('quoteClientEmail').value = '';
+  document.getElementById('quoteDiscountPercent').value = '0';
+  document.getElementById('quoteTaxPercent').value = '0';
+  currentQuoteItems = [{ name: 'Implementación de Agente IA WhatsApp Multi-Flujo', qty: 1, price: 490 }];
+  renderQuoteItemsBuilder();
+  updateQuotePreview();
+  showToast('Formulario de cotización reiniciado', 'info');
+}
+
+function printQuoteOfficialPDF() {
+  window.print();
+}
+
+function saveAndSendCurrentQuote() {
+  const compId = document.getElementById('quoteCompanySelector')?.value || activeClientId;
+  const client = agencyClients.find(c => c.id === compId);
+  const profile = getAgencyProfile();
+  const compName = client ? client.name : profile.name;
+
+  const folio = document.getElementById('quoteNumber')?.value || `COT-2026-${Date.now().toString().slice(-4)}`;
+  const clientName = document.getElementById('quoteClientName')?.value.trim() || 'Cliente';
+  const clientPhone = document.getElementById('quoteClientPhone')?.value.trim();
+  const clientEmail = document.getElementById('quoteClientEmail')?.value.trim() || '';
+  const validity = document.getElementById('quoteValidity')?.value || '15 Días';
+
+  const subtotal = currentQuoteItems.reduce((acc, it) => acc + (it.qty * it.price), 0);
+  const discountPct = parseFloat(document.getElementById('quoteDiscountPercent')?.value) || 0;
+  const taxPct = parseFloat(document.getElementById('quoteTaxPercent')?.value) || 0;
+  const total = (subtotal * (1 - discountPct / 100)) * (1 + taxPct / 100);
+
+  const newQuote = {
+    id: 'quote_' + Date.now(),
+    folio: folio,
+    companyId: compId,
+    companyName: compName,
+    clientName: clientName,
+    clientPhone: clientPhone,
+    clientEmail: clientEmail,
+    validity: validity,
+    items: JSON.parse(JSON.stringify(currentQuoteItems)),
+    subtotal: subtotal,
+    total: total,
+    status: 'Enviada',
+    sentViaWa: true,
+    date: new Date().toLocaleDateString()
+  };
+
+  const quotes = getStoredQuotes();
+  quotes.unshift(newQuote);
+  saveQuotes(quotes);
+
+  // Sync to CRM Pipeline
+  syncQuoteToCrmPipeline(newQuote);
+
+  renderQuotesHistoryTable();
+
+  // Send WhatsApp
+  if (clientPhone) {
+    const itemsText = currentQuoteItems.map(it => `• ${it.name} (x${it.qty}) -> $${(it.qty * it.price).toFixed(2)} USD`).join('\n');
+    const waMsg = encodeURIComponent(
+      `🧾 *COTIZACIÓN COMERCIAL OFICIAL - ${compName}*\n` +
+      `Folio: *#${folio}* | Fecha: ${newQuote.date}\n\n` +
+      `Estimado/a *${clientName}*,\n` +
+      `Adjuntamos la propuesta de servicios solicitada:\n\n` +
+      `${itemsText}\n\n` +
+      `💰 *TOTAL A PAGAR:* $${total.toFixed(2)} USD\n` +
+      `⏳ *Validez de la oferta:* ${validity}\n\n` +
+      `💳 *Para confirmar y activar tu servicio hoy mismo, responde a este mensaje o abona mediante nuestro link oficial.*`
+    );
+    window.open(`https://wa.me/${clientPhone.replace(/\D/g, '')}?text=${waMsg}`, '_blank');
+  }
+
+  showToast(`¡Cotización #${folio} guardada y enviada por WhatsApp con éxito!`, 'success');
+}
+
+function sendQuoteWhatsAppDirect() {
+  saveAndSendCurrentQuote();
+}
+
+function openDirectQuotePaymentGateway() {
+  executeGatewayPayment();
+}
+
+function syncQuoteToCrmPipeline(quote) {
+  let leads = getAgencyLeads();
+  let existingLead = leads.find(l => (quote.clientPhone && l.phone === quote.clientPhone) || l.name === quote.clientName);
+
+  if (existingLead) {
+    existingLead.stage = 'Cotización Enviada';
+    existingLead.estimatedValue = `$${quote.total.toFixed(2)} USD`;
+    existingLead.lastMessage = `Cotización #${quote.folio} enviada por $${quote.total.toFixed(2)} USD`;
+  } else {
+    leads.unshift({
+      id: 'lead_' + Date.now(),
+      name: quote.clientName,
+      phone: quote.clientPhone || '+1 555-900-1122',
+      stage: 'Cotización Enviada',
+      estimatedValue: `$${quote.total.toFixed(2)} USD`,
+      lastMessage: `Cotización #${quote.folio} generada`,
+      timestamp: 'Hoy',
+      history: []
+    });
+  }
+
+  saveAgencyLeads(leads);
+  renderRealKanban();
+}
+
+function renderQuotesHistoryTable() {
+  const quotes = getStoredQuotes();
+  const tbody = document.getElementById('quotesHistoryTableBody');
+  const countElem = document.getElementById('quotesTableCount');
+  
+  if (countElem) countElem.innerText = `${quotes.length} cotizaciones registradas`;
+
+  // Update Top Stats
+  const totalAmount = quotes.reduce((acc, q) => acc + (q.total || 0), 0);
+  const acceptedCount = quotes.filter(q => q.status === 'Aceptada' || q.status === 'Pagada').length;
+  const sentWaCount = quotes.filter(q => q.sentViaWa).length;
+
+  if (document.getElementById('quotesStatTotal')) document.getElementById('quotesStatTotal').innerText = quotes.length;
+  if (document.getElementById('quotesStatAmount')) document.getElementById('quotesStatAmount').innerText = `$${Math.round(totalAmount).toLocaleString()} USD`;
+  if (document.getElementById('quotesStatAccepted')) document.getElementById('quotesStatAccepted').innerText = acceptedCount;
+  if (document.getElementById('quotesStatSentWa')) document.getElementById('quotesStatSentWa').innerText = sentWaCount;
+
+  if (!tbody) return;
+
+  if (quotes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding: 24px; text-align: center; color: var(--text-dim);">No se han emitido cotizaciones todavía. Diseña la primera arriba.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = quotes.map(q => {
+    const statusColor = q.status === 'Pagada' ? '#34d399' : q.status === 'Aceptada' ? '#22d3ee' : q.status === 'Enviada' ? '#fbbf24' : '#94a3b8';
+    return `
+      <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+        <td style="padding: 12px 14px; font-weight: 800; color: #818cf8;">#${q.folio}</td>
+        <td style="padding: 12px 14px; font-weight: 600; color: white;">${q.clientName}<br><span style="font-size: 11px; color: var(--text-dim);">${q.clientPhone || '--'}</span></td>
+        <td style="padding: 12px 14px; color: #cbd5e1;">${q.companyName}</td>
+        <td style="padding: 12px 14px; font-weight: 800; color: #34d399; font-size: 14px;">$${Number(q.total).toFixed(2)} USD</td>
+        <td style="padding: 12px 14px; color: var(--text-muted); font-size: 12px;">${q.date}</td>
+        <td style="padding: 12px 14px;">
+          <select onchange="changeQuoteStatus('${q.id}', this.value)" style="background: rgba(15,23,42,0.8); color: ${statusColor}; border: 1px solid ${statusColor}; border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
+            <option value="Borrador" ${q.status === 'Borrador' ? 'selected' : ''}>Borrador</option>
+            <option value="Enviada" ${q.status === 'Enviada' ? 'selected' : ''}>Enviada 📲</option>
+            <option value="Aceptada" ${q.status === 'Aceptada' ? 'selected' : ''}>Aceptada ✅</option>
+            <option value="Pagada" ${q.status === 'Pagada' ? 'selected' : ''}>Pagada 💰</option>
+          </select>
+        </td>
+        <td style="padding: 12px 14px; text-align: right;">
+          <button class="btn btn-secondary btn-sm" onclick="reSendQuoteWhatsApp('${q.id}')" title="Reenviar WhatsApp" style="padding: 4px 8px; font-size: 11px;">
+            <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i>
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="deleteQuote('${q.id}')" title="Eliminar cotización" style="padding: 4px 8px; font-size: 11px;">
+            <i class="fa-solid fa-trash" style="color: #f43f5e;"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function changeQuoteStatus(quoteId, newStatus) {
+  const quotes = getStoredQuotes();
+  const q = quotes.find(item => item.id === quoteId);
+  if (q) {
+    q.status = newStatus;
+    saveQuotes(quotes);
+    renderQuotesHistoryTable();
+    showToast(`Estado de cotización #${q.folio} actualizado a ${newStatus}`, 'success');
+  }
+}
+
+function reSendQuoteWhatsApp(quoteId) {
+  const quotes = getStoredQuotes();
+  const q = quotes.find(item => item.id === quoteId);
+  if (!q) return;
+
+  if (q.clientPhone) {
+    const itemsText = q.items.map(it => `• ${it.name} (x${it.qty}) -> $${(it.qty * it.price).toFixed(2)} USD`).join('\n');
+    const waMsg = encodeURIComponent(
+      `🧾 *RECORDATORIO DE COTIZACIÓN - ${q.companyName}*\n` +
+      `Folio: *#${q.folio}*\n\n` +
+      `Hola *${q.clientName}*, te reenviamos el detalle de tu propuesta:\n\n` +
+      `${itemsText}\n\n` +
+      `💰 *TOTAL:* $${q.total.toFixed(2)} USD\n\n` +
+      `¿Deseas que te reservemos el turno / activemos el servicio hoy?`
+    );
+    window.open(`https://wa.me/${q.clientPhone.replace(/\D/g, '')}?text=${waMsg}`, '_blank');
+  } else {
+    showToast('Esta cotización no tiene teléfono registrado', 'error');
+  }
+}
+
+function deleteQuote(quoteId) {
+  if (!confirm('¿Deseas eliminar este registro de cotización?')) return;
+  let quotes = getStoredQuotes();
+  quotes = quotes.filter(q => q.id !== quoteId);
+  saveQuotes(quotes);
+  renderQuotesHistoryTable();
+  showToast('Cotización eliminada', 'info');
 }
 
 function testGoogleCalendarLink() {

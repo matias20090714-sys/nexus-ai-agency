@@ -85,6 +85,11 @@
           <span class="nav-icon"><i class="fa-solid fa-bars-progress"></i></span>
           <span>Pipeline & Leads Reales</span>
         </a>
+        <a class="nav-item" data-tab="quotes" onclick="switchTab('quotes')">
+          <span class="nav-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+          <span>Cotizaciones & Facturación</span>
+          <span class="nav-badge" id="quotesCountBadge" style="background: rgba(99,102,241,0.2); color: #818cf8;">Auto-PDF</span>
+        </a>
 
         <div class="nav-section-title">Herramientas de Cierre & Venta</div>
         <a class="nav-item" data-tab="playbook" onclick="switchTab('playbook')">
@@ -613,158 +618,641 @@
           </div>
         </div>
 
-        <!-- ==================== TAB 3: AGENTES & BASE DE CONOCIMIENTO ==================== -->
+        <!-- ==================== TAB 3: AGENTES & BASE DE CONOCIMIENTO MULTI-FLUJO ==================== -->
         <div id="tab-agents-builder" class="tab-view">
           <div class="glass-panel">
-            <div class="panel-header">
+            
+            <!-- Agent Header & Active Client Context -->
+            <div class="panel-header" style="flex-wrap: wrap; gap: 14px;">
               <div>
                 <div class="panel-title">
                   <i class="fa-solid fa-robot" style="color: var(--accent-indigo);"></i>
-                  <span>Configuración del Agente & Base de Conocimiento Real</span>
+                  <span>Entrenamiento de Agente Multi-Flujo & Catálogo de Precios</span>
                 </div>
                 <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-                  Define el comportamiento, reglas de venta, horarios y lista de precios para la empresa activa.
-                </div>
-              </div>
-              <button class="btn btn-primary" onclick="saveActiveAgentConfig()">
-                <i class="fa-solid fa-floppy-disk"></i> Guardar Cambios del Agente
-              </button>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
-              <!-- Left: System Prompt & Personality -->
-              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
-                <div class="form-group">
-                  <label class="form-label">Plantilla de Industria (Cargar base)</label>
-                  <select id="blueprintSelector" class="form-control" onchange="loadBlueprintPrompt(this.value)">
-                    <option value="">-- Seleccionar Plantilla de Rubro --</option>
-                    <option value="salud_clinicas">🏥 Salud & Clínicas Odontológicas</option>
-                    <option value="inmobiliarias">🏢 Bienes Raíces & Inmobiliarias</option>
-                    <option value="belleza_barberias">✂️ Belleza & Barberías</option>
-                    <option value="gastronomia">🍽️ Restaurantes & Gastronomía</option>
-                    <option value="servicios_b2b">⚖️ Empresas & Servicios B2B</option>
-                    <option value="ecommerce_retail">🛍️ E-Commerce & Retail</option>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Nombre del Asistente Virtual</label>
-                  <input type="text" id="agentEditorName" class="form-control" placeholder="Ej: Sofía - Asistente Oficial">
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Prompt de Sistema (Instrucciones de la IA)</label>
-                  <textarea id="agentEditorPrompt" class="form-control" rows="8" placeholder="Escribe aquí las instrucciones exactas de cómo debe atender, qué tono utilizar y qué preguntas hacer para calificar y cerrar la venta..."></textarea>
+                  Personaliza cada empresa vinculada con su propio catálogo, flujos de ventas, soporte, postventa y agendamiento 24/7.
                 </div>
               </div>
 
-              <!-- Right: Knowledge Base & Services / Prices -->
-              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
-                <div class="form-group">
-                  <label class="form-label">Base de Conocimiento (Servicios, Precios & Horarios)</label>
-                  <textarea id="agentEditorKnowledge" class="form-control" rows="8" placeholder="Ingresa los datos del negocio:&#10;- Horarios de atención: Lun a Sáb de 09:00 a 20:00&#10;- Servicios y Precios:&#10;  * Consulta general: $30 USD&#10;  * Tratamiento completo: $150 USD&#10;- Dirección: Av. Principal 123&#10;- Políticas de reserva: Se solicita 10 min de anticipación"></textarea>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); padding: 5px 12px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                  <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">Empresa en edición:</span>
+                  <strong style="color: #34d399; font-size: 13px;" id="agentActiveCompanyBadge">NEXUS AI Agency HQ</strong>
                 </div>
-
-                <div class="form-group">
-                  <label class="form-label">Objetivo Principal del Agente</label>
-                  <select id="agentEditorGoal" class="form-control">
-                    <option value="appointments">📅 Agendar Cita o Reserva en Calendario</option>
-                    <option value="sales">💰 Calificar Lead y Cerrar Venta</option>
-                    <option value="support">❓ Soporte y Preguntas Frecuentes</option>
-                    <option value="custom">⚡ Diagnóstico Personalizado</option>
-                  </select>
-                </div>
-
-                <button class="btn btn-emerald" style="width: 100%; margin-top: 10px;" onclick="testAgentLiveDialog()">
-                  <i class="fa-solid fa-play"></i> Probar Diálogo del Agente con Gemini IA
+                <button class="btn btn-secondary btn-sm" onclick="testAgentLiveDialog()">
+                  <i class="fa-solid fa-play"></i> Probar Diálogo IA
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="saveActiveAgentConfig()">
+                  <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración
                 </button>
               </div>
             </div>
 
-            <!-- Calendar & Automated Appointment Scheduling Configuration -->
-            <div style="margin-top: 24px; background: rgba(10, 13, 28, 0.7); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: var(--radius-lg); padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 14px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                  <div style="width: 40px; height: 40px; border-radius: var(--radius-sm); background: rgba(52, 211, 153, 0.15); border: 1px solid #34d399; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #34d399;">
-                    <i class="fa-solid fa-calendar-check"></i>
+            <!-- Multi-Flow Subtabs Pill Navigation -->
+            <div class="subtabs-nav-bar">
+              <button class="subtab-btn active" id="subtabBtn-identity" onclick="switchAgentSubtab('identity')">
+                <i class="fa-solid fa-brain"></i> 1. Identidad & Base
+              </button>
+              <button class="subtab-btn" id="subtabBtn-catalog" onclick="switchAgentSubtab('catalog')">
+                <i class="fa-solid fa-tags"></i> 2. Catálogo & Precios
+              </button>
+              <button class="subtab-btn" id="subtabBtn-sales" onclick="switchAgentSubtab('sales')">
+                <i class="fa-solid fa-funnel-dollar"></i> 3. Flujo de Ventas
+              </button>
+              <button class="subtab-btn" id="subtabBtn-support" onclick="switchAgentSubtab('support')">
+                <i class="fa-solid fa-headset"></i> 4. Flujo de Soporte
+              </button>
+              <button class="subtab-btn" id="subtabBtn-aftersales" onclick="switchAgentSubtab('aftersales')">
+                <i class="fa-solid fa-star"></i> 5. Postventa & Reseñas
+              </button>
+              <button class="subtab-btn" id="subtabBtn-booking" onclick="switchAgentSubtab('booking')">
+                <i class="fa-solid fa-calendar-check"></i> 6. Citas & Calendario
+              </button>
+            </div>
+
+            <!-- SUBTAB 1: IDENTIDAD & BASE DE CONOCIMIENTO -->
+            <div id="subtabView-identity" class="subtab-view-content active">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 22px;">
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <div class="form-group">
+                    <label class="form-label">Plantilla de Rubro (Cargar base recomendada)</label>
+                    <select id="blueprintSelector" class="form-control" onchange="loadBlueprintPrompt(this.value)">
+                      <option value="">-- Seleccionar Plantilla de Rubro --</option>
+                      <option value="salud_clinicas">🏥 Salud & Clínicas Odontológicas</option>
+                      <option value="inmobiliarias">🏢 Bienes Raíces & Inmobiliarias</option>
+                      <option value="belleza_barberias">✂️ Belleza & Barberías</option>
+                      <option value="gastronomia">🍽️ Restaurantes & Gastronomía</option>
+                      <option value="servicios_b2b">⚖️ Empresas & Servicios B2B</option>
+                      <option value="ecommerce_retail">🛍️ E-Commerce & Retail</option>
+                    </select>
                   </div>
-                  <div>
-                    <h3 style="font-size: 16px; font-weight: 800; color: white; margin: 0;">Motor de Agendamiento Inteligente & Google Calendar</h3>
-                    <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0 0;">El agente de IA detecta citas en WhatsApp, sincroniza con Google Calendar y envía recordatorios anti-ausentismo.</p>
+
+                  <div class="form-group">
+                    <label class="form-label">Nombre del Asistente Virtual</label>
+                    <input type="text" id="agentEditorName" class="form-control" placeholder="Ej: Sofía - Asistente Oficial">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Tono de Comunicación & Personalidad</label>
+                    <select id="agentEditorTone" class="form-control">
+                      <option value="profesional_calido">Profesional y Cálido (Recomendado para Servicios)</option>
+                      <option value="comercial_persuasivo">Comercial, Dinámico y Persuasivo (Enfocado en Ventas)</option>
+                      <option value="ejecutivo_corporativo">Ejecutivo & Formal (B2B)</option>
+                      <option value="amigable_informal">Fresco, Cercano y Juvenil (Gimnasios, Barberías)</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Prompt Maestro del Sistema (Instrucciones Directas de la IA)</label>
+                    <textarea id="agentEditorPrompt" class="form-control" rows="8" placeholder="Escribe aquí las instrucciones exactas de cómo debe atender, qué tono utilizar y qué preguntas hacer para calificar y cerrar la venta..."></textarea>
                   </div>
                 </div>
-                <span class="brand-badge" style="background: rgba(52,211,153,0.15); color: #34d399; font-weight: 800; padding: 6px 12px; border: 1px solid rgba(52,211,153,0.3);">
-                  <i class="fa-solid fa-bolt"></i> Sistema Híbrido Activo
-                </span>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <div class="form-group">
+                    <label class="form-label">Base de Conocimiento General (Políticas, Horarios y Ubicación)</label>
+                    <textarea id="agentEditorKnowledge" class="form-control" rows="8" placeholder="Ingresa los datos del negocio:&#10;- Horarios de atención: Lun a Sáb de 09:00 a 20:00&#10;- Dirección física: Av. Principal 123, Piso 4&#10;- Políticas de reserva: Se solicita 10 min de anticipación&#10;- Métodos de pago aceptados: Efectivo, Tarjetas, Transferencias, Stripe"></textarea>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Objetivo Principal del Agente</label>
+                    <select id="agentEditorGoal" class="form-control">
+                      <option value="appointments">📅 Agendar Cita o Reserva en Calendario</option>
+                      <option value="sales">💰 Calificar Lead, Enviar Cotización y Cerrar Venta</option>
+                      <option value="support">❓ Soporte y Preguntas Frecuentes</option>
+                      <option value="custom">⚡ Diagnóstico Integral Multi-Flujo</option>
+                    </select>
+                  </div>
+
+                  <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; margin-top: 14px;">
+                    <div style="font-size: 12px; color: #a5b4fc; font-weight: 700; margin-bottom: 4px;">
+                      <i class="fa-solid fa-shield-check" style="color: #34d399;"></i> Regla Antialucinación Activada
+                    </div>
+                    <p style="font-size: 11.5px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                      Si un usuario pregunta datos fuera de esta base de conocimiento, la IA responderá amablemente que verificará con el equipo humano y derivará la consulta.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUBTAB 2: CATÁLOGO DE SERVICIOS & PRECIOS -->
+            <div id="subtabView-catalog" class="subtab-view-content">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                <div>
+                  <strong style="font-size: 15px; color: white;">🛍️ Catálogo Oficial de la Empresa</strong>
+                  <div style="font-size: 12.5px; color: var(--text-muted); margin-top: 2px;">
+                    El agente utilizará estos precios exactos para cotizar y responder dudas al instante por WhatsApp.
+                  </div>
+                </div>
+                <button class="btn btn-emerald btn-sm" onclick="openNewCatalogItemModal()">
+                  <i class="fa-solid fa-plus"></i> Agregar Nuevo Ítem
+                </button>
               </div>
 
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px;">
-                <!-- Col 1: Integration URLs & Google Calendar -->
-                <div>
-                  <div class="form-group">
-                    <label class="form-label" style="font-size: 12px;">Enlace de Autocita (Calendly / Cal.com / Meet)</label>
-                    <input type="text" id="agentCalendarLink" class="form-control" placeholder="https://calendly.com/tu-empresa/cita" style="font-size: 13px;">
-                    <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px;">El agente entregará este enlace si el cliente pide elegir su horario en pantalla.</span>
-                  </div>
+              <!-- Interactive Catalog Table -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 13px;">
+                  <thead>
+                    <tr style="background: rgba(15, 23, 42, 0.9); border-bottom: 1px solid var(--border-subtle); color: #cbd5e1;">
+                      <th style="padding: 12px 16px;">Servicio / Producto</th>
+                      <th style="padding: 12px 16px;">Descripción</th>
+                      <th style="padding: 12px 16px;">Duración / Entrega</th>
+                      <th style="padding: 12px 16px;">Precio ($ USD)</th>
+                      <th style="padding: 12px 16px; text-align: right;">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="agentCatalogTableBody">
+                    <!-- Rendered dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
+            <!-- SUBTAB 3: FLUJO DE VENTAS & CALIFICACIÓN -->
+            <div id="subtabView-sales" class="subtab-view-content">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 22px;">
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <strong style="font-size: 14.5px; color: white; display: block; margin-bottom: 12px;">
+                    🎯 1. Preguntas de Calificación Automática
+                  </strong>
                   <div class="form-group">
-                    <label class="form-label" style="font-size: 12px;">Email o ID de Google Calendar</label>
-                    <input type="email" id="agentGoogleCalendarEmail" class="form-control" placeholder="citas.empresa@gmail.com" style="font-size: 13px;">
-                    <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px;">Recibe las alertas directas en la app de calendario de tu teléfono.</span>
+                    <label class="form-label">Pregunta Clave para Descubrir Necesidad</label>
+                    <textarea id="salesFlowQualification" class="form-control" rows="3" placeholder="Ej: ¿Presentas algún dolor agudo o buscas una consulta preventiva?"></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Pregunta de Presupuesto / Urgencia</label>
+                    <input type="text" id="salesFlowBudget" class="form-control" placeholder="Ej: ¿Para cuándo tienes pensado iniciar el tratamiento?">
                   </div>
                 </div>
 
-                <!-- Col 2: Schedules & Slot Durations -->
-                <div>
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div class="form-group">
-                      <label class="form-label" style="font-size: 12px;">Hora Apertura</label>
-                      <input type="time" id="agentScheduleStart" class="form-control" value="09:00">
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <strong style="font-size: 14.5px; color: white; display: block; margin-bottom: 12px;">
+                    💡 2. Manejo de Objeciones & Cierre de Venta
+                  </strong>
+                  <div class="form-group">
+                    <label class="form-label">Cómo Responder a la Objeción de Precio</label>
+                    <textarea id="salesFlowObjections" class="form-control" rows="3" placeholder="Ej: Si el paciente consulta por precio, enfatiza que incluye diagnóstico digital completo y facilidades de pago en hasta 6 cuotas."></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Llamado a la Acción de Cierre (Call To Action)</label>
+                    <textarea id="salesFlowClosing" class="form-control" rows="3" placeholder="Ej: Para reservar tu espacio médico exclusivo, por favor indícame tu Nombre y Horario preferido (Mañana o Tarde)."></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUBTAB 4: FLUJO DE SOPORTE & FAQS -->
+            <div id="subtabView-support" class="subtab-view-content">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 22px;">
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <strong style="font-size: 14.5px; color: white; display: block; margin-bottom: 12px;">
+                    🛠️ Preguntas Frecuentes Automatizadas (FAQs)
+                  </strong>
+                  <div class="form-group">
+                    <label class="form-label">Preguntas y Respuestas Rápidas (Formato Q: / R:)</label>
+                    <textarea id="supportFlowFaqs" class="form-control" rows="8" placeholder="Q: ¿Aceptan seguros médicos? R: Sí, trabajamos con reintegros directos y las principales coberturas.&#10;&#10;Q: ¿Dónde se encuentran? R: Av. Principal 123, Piso 4 con estacionamiento gratuito.&#10;&#10;Q: ¿Cuáles son las formas de pago? R: Tarjetas, efectivo, transferencias y cuotas sin interés."></textarea>
+                  </div>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <strong style="font-size: 14.5px; color: white; display: block; margin-bottom: 12px;">
+                    🚨 Derivación Humana & Protocolo de Urgencias
+                  </strong>
+                  <div class="form-group">
+                    <label class="form-label">Mensaje en Caso de Emergencia o Caso Complejo</label>
+                    <textarea id="supportFlowEmergency" class="form-control" rows="4" placeholder="En caso de traumatismo o urgencia médica, comunícate inmediatamente a nuestra línea de guardia prioritaria o indícanos tu teléfono para que un profesional te llame."></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Teléfono de Derivación Humana (WhatsApp Supervisor)</label>
+                    <input type="text" id="supportFlowHumanPhone" class="form-control" placeholder="+54 9 11 1234-5678">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUBTAB 5: FLUJO DE POSTVENTA & RESEÑAS GOOGLE -->
+            <div id="subtabView-aftersales" class="subtab-view-content">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 22px;">
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <strong style="font-size: 14.5px; color: white;">⭐ 1. Encuesta de Satisfacción Automática (NPS)</strong>
+                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #34d399; cursor: pointer;">
+                      <input type="checkbox" id="aftersalesToggle" checked style="accent-color: #34d399;"> Activo
+                    </label>
+                  </div>
+                  <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+                    Envía un mensaje por WhatsApp al cliente horas después de haber recibido el servicio o producto.
+                  </p>
+                  <div class="form-group">
+                    <label class="form-label">Horas de Espera tras el Servicio</label>
+                    <input type="number" id="aftersalesDelay" class="form-control" value="4">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Plantilla del Mensaje de Calificación</label>
+                    <textarea id="aftersalesMessage" class="form-control" rows="4" placeholder="¡Hola {nombre}! Esperamos que tu consulta de hoy en {empresa} haya sido excelente. Del 1 al 10, ¿cómo calificarías nuestra atención?"></textarea>
+                  </div>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px;">
+                  <strong style="font-size: 14.5px; color: white; display: block; margin-bottom: 12px;">
+                    🚀 2. Multiplicador de Reseñas 5 Estrellas en Google Maps
+                  </strong>
+                  <div class="form-group">
+                    <label class="form-label">Enlace Directo a Reseñas de Google Maps</label>
+                    <input type="url" id="aftersalesGoogleUrl" class="form-control" placeholder="https://g.page/r/tu-negocio/review">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Mensaje si Califica 9 o 10 (Solicitar Reseña)</label>
+                    <textarea id="aftersalesGooglePrompt" class="form-control" rows="3" placeholder="¡Muchas gracias por tu calificación! Si nos dejas una breve reseña en Google Maps nos ayudas muchísimo a seguir creciendo: {link}"></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Cupón de Fidelización / Descuento para Próxima Compra</label>
+                    <input type="text" id="aftersalesLoyalty" class="form-control" placeholder="15% de descuento en tu próximo servicio o para un familiar.">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUBTAB 6: FLUJO DE AGENDAMIENTO & CALENDARIO -->
+            <div id="subtabView-booking" class="subtab-view-content">
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: var(--radius-lg); padding: 22px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 14px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: var(--radius-sm); background: rgba(52, 211, 153, 0.15); border: 1px solid #34d399; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #34d399;">
+                      <i class="fa-solid fa-calendar-check"></i>
                     </div>
+                    <div>
+                      <h3 style="font-size: 16px; font-weight: 800; color: white; margin: 0;">Motor de Agendamiento Inteligente & Google Calendar</h3>
+                      <p style="font-size: 12.5px; color: var(--text-muted); margin: 2px 0 0 0;">El agente de IA detecta citas en WhatsApp, sincroniza con Google Calendar y envía recordatorios anti-ausentismo.</p>
+                    </div>
+                  </div>
+                  <span class="brand-badge" style="background: rgba(52,211,153,0.15); color: #34d399; font-weight: 800; padding: 6px 12px; border: 1px solid rgba(52,211,153,0.3);">
+                    <i class="fa-solid fa-bolt"></i> Sistema Híbrido Activo
+                  </span>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px;">
+                  <!-- Col 1: URLs & Google Calendar -->
+                  <div>
                     <div class="form-group">
-                      <label class="form-label" style="font-size: 12px;">Hora Cierre</label>
-                      <input type="time" id="agentScheduleEnd" class="form-control" value="19:00">
+                      <label class="form-label" style="font-size: 12px;">Enlace de Autocita (Calendly / Cal.com / Meet)</label>
+                      <input type="text" id="agentCalendarLink" class="form-control" placeholder="https://calendly.com/tu-empresa/cita" style="font-size: 13px;">
+                      <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px;">El agente entregará este enlace si el cliente pide elegir su horario en pantalla.</span>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 12px;">Email o ID de Google Calendar</label>
+                      <input type="email" id="agentGoogleCalendarEmail" class="form-control" placeholder="citas.empresa@gmail.com" style="font-size: 13px;">
+                      <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 4px;">Recibe las alertas directas en la app de calendario de tu teléfono.</span>
                     </div>
                   </div>
 
+                  <!-- Col 2: Schedules & Slot Durations -->
+                  <div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <div class="form-group">
+                        <label class="form-label" style="font-size: 12px;">Hora Apertura</label>
+                        <input type="time" id="agentScheduleStart" class="form-control" value="09:00">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" style="font-size: 12px;">Hora Cierre</label>
+                        <input type="time" id="agentScheduleEnd" class="form-control" value="19:00">
+                      </div>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 12px;">Duración por Cita / Turno</label>
+                      <select id="agentSlotDuration" class="form-control">
+                        <option value="15">15 Minutos (Consultas rápidas)</option>
+                        <option value="30" selected>30 Minutos (Estándar)</option>
+                        <option value="45">45 Minutos (Tratamientos)</option>
+                        <option value="60">60 Minutos (1 Hora completa)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Col 3: Anti-NoShow WhatsApp Reminders -->
+                  <div style="background: rgba(15, 23, 42, 0.6); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <strong style="font-size: 12.5px; color: white;"><i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Recordatorio WhatsApp</strong>
+                      <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #34d399; cursor: pointer;">
+                        <input type="checkbox" id="agentReminderToggle" checked style="accent-color: #25d366;"> Activo
+                      </label>
+                    </div>
+                    <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
+                      Envía mensaje automático por WhatsApp 24h y 2h antes de la cita para evitar ausencias.
+                    </p>
+                    <div class="form-group" style="margin-bottom: 0;">
+                      <textarea id="agentReminderTemplate" class="form-control" rows="3" style="font-size: 11.5px;" placeholder="Hola {nombre}, te recordamos tu cita de {servicio} mañana a las {hora}. ¿Confirmas tu asistencia?"></textarea>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
+                  <button class="btn btn-secondary btn-sm" onclick="testGoogleCalendarLink()">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Probar Enlace de Google Calendar
+                  </button>
+                  <button class="btn btn-emerald btn-sm" onclick="saveActiveAgentConfig()">
+                    <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración de Calendario
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ==================== TAB: COTIZACIONES & FACTURACIÓN INTELIGENTE ==================== -->
+        <div id="tab-quotes" class="tab-view">
+          
+          <!-- Summary Metrics Cards -->
+          <div class="stats-grid" style="margin-bottom: 24px;">
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                <i class="fa-solid fa-file-invoice"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="quotesStatTotal">0</div>
+                <div class="stat-label">Cotizaciones Generadas</div>
+                <div class="stat-growth" style="color: var(--accent-cyan);">Total acumulado</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                <i class="fa-solid fa-hand-holding-dollar"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="quotesStatAmount">$0 USD</div>
+                <div class="stat-label">Monto Total Cotizado</div>
+                <div class="stat-growth" style="color: #34d399;"><i class="fa-solid fa-arrow-up"></i> Pipeline de ventas</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="quotesStatAccepted">0</div>
+                <div class="stat-label">Cotizaciones Aceptadas / Pagadas</div>
+                <div class="stat-growth" style="color: #fbbf24;">Cierres efectivos</div>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee;">
+                <i class="fa-brands fa-whatsapp"></i>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="quotesStatSentWa">0</div>
+                <div class="stat-label">Entregadas por WhatsApp</div>
+                <div class="stat-growth" style="color: #38bdf8;">100% Automático</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main Split Section: Generator vs Live Invoice Preview -->
+          <div class="glass-panel" style="margin-bottom: 28px;">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-file-invoice-dollar" style="color: var(--accent-indigo);"></i>
+                  <span>Generador Oficial de Cotizaciones & Facturas Comerciales</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  Elige los servicios del catálogo, calcula subtotales e impuestos, y despacha en 1 clic la propuesta en PDF o WhatsApp con links de cobro.
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="resetQuoteForm()">
+                  <i class="fa-solid fa-rotate-left"></i> Limpiar
+                </button>
+                <button class="btn btn-emerald btn-sm" onclick="saveAndSendCurrentQuote()">
+                  <i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="printQuoteOfficialPDF()">
+                  <i class="fa-solid fa-file-pdf"></i> Imprimir / PDF Oficial
+                </button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px;">
+              
+              <!-- Left: Quote Interactive Builder -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+                <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
+                  <i class="fa-solid fa-sliders" style="color: var(--accent-cyan);"></i> 1. Datos del Cliente & Empresa Emisora
+                </strong>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                   <div class="form-group">
-                    <label class="form-label" style="font-size: 12px;">Duración por Cita / Turno</label>
-                    <select id="agentSlotDuration" class="form-control">
-                      <option value="15">15 Minutos (Consultas rápidas)</option>
-                      <option value="30" selected>30 Minutos (Estándar)</option>
-                      <option value="45">45 Minutos (Tratamientos)</option>
-                      <option value="60">60 Minutos (1 Hora completa)</option>
+                    <label class="form-label">Empresa Emisora</label>
+                    <select id="quoteCompanySelector" class="form-control" onchange="onQuoteCompanyChange(this.value)">
+                      <!-- Populated dynamically -->
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Número de Folio / Cotización</label>
+                    <input type="text" id="quoteNumber" class="form-control" value="COT-2026-001" readonly style="background: rgba(0,0,0,0.3); font-weight: 700; color: #818cf8;">
+                  </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div class="form-group">
+                    <label class="form-label">Nombre del Cliente / Empresa</label>
+                    <input type="text" id="quoteClientName" class="form-control" placeholder="Ej: Dr. Carlos Méndez" oninput="updateQuotePreview()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">WhatsApp del Cliente (con cód. país)</label>
+                    <input type="text" id="quoteClientPhone" class="form-control" placeholder="Ej: 5491148923310" oninput="updateQuotePreview()">
+                  </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div class="form-group">
+                    <label class="form-label">Email del Cliente (Opcional)</label>
+                    <input type="email" id="quoteClientEmail" class="form-control" placeholder="cliente@empresa.com" oninput="updateQuotePreview()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Validez de la Oferta</label>
+                    <select id="quoteValidity" class="form-control" onchange="updateQuotePreview()">
+                      <option value="7 días">7 Días</option>
+                      <option value="15 días" selected>15 Días (Estándar)</option>
+                      <option value="30 días">30 Días</option>
+                      <option value="Inmediata">Inmediata (48 horas)</option>
                     </select>
                   </div>
                 </div>
 
-                <!-- Col 3: Anti-NoShow WhatsApp Reminders -->
-                <div style="background: rgba(15, 23, 42, 0.6); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <strong style="font-size: 12.5px; color: white;"><i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Recordatorio WhatsApp</strong>
-                    <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #34d399; cursor: pointer;">
-                      <input type="checkbox" id="agentReminderToggle" checked style="accent-color: #25d366;"> Activo
-                    </label>
+                <!-- Line Items Adder from Catalog -->
+                <div style="margin-top: 18px; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <strong style="font-size: 14px; color: white;">
+                      <i class="fa-solid fa-cart-plus" style="color: #34d399;"></i> 2. Ítems y Servicios a Cotizar
+                    </strong>
+                    <div style="display: flex; gap: 8px;">
+                      <select id="quoteQuickCatalogSelect" class="form-control" style="font-size: 12px; padding: 4px 8px; width: auto;">
+                        <option value="">-- Cargar del Catálogo --</option>
+                      </select>
+                      <button class="btn btn-secondary btn-sm" onclick="addSelectedCatalogItemToQuote()">
+                        <i class="fa-solid fa-plus"></i> Añadir
+                      </button>
+                    </div>
                   </div>
-                  <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px; line-height: 1.4;">
-                    Envía mensaje automático por WhatsApp 24h y 2h antes de la cita para evitar ausencias.
-                  </p>
-                  <div class="form-group" style="margin-bottom: 0;">
-                    <textarea id="agentReminderTemplate" class="form-control" rows="3" style="font-size: 11.5px;" placeholder="Hola {nombre}, te recordamos tu cita de {servicio} mañana a las {hora}. ¿Confirmas tu asistencia?"></textarea>
+
+                  <!-- Dynamic Items List in Builder -->
+                  <div id="quoteItemsListBuilder" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+                    <!-- Line items rows rendered via JS -->
+                  </div>
+
+                  <button class="btn btn-secondary btn-sm" style="width: 100%;" onclick="addCustomItemToQuote()">
+                    <i class="fa-solid fa-plus"></i> + Agregar Ítem Personalizado Manual
+                  </button>
+                </div>
+
+                <!-- Discounts, Taxes & Payment Notes -->
+                <div style="margin-top: 18px; border-top: 1px solid var(--border-subtle); padding-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                  <div class="form-group">
+                    <label class="form-label">Descuento (%)</label>
+                    <input type="number" id="quoteDiscountPercent" class="form-control" value="0" min="0" max="100" oninput="updateQuotePreview()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Impuesto / IVA (%)</label>
+                    <input type="number" id="quoteTaxPercent" class="form-control" value="0" min="0" max="50" oninput="updateQuotePreview()">
                   </div>
                 </div>
+
+                <div class="form-group">
+                  <label class="form-label">Notas Comerciales & Condiciones de Pago</label>
+                  <textarea id="quoteNotes" class="form-control" rows="2" placeholder="Ej: 50% de anticipo al inicio y 50% al finalizar la entrega. Incluye garantía de satisfacción de 30 días." oninput="updateQuotePreview()"></textarea>
+                </div>
+
               </div>
 
-              <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px;">
-                <button class="btn btn-secondary btn-sm" onclick="testGoogleCalendarLink()">
-                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Probar Enlace de Google Calendar
-                </button>
-                <button class="btn btn-emerald btn-sm" onclick="saveActiveAgentConfig()">
-                  <i class="fa-solid fa-floppy-disk"></i> Guardar Configuración de Calendario
-                </button>
+              <!-- Right: Live Quote Preview Card (High-Resolution Visual Invoice) -->
+              <div id="quoteOfficialDocumentWrapper" style="background: #ffffff; color: #0f172a; border-radius: var(--radius-lg); padding: 26px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-family: system-ui, -apple-system, sans-serif; position: relative;">
+                
+                <!-- Quote Letterhead Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 18px;">
+                  <div>
+                    <div style="font-size: 22px; font-weight: 900; color: #4338ca; letter-spacing: -0.5px;" id="prevQuoteCompanyName">NEXUS AI Agency</div>
+                    <div style="font-size: 12px; color: #64748b; margin-top: 2px;" id="prevQuoteCompanySubtitle">Soluciones de Inteligencia Artificial & Automatización</div>
+                    <div style="font-size: 11px; color: #94a3b8;" id="prevQuoteCompanyContact">contacto@nexus-ai.agency • WhatsApp Oficial</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 12px; font-weight: 800; color: #4338ca; text-transform: uppercase; letter-spacing: 1px;">COTIZACIÓN COMERCIAL</div>
+                    <div style="font-size: 16px; font-weight: 900; color: #0f172a;" id="prevQuoteFolio">#COT-2026-001</div>
+                    <div style="font-size: 11.5px; color: #64748b;" id="prevQuoteDate">Fecha: 09/10/2026</div>
+                  </div>
+                </div>
+
+                <!-- Client Details Box -->
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; font-size: 12px;">
+                  <div>
+                    <strong style="color: #334155; display: block; margin-bottom: 2px;">PREPARADO PARA:</strong>
+                    <div style="font-size: 14px; font-weight: 800; color: #0f172a;" id="prevQuoteClientName">Cliente Destinatario</div>
+                    <div style="color: #64748b;" id="prevQuoteClientPhone">+54 9 11 0000-0000</div>
+                    <div style="color: #64748b;" id="prevQuoteClientEmail">cliente@empresa.com</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <strong style="color: #334155; display: block; margin-bottom: 2px;">VALIDEZ:</strong>
+                    <div style="font-weight: 700; color: #059669;" id="prevQuoteValidity">15 Días</div>
+                    <div style="color: #64748b; font-size: 11px;">Moneda: USD Dólares</div>
+                  </div>
+                </div>
+
+                <!-- Items Table Preview -->
+                <div style="margin-bottom: 16px; overflow-x: auto;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                    <thead>
+                      <tr style="border-bottom: 2px solid #cbd5e1; color: #475569; font-weight: 700;">
+                        <th style="padding: 8px 6px;">DESCRIPCIÓN</th>
+                        <th style="padding: 8px 6px; text-align: center;">CANT</th>
+                        <th style="padding: 8px 6px; text-align: right;">PRECIO UNIT</th>
+                        <th style="padding: 8px 6px; text-align: right;">SUBTOTAL</th>
+                      </tr>
+                    </thead>
+                    <tbody id="prevQuoteItemsBody">
+                      <!-- Rendered dynamically -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Totals Calculation -->
+                <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; margin-bottom: 16px; display: flex; justify-content: flex-end;">
+                  <div style="width: 220px; font-size: 12.5px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #475569;">
+                      <span>Subtotal:</span>
+                      <strong id="prevQuoteSubtotal" style="color: #0f172a;">$0.00</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #dc2626;" id="prevQuoteDiscountRow">
+                      <span>Descuento (<span id="prevQuoteDiscountLabel">0%</span>):</span>
+                      <strong id="prevQuoteDiscountVal">-$0.00</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #475569;" id="prevQuoteTaxRow">
+                      <span>IVA / Impuesto (<span id="prevQuoteTaxLabel">0%</span>):</span>
+                      <strong id="prevQuoteTaxVal">+$0.00</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-top: 2px solid #0f172a; padding-top: 6px; font-size: 16px; font-weight: 900; color: #4338ca;">
+                      <span>TOTAL USD:</span>
+                      <span id="prevQuoteTotal">$0.00</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Notes & Payment Guarantee Footnote -->
+                <div style="background: #f1f5f9; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #475569; line-height: 1.4; margin-bottom: 16px;">
+                  <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Condiciones Comerciales:</strong>
+                  <span id="prevQuoteNotes">50% de anticipo para reserva y 50% contra entrega. Facturación oficial inmediata.</span>
+                </div>
+
+                <!-- Direct Payment Buttons in Invoice -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                  <button class="btn btn-emerald btn-sm" style="font-size: 11.5px; padding: 6px 10px; width: 100%;" onclick="openDirectQuotePaymentGateway()">
+                    <i class="fa-solid fa-lock"></i> Pagar Online Seguro
+                  </button>
+                  <button class="btn btn-secondary btn-sm" style="font-size: 11.5px; padding: 6px 10px; width: 100%; color: #0f172a; border-color: #cbd5e1;" onclick="sendQuoteWhatsAppDirect()">
+                    <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Coordinar por WhatsApp
+                  </button>
+                </div>
+
               </div>
+
             </div>
           </div>
+
+          <!-- Bottom: Historical Quotes Register Table -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div class="panel-title">
+                <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-cyan);"></i>
+                <span>Historial de Cotizaciones Emitidas</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted);" id="quotesTableCount">0 cotizaciones registradas</div>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                <thead>
+                  <tr style="background: rgba(15, 23, 42, 0.9); border-bottom: 1px solid var(--border-subtle); color: #cbd5e1;">
+                    <th style="padding: 12px 14px;">Folio</th>
+                    <th style="padding: 12px 14px;">Cliente</th>
+                    <th style="padding: 12px 14px;">Empresa Emisora</th>
+                    <th style="padding: 12px 14px;">Monto Total</th>
+                    <th style="padding: 12px 14px;">Fecha</th>
+                    <th style="padding: 12px 14px;">Estado</th>
+                    <th style="padding: 12px 14px; text-align: right;">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="quotesHistoryTableBody">
+                  <!-- Rendered dynamically -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
 
         <!-- ==================== TAB 4: BANDEJA WHATSAPP REAL ==================== -->
@@ -1774,6 +2262,43 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('agencyCheckoutModal')">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Agregar Ítem al Catálogo -->
+  <div class="modal-backdrop" id="modalNewCatalogItem">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <div>
+          <strong style="font-size: 16px; color: white;"><i class="fa-solid fa-tag" style="color: #34d399;"></i> Agregar Servicio o Producto al Catálogo</strong>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Se guardará en la empresa activa seleccionada</div>
+        </div>
+        <button class="close-btn" onclick="closeModal('modalNewCatalogItem')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Nombre del Servicio o Producto</label>
+          <input type="text" id="newCatItemName" class="form-control" placeholder="Ej: Blanqueamiento Dental Láser">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción Breve</label>
+          <textarea id="newCatItemDesc" class="form-control" rows="2" placeholder="Ej: Tratamiento en 1 sesión de 45 min con tecnología LED indolora."></textarea>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Precio ($ USD)</label>
+            <input type="number" id="newCatItemPrice" class="form-control" placeholder="150" min="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Duración / Tiempo de Entrega</label>
+            <input type="text" id="newCatItemDuration" class="form-control" placeholder="Ej: 45 min o 48 hs">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalNewCatalogItem')">Cancelar</button>
+        <button class="btn btn-emerald" onclick="saveNewCatalogItem()"><i class="fa-solid fa-check"></i> Guardar en Catálogo</button>
       </div>
     </div>
   </div>
