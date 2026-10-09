@@ -594,7 +594,7 @@
               </div>
             </div>
 
-            <!-- Pricing Packages -->
+            <!-- Dynamic Pricing Packages -->
             <div id="pricingSectionAnchor" style="margin-bottom: 40px;">
               <div style="text-align: center; margin-bottom: 32px;">
                 <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399; font-size: 11px; padding: 4px 14px;">💎 PLANES DE SUSCRIPCIÓN</span>
@@ -602,46 +602,9 @@
                 <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Sin contratos de permanencia forzados. Servidor, soporte y actualizaciones de IA incluidas.</p>
               </div>
 
-              <div class="landing-pricing-grid">
-                
-                <!-- Plan Starter -->
-                <div class="landing-price-card">
-                  <span class="agent-category">Negocios & Comercios Locales</span>
-                  <div style="font-size: 20px; font-weight: 800; color: white; margin: 4px 0 12px 0;">Plan Starter IA</div>
-                  <div style="font-size: 38px; font-weight: 900; color: white; margin-bottom: 16px;" id="portalPriceStarter">$290 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
-                  
-                  <div class="landing-price-features">
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> 1 Agente de WhatsApp 24/7 entrenado a medida</div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Respuestas a consultas y precios al instante</div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Catálogo interactivo de productos y servicios</div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Derivación automática a tu WhatsApp personal</div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Mantenimiento de servidor e IA incluido</div>
-                  </div>
-                  <button class="btn btn-secondary" style="width: 100%; margin-top: auto;" onclick="openAgencyRealCheckout('starter')">
-                    <i class="fa-solid fa-cart-shopping"></i> Comenzar con Plan Starter
-                  </button>
-                </div>
-
-                <!-- Plan Pro (Featured) -->
-                <div class="landing-price-card featured">
-                  <div class="popular-ribbon">MÁS ELEGIDO • 85% DE CLIENTES</div>
-                  <span class="agent-category" style="color: #a5b4fc;">Clínicas, Inmobiliarias & Empresas</span>
-                  <div style="font-size: 22px; font-weight: 800; color: white; margin: 4px 0 12px 0;">Plan Growth Pro Multi-Flujo</div>
-                  <div style="font-size: 38px; font-weight: 900; color: #34d399; margin-bottom: 16px;" id="portalPricePro">$690 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
-                  
-                  <div class="landing-price-features">
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Todo lo incluido en el Plan Starter</strong></div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Agendamiento Automático en Google Calendar</strong></div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Recordatorios WhatsApp anti-ausentismo (24h y 2h)</strong></div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Generador de Cotizaciones con links de pago</strong></div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Encuestas NPS y Reseñas en Google Maps 5★</strong></div>
-                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> CRM Kanban y Pipeline de Leads en tiempo real</div>
-                  </div>
-                  <button class="btn btn-primary" style="width: 100%; margin-top: auto; padding: 14px; font-weight: 800; box-shadow: 0 4px 20px rgba(99,102,241,0.4);" onclick="openAgencyRealCheckout('pro')">
-                    <i class="fa-solid fa-bolt"></i> Activar Plan Growth Pro
-                  </button>
-                </div>
-
+              <!-- Dynamically Populated with 1, 2, 3 or more agency plans -->
+              <div id="portalPricingContainer" class="landing-pricing-grid">
+                <!-- Rendered dynamically via renderPortalPricing() -->
               </div>
 
               <!-- Guarantee Box -->
@@ -2117,27 +2080,47 @@
           </div>
         </div>
 
-        <!-- ==================== TAB 8: PERSONALIZACIÓN MARCA BLANCA & COBROS ==================== -->
+        <!-- ==================== TAB 8: PERSONALIZACIÓN MARCA BLANCA, PLANES & COBROS ==================== -->
         <div id="tab-whitelabel" class="tab-view">
           <div class="glass-panel">
             <div class="panel-header">
               <div>
                 <div class="panel-title">
                   <i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i>
-                  <span>Marca Blanca & Pasarelas de Cobro Real</span>
+                  <span>Marca Blanca, Gestor de Planes & Pasarelas de Cobro</span>
                 </div>
                 <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-                  Configura tus precios, enlaces de Stripe / PayPal / Mercado Pago y datos bancarios para cobrar directamente desde tu Web Comercial.
+                  Define cuántos planes ofrecer (1 único plan o múltiples), sus precios, características y enlaces de cobro para que el dinero vaya directo a tu cuenta.
                 </div>
+              </div>
+            </div>
+
+            <!-- SECTION: DYNAMIC PLAN MANAGER -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-tags" style="color: #38bdf8;"></i> Planes Comerciales en tu Landing Page
+                  </strong>
+                  <span style="font-size: 12.5px; color: var(--text-muted);">Puedes tener 1 solo plan principal o crear varios planes según tu modelo de negocio:</span>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="openModalPlanEditor()">
+                  <i class="fa-solid fa-plus"></i> Crear Nuevo Plan
+                </button>
+              </div>
+
+              <!-- Container for dynamically listed plans -->
+              <div id="whitelabelPlansListContainer" class="plans-admin-grid">
+                <!-- Populated via renderAgencyPlansAdmin() in app.js -->
               </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
               
-              <!-- Column 1: Precios & Links de Pago Online -->
-              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+              <!-- Column 1: Configuración General de Marca -->
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px; display: flex; flex-direction: column;">
                 <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
-                  <i class="fa-solid fa-credit-card" style="color: #34d399;"></i> 1. Precios & Pasarelas de Pago Online
+                  <i class="fa-solid fa-paintbrush" style="color: #818cf8;"></i> 1. Identidad de Marca de tu Agencia
                 </strong>
 
                 <div class="form-group">
@@ -2147,43 +2130,30 @@
 
                 <div class="form-group">
                   <label class="form-label">Color de Acento Corporativo</label>
-                  <input type="color" id="wlColorPicker" value="#6366f1" style="height: 40px; width: 60px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); cursor: pointer;" onchange="updateBrandColor(this.value)">
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                  <div class="form-group">
-                    <label class="form-label">Precio Plan Starter ($/mes)</label>
-                    <input type="number" id="wlPriceStarter" class="form-control" value="290">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Precio Plan Pro ($/mes)</label>
-                    <input type="number" id="wlPricePro" class="form-control" value="690">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <input type="color" id="wlColorPicker" value="#6366f1" style="height: 40px; width: 60px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); cursor: pointer;" onchange="updateBrandColor(this.value)">
+                    <span style="font-size: 12px; color: var(--text-muted);">Afecta botones y brillos en tu portal de ventas</span>
                   </div>
                 </div>
 
                 <div class="form-group">
-                  <label class="form-label">Link de Pago Plan Starter (Stripe / Mercado Pago / PayPal)</label>
-                  <input type="url" id="wlPaymentLinkStarter" class="form-control" placeholder="https://buy.stripe.com/... o https://mpago.la/...">
+                  <label class="form-label">WhatsApp de Contacto Directo / Ventas</label>
+                  <input type="text" id="wlBillingPhone" class="form-control" placeholder="Ej: 5491148923310 (con código de país sin +)">
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label">Link de Pago Plan Pro (Stripe / Mercado Pago / PayPal)</label>
-                  <input type="url" id="wlPaymentLinkPro" class="form-control" placeholder="https://buy.stripe.com/... o https://mpago.la/...">
-                </div>
-
-                <button class="btn btn-primary" style="width: 100%; margin-top: 8px;" onclick="saveWhiteLabelSettings()">
-                  <i class="fa-solid fa-floppy-disk"></i> Guardar Ajustes de Marca & Pasarelas
+                <button class="btn btn-primary" style="width: 100%; margin-top: auto;" onclick="saveWhiteLabelSettings()">
+                  <i class="fa-solid fa-floppy-disk"></i> Guardar Ajustes de Marca
                 </button>
               </div>
 
-              <!-- Column 2: Transferencia Bancaria Directa & WhatsApp de Cobros -->
+              <!-- Column 2: Transferencia Bancaria Directa & Cobros -->
               <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px; display: flex; flex-direction: column;">
                 <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
-                  <i class="fa-solid fa-building-columns" style="color: #67e8f9;"></i> 2. Cobros por Transferencia Bancaria & Facturación
+                  <i class="fa-solid fa-building-columns" style="color: #34d399;"></i> 2. Cuenta Bancaria para Recibir Transferencias
                 </strong>
 
                 <div class="form-group">
-                  <label class="form-label">Banco / Entidad Financiera</label>
+                  <label class="form-label">Banco / Billetera Virtual</label>
                   <input type="text" id="wlBankName" class="form-control" placeholder="Ej: Santander / BBVA / Chase / Mercado Pago">
                 </div>
 
@@ -2202,14 +2172,9 @@
                   <input type="text" id="wlBankTaxId" class="form-control" placeholder="Ej: 20-39485921-9">
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label">WhatsApp Oficial para Envío de Comprobantes & Factura</label>
-                  <input type="text" id="wlBillingPhone" class="form-control" placeholder="Ej: 5491148923310 (con código de país sin +)">
-                </div>
-
                 <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; font-size: 12px; color: #a5b4fc; margin-top: auto;">
                   <i class="fa-solid fa-circle-check" style="color: #34d399;"></i>
-                  <span>Al hacer clic en 'Contratar', tus clientes verán estas opciones reales de pago de inmediato.</span>
+                  <span>Tus clientes verán estos datos bancarios exactos al elegir pago por transferencia.</span>
                 </div>
               </div>
 
@@ -2223,6 +2188,82 @@
   </div>
 
   <!-- ==================== MODALS ==================== -->
+
+  <!-- Modal: Editor de Plan Comercial (Crear / Editar Plan Dinámico) -->
+  <div class="modal-backdrop" id="modalPlanEditor">
+    <div class="modal-content" style="max-width: 580px;">
+      <div class="modal-header">
+        <strong style="font-size: 17px; color: white;" id="modalPlanEditorTitle">
+          <i class="fa-solid fa-tag" style="color: #38bdf8;"></i> Configurar Plan Comercial
+        </strong>
+        <button class="close-btn" onclick="closeModal('modalPlanEditor')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editPlanId">
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Nombre del Plan</label>
+            <input type="text" id="editPlanName" class="form-control" placeholder="Ej: Plan Growth Pro Multi-Flujo">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio ($)</label>
+            <input type="number" id="editPlanPrice" class="form-control" placeholder="Ej: 690">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">Moneda</label>
+            <select id="editPlanCurrency" class="form-control">
+              <option value="USD">USD ($ Dólares)</option>
+              <option value="EUR">EUR (€ Euros)</option>
+              <option value="ARS">ARS ($ Pesos Arg)</option>
+              <option value="MXN">MXN ($ Pesos Mex)</option>
+              <option value="COP">COP ($ Pesos Col)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Frecuencia de Cobro</label>
+            <select id="editPlanPeriod" class="form-control">
+              <option value="mes">Mensual (/ mes)</option>
+              <option value="año">Anual (/ año)</option>
+              <option value="pago único">Pago Único (Sin recurrencia)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Etiqueta / Subtítulo del Plan</label>
+          <input type="text" id="editPlanCategory" class="form-control" placeholder="Ej: Ideal Clínicas, Inmobiliarias & Negocios">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Enlace de Pago Online (Stripe / Mercado Pago / PayPal)</label>
+          <input type="url" id="editPlanPaymentLink" class="form-control" placeholder="https://buy.stripe.com/... o https://mpago.la/...">
+          <span style="font-size: 11.5px; color: var(--text-muted);">Al hacer clic en pagar con tarjeta, tu cliente irá directo a este link. Si lo dejas vacío, usará el modal general.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Características & Beneficios (1 por cada línea)</label>
+          <textarea id="editPlanFeatures" class="form-control" rows="5" placeholder="1 Agente de WhatsApp 24/7 entrenado a medida&#10;Agendamiento Automático en Google Calendar&#10;Recordatorios WhatsApp anti-ausentismo (24h y 2h)&#10;Generador de Cotizaciones con links de pago&#10;Encuestas NPS y Reseñas en Google Maps 5★&#10;CRM Kanban y Pipeline de Leads"></textarea>
+        </div>
+
+        <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <div>
+            <strong style="font-size: 13px; color: white; display: block;">Destacar como 'Más Popular / Recomendado'</strong>
+            <span style="font-size: 11.5px; color: var(--text-muted);">Tendrá borde brillante y cinta distintiva en tu landing</span>
+          </div>
+          <input type="checkbox" id="editPlanFeatured" style="width: 20px; height: 20px; accent-color: #6366f1; cursor: pointer;">
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalPlanEditor')">Cancelar</button>
+        <button class="btn btn-primary" onclick="savePlanFromModal()"><i class="fa-solid fa-check"></i> Guardar Plan</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal: Crear Nueva Agencia Independiente (Para Compradores) -->
   <div class="modal-backdrop" id="newAgencyModal">

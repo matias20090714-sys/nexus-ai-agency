@@ -160,6 +160,8 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
   renderQuotesHistoryTable();
   updateMarketingForm();
   checkQrConnectionState();
+  renderAgencyPlansAdmin();
+  renderPortalPricing();
 }
 
 // ==================== TAB NAVIGATION ====================
@@ -220,7 +222,7 @@ function switchTab(tabName) {
     'prospecting': '<i class="fa-solid fa-crosshairs" style="color: var(--accent-indigo);"></i> Prospección B2B & Demos',
     'marketing': '<i class="fa-solid fa-wand-magic-sparkles" style="color: #ec4899;"></i> AI Marketing Studio',
     'connections': '<i class="fa-solid fa-plug" style="color: var(--accent-cyan);"></i> APIs & WhatsApp Gateway',
-    'whitelabel': '<i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i> Personalización Marca Blanca'
+    'whitelabel': '<i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i> Personalización Marca Blanca & Planes'
   };
 
   if (titles[tabName]) {
@@ -230,6 +232,14 @@ function switchTab(tabName) {
 
   if (tabName === 'quotes') {
     renderQuotesModule();
+  }
+
+  if (tabName === 'agency-portal') {
+    renderPortalPricing();
+  }
+
+  if (tabName === 'whitelabel') {
+    renderAgencyPlansAdmin();
   }
 
   if (tabName === 'connections') {
@@ -1957,7 +1967,309 @@ function confirmClientQrPair() {
 }
 
 // ==================== WHITE LABEL & REAL PAYMENTS ====================
-let activeCheckoutPlan = 'pro';
+// ==================== DYNAMIC PLANS & WHITE LABEL SETTINGS ====================
+let activeCheckoutPlanId = null;
+
+function getDefaultAgencyPlans() {
+  return [
+    {
+      id: 'plan_starter',
+      name: 'Plan Starter IA',
+      category: 'Negocios & Comercios Locales',
+      price: '290',
+      currency: 'USD',
+      billingPeriod: 'mes',
+      isFeatured: false,
+      badgeText: '',
+      paymentLink: '',
+      features: [
+        '1 Agente de WhatsApp 24/7 entrenado a medida',
+        'Respuestas a consultas y precios al instante',
+        'Catálogo interactivo de productos y servicios',
+        'Derivación automática a tu WhatsApp personal',
+        'Mantenimiento de servidor e IA incluido'
+      ]
+    },
+    {
+      id: 'plan_pro',
+      name: 'Plan Growth Pro Multi-Flujo',
+      category: 'Clínicas, Inmobiliarias & Empresas',
+      price: '690',
+      currency: 'USD',
+      billingPeriod: 'mes',
+      isFeatured: true,
+      badgeText: 'MÁS ELEGIDO • 85% DE CLIENTES',
+      paymentLink: '',
+      features: [
+        'Todo lo incluido en el Plan Starter',
+        'Agendamiento Automático en Google Calendar',
+        'Recordatorios WhatsApp anti-ausentismo (24h y 2h)',
+        'Generador de Cotizaciones con links de pago',
+        'Encuestas NPS y Reseñas en Google Maps 5★',
+        'CRM Kanban y Pipeline de Leads en tiempo real'
+      ]
+    }
+  ];
+}
+
+function getAgencyPlans(profile) {
+  if (!profile) profile = getAgencyProfile();
+  if (!profile) return getDefaultAgencyPlans();
+
+  if (profile.plans && Array.isArray(profile.plans) && profile.plans.length > 0) {
+    return profile.plans;
+  }
+
+  // If old structure had priceStarter/pricePro, migrate seamlessly
+  const def = getDefaultAgencyPlans();
+  if (profile.priceStarter) def[0].price = profile.priceStarter;
+  if (profile.pricePro) def[1].price = profile.pricePro;
+  if (profile.paymentLinkStarter) def[0].paymentLink = profile.paymentLinkStarter;
+  if (profile.paymentLinkPro) def[1].paymentLink = profile.paymentLinkPro;
+  
+  profile.plans = def;
+  saveAgencyProfile(profile);
+  return def;
+}
+
+function saveAgencyPlans(plans) {
+  const profile = getAgencyProfile();
+  if (!profile) return;
+  profile.plans = plans;
+  saveAgencyProfile(profile);
+  renderAgencyPlansAdmin();
+  renderPortalPricing();
+}
+
+function renderAgencyPlansAdmin() {
+  const container = document.getElementById('whitelabelPlansListContainer');
+  if (!container) return;
+
+  const profile = getAgencyProfile();
+  const plans = getAgencyPlans(profile);
+
+  if (plans.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 24px; color: var(--text-muted); background: rgba(10, 13, 28, 0.6); border-radius: var(--radius-md);">
+        <i class="fa-solid fa-tag" style="font-size: 24px; color: #818cf8; margin-bottom: 8px;"></i>
+        <div>No tienes ningún plan configurado. Agrega al menos un plan para mostrar en tu web.</div>
+        <button class="btn btn-primary btn-sm" style="margin-top: 12px;" onclick="openModalPlanEditor()">
+          <i class="fa-solid fa-plus"></i> Crear Primer Plan
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = plans.map(p => {
+    const isSingle = plans.length === 1;
+    return `
+      <div class="plan-admin-card ${p.isFeatured ? 'featured' : ''}">
+        <div>
+          <div class="plan-admin-card-header">
+            <div>
+              <span class="agent-category" style="font-size: 11px;">${escapeHtml(p.category || 'Plan de Agencia')}</span>
+              <strong style="font-size: 16px; color: white; display: block; margin-top: 4px;">${escapeHtml(p.name)}</strong>
+            </div>
+            ${p.isFeatured ? `<span class="brand-badge" style="background: rgba(99,102,241,0.25); color: #a5b4fc; font-size: 10px;">★ DESTACADO</span>` : ''}
+          </div>
+
+          <div class="plan-admin-price">
+            $${escapeHtml(p.price)} <span style="font-size: 13px; color: var(--text-dim); font-weight: normal;">${escapeHtml(p.currency || 'USD')} / ${escapeHtml(p.billingPeriod || 'mes')}</span>
+          </div>
+
+          <div style="font-size: 12px; color: #a5b4fc; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-link" style="color: ${p.paymentLink ? '#34d399' : '#f59e0b'};"></i>
+            <span>${p.paymentLink ? 'Pasarela online vinculada' : 'Sin link directo (Usa datos bancarios/WhatsApp)'}</span>
+          </div>
+
+          <div class="plan-admin-features-preview">
+            ${(p.features || []).map(f => `<div>• ${escapeHtml(f)}</div>`).join('')}
+          </div>
+        </div>
+
+        <div class="plan-admin-actions">
+          <button class="btn btn-secondary btn-sm" style="flex: 1;" onclick="openModalPlanEditor('${p.id}')">
+            <i class="fa-solid fa-pen-to-square"></i> Editar
+          </button>
+          <button class="btn btn-secondary btn-sm" style="color: #f87171;" onclick="deletePlan('${p.id}')" title="Eliminar plan">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function openModalPlanEditor(planId = null) {
+  const modal = document.getElementById('modalPlanEditor');
+  if (!modal) return;
+
+  const profile = getAgencyProfile();
+  const plans = getAgencyPlans(profile);
+
+  const titleElem = document.getElementById('modalPlanEditorTitle');
+  const editId = document.getElementById('editPlanId');
+  const editName = document.getElementById('editPlanName');
+  const editPrice = document.getElementById('editPlanPrice');
+  const editCurrency = document.getElementById('editPlanCurrency');
+  const editPeriod = document.getElementById('editPlanPeriod');
+  const editCategory = document.getElementById('editPlanCategory');
+  const editPaymentLink = document.getElementById('editPlanPaymentLink');
+  const editFeatures = document.getElementById('editPlanFeatures');
+  const editFeatured = document.getElementById('editPlanFeatured');
+
+  if (planId) {
+    const p = plans.find(x => x.id === planId);
+    if (!p) return;
+
+    if (titleElem) titleElem.innerHTML = `<i class="fa-solid fa-pen" style="color: #38bdf8;"></i> Editar Plan: ${escapeHtml(p.name)}`;
+    editId.value = p.id;
+    editName.value = p.name || '';
+    editPrice.value = p.price || '';
+    editCurrency.value = p.currency || 'USD';
+    editPeriod.value = p.billingPeriod || 'mes';
+    editCategory.value = p.category || '';
+    editPaymentLink.value = p.paymentLink || '';
+    editFeatures.value = Array.isArray(p.features) ? p.features.join('\n') : '';
+    editFeatured.checked = !!p.isFeatured;
+  } else {
+    if (titleElem) titleElem.innerHTML = `<i class="fa-solid fa-plus" style="color: #34d399;"></i> Crear Nuevo Plan Comercial`;
+    editId.value = '';
+    editName.value = '';
+    editPrice.value = '';
+    editCurrency.value = 'USD';
+    editPeriod.value = 'mes';
+    editCategory.value = '';
+    editPaymentLink.value = '';
+    editFeatures.value = "1 Agente de WhatsApp 24/7 entrenado a medida\nAtención y respuestas automáticas\nCatálogo de servicios y precios\nDerivación a WhatsApp humano\nSoporte y servidor incluido";
+    editFeatured.checked = plans.length === 0; // First plan default featured
+  }
+
+  modal.classList.add('active');
+}
+
+function savePlanFromModal() {
+  const editId = document.getElementById('editPlanId').value.trim();
+  const name = document.getElementById('editPlanName').value.trim();
+  const price = document.getElementById('editPlanPrice').value.trim();
+  const currency = document.getElementById('editPlanCurrency').value;
+  const billingPeriod = document.getElementById('editPlanPeriod').value;
+  const category = document.getElementById('editPlanCategory').value.trim();
+  const paymentLink = document.getElementById('editPlanPaymentLink').value.trim();
+  const featuresRaw = document.getElementById('editPlanFeatures').value.trim();
+  const isFeatured = document.getElementById('editPlanFeatured').checked;
+
+  if (!name || !price) {
+    alert('Por favor indica el Nombre y el Precio del plan.');
+    return;
+  }
+
+  const features = featuresRaw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+  const profile = getAgencyProfile();
+  let plans = getAgencyPlans(profile);
+
+  if (editId) {
+    // Edit existing
+    const idx = plans.findIndex(p => p.id === editId);
+    if (idx !== -1) {
+      plans[idx] = {
+        ...plans[idx],
+        name,
+        price,
+        currency,
+        billingPeriod,
+        category,
+        paymentLink,
+        features,
+        isFeatured
+      };
+    }
+  } else {
+    // New plan
+    const newPlan = {
+      id: `plan_${Date.now()}`,
+      name,
+      price,
+      currency,
+      billingPeriod,
+      category,
+      paymentLink,
+      features,
+      isFeatured,
+      badgeText: isFeatured ? 'MÁS POPULAR' : ''
+    };
+    plans.push(newPlan);
+  }
+
+  saveAgencyPlans(plans);
+  closeModal('modalPlanEditor');
+  showToast('¡Plan comercial guardado exitosamente!', 'success');
+}
+
+function deletePlan(planId) {
+  if (!confirm('¿Estás seguro de que deseas eliminar este plan de tu oferta comercial?')) return;
+  const profile = getAgencyProfile();
+  let plans = getAgencyPlans(profile);
+  plans = plans.filter(p => p.id !== planId);
+  saveAgencyPlans(plans);
+  showToast('Plan eliminado', 'info');
+}
+
+function renderPortalPricing() {
+  const container = document.getElementById('portalPricingContainer');
+  if (!container) return;
+
+  const profile = getAgencyProfile();
+  const plans = getAgencyPlans(profile);
+
+  if (plans.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: rgba(15, 20, 42, 0.7); border-radius: var(--radius-xl); border: 1px dashed var(--border-subtle);">
+        <h3 style="color: white; margin-bottom: 8px;">No hay planes publicados actualmente</h3>
+        <p style="color: var(--text-muted); font-size: 14px;">Ve a la pestaña 'Marca Blanca' para configurar 1 o varios planes con sus precios.</p>
+        <button class="btn btn-primary btn-sm" onclick="switchTab('whitelabel')">
+          <i class="fa-solid fa-tags"></i> Configurar Planes Ahora
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  // Adjust container class for 1 single plan vs multi-plans
+  if (plans.length === 1) {
+    container.className = 'landing-pricing-grid single-plan';
+  } else {
+    container.className = 'landing-pricing-grid';
+  }
+
+  container.innerHTML = plans.map(p => {
+    return `
+      <div class="landing-price-card ${p.isFeatured ? 'featured' : ''}">
+        ${p.isFeatured ? `<div class="popular-ribbon">${escapeHtml(p.badgeText || 'MÁS ELEGIDO')}</div>` : ''}
+        <span class="agent-category" style="${p.isFeatured ? 'color: #a5b4fc;' : ''}">${escapeHtml(p.category || 'Solución IA')}</span>
+        <div style="font-size: 21px; font-weight: 800; color: white; margin: 4px 0 12px 0;">${escapeHtml(p.name)}</div>
+        <div style="font-size: 38px; font-weight: 900; color: ${p.isFeatured ? '#34d399' : 'white'}; margin-bottom: 16px;">
+          $${escapeHtml(p.price)} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">${escapeHtml(p.currency || 'USD')} / ${escapeHtml(p.billingPeriod || 'mes')}</span>
+        </div>
+        
+        <div class="landing-price-features">
+          ${(p.features || []).map(f => `
+            <div>
+              <i class="fa-solid fa-check" style="color: #34d399;"></i>
+              <span>${escapeHtml(f)}</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <button class="btn ${p.isFeatured ? 'btn-primary' : 'btn-secondary'}" style="width: 100%; margin-top: auto; padding: 14px; font-weight: 800;" onclick="openAgencyRealCheckout('${p.id}')">
+          <i class="fa-solid ${p.isFeatured ? 'fa-bolt' : 'fa-cart-shopping'}"></i> Contratar ${escapeHtml(p.name)}
+        </button>
+      </div>
+    `;
+  }).join('');
+}
 
 function updateBrandColor(color) {
   document.documentElement.style.setProperty('--accent-indigo', color);
@@ -1970,10 +2282,6 @@ function saveWhiteLabelSettings() {
 
   const name = document.getElementById('wlBrandName').value.trim() || profile.name;
   const color = document.getElementById('wlColorPicker').value;
-  const priceStarter = document.getElementById('wlPriceStarter').value.trim() || '290';
-  const pricePro = document.getElementById('wlPricePro').value.trim() || '690';
-  const paymentLinkStarter = document.getElementById('wlPaymentLinkStarter').value.trim();
-  const paymentLinkPro = document.getElementById('wlPaymentLinkPro').value.trim();
   const bankName = document.getElementById('wlBankName').value.trim();
   const bankHolder = document.getElementById('wlBankHolder').value.trim();
   const bankCbu = document.getElementById('wlBankCbu').value.trim();
@@ -1982,10 +2290,6 @@ function saveWhiteLabelSettings() {
 
   profile.name = name;
   profile.brandColor = color;
-  profile.priceStarter = priceStarter;
-  profile.pricePro = pricePro;
-  profile.paymentLinkStarter = paymentLinkStarter;
-  profile.paymentLinkPro = paymentLinkPro;
   profile.bankName = bankName;
   profile.bankHolder = bankHolder;
   profile.bankCbu = bankCbu;
@@ -2000,44 +2304,63 @@ function saveWhiteLabelSettings() {
   const portalAgency = document.getElementById('portalAgencyName');
   if (portalAgency) portalAgency.innerText = name;
 
-  const portalStarter = document.getElementById('portalPriceStarter');
-  const portalPro = document.getElementById('portalPricePro');
-  if (portalStarter) portalStarter.innerHTML = `$${priceStarter} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span>`;
-  if (portalPro) portalPro.innerHTML = `$${pricePro} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span>`;
-
+  renderPortalPricing();
   showToast('¡Ajustes de Marca Blanca y Pasarelas de Pago guardados con éxito!', 'success');
 }
 
-function openAgencyRealCheckout(planKey) {
-  activeCheckoutPlan = planKey;
+function openAgencyRealCheckout(planId = null) {
   const profile = getAgencyProfile();
-  const isPro = planKey === 'pro';
+  const plans = getAgencyPlans(profile);
 
-  const planName = isPro ? 'Plan Growth Pro' : 'Plan Starter IA';
-  const price = isPro ? (profile.pricePro || '690') : (profile.priceStarter || '290');
-  const gatewayLink = isPro ? profile.paymentLinkPro : profile.paymentLinkStarter;
+  // Find target plan
+  let selectedPlan = null;
+  if (planId) {
+    selectedPlan = plans.find(p => p.id === planId);
+  }
+  if (!selectedPlan && plans.length > 0) {
+    selectedPlan = plans.find(p => p.isFeatured) || plans[0];
+  }
+
+  if (!selectedPlan) {
+    selectedPlan = {
+      id: 'default',
+      name: 'Plan Growth Pro Multi-Flujo',
+      price: '690',
+      currency: 'USD',
+      billingPeriod: 'mes',
+      paymentLink: ''
+    };
+  }
+
+  activeCheckoutPlanId = selectedPlan.id;
+
+  const planName = selectedPlan.name;
+  const price = selectedPlan.price;
+  const currency = selectedPlan.currency || 'USD';
+  const period = selectedPlan.billingPeriod || 'mes';
+  const gatewayLink = selectedPlan.paymentLink;
 
   document.getElementById('checkoutSummaryPlan').innerText = planName.toUpperCase();
   document.getElementById('checkoutSummaryPrice').innerText = `$${price}`;
-  document.getElementById('checkoutModalTitle').innerHTML = `<i class="fa-solid fa-lock" style="color: #34d399;"></i> Contratar ${planName}`;
+  document.getElementById('checkoutModalTitle').innerHTML = `<i class="fa-solid fa-lock" style="color: #34d399;"></i> Contratar ${escapeHtml(planName)}`;
 
   // Populate Bank Details
   const bankDetailsContainer = document.getElementById('checkoutBankDetails');
   if (bankDetailsContainer) {
     if (profile.bankName || profile.bankCbu) {
       bankDetailsContainer.innerHTML = `
-        <div><strong>Banco:</strong> ${profile.bankName || 'A coordinar'}</div>
-        <div><strong>Titular:</strong> ${profile.bankHolder || profile.name}</div>
+        <div><strong>Banco / Entidad:</strong> ${profile.bankName || 'A coordinar'}</div>
+        <div><strong>Titular de la Cuenta:</strong> ${profile.bankHolder || profile.name}</div>
         <div><strong>CBU/IBAN/Alias:</strong> <span style="color: #67e8f9; font-weight: 800;">${profile.bankCbu || 'Consultar por WhatsApp'}</span></div>
         <div><strong>Identificación Fiscal:</strong> ${profile.bankTaxId || 'Consumidor Final'}</div>
-        <div><strong>Monto Exacto:</strong> $${price} USD</div>
+        <div><strong>Monto Exacto a Transferir:</strong> $${price} ${currency} / ${period}</div>
       `;
     } else {
       bankDetailsContainer.innerHTML = `
-        <div><strong>Banco:</strong> Transferencia Local / Internacional</div>
+        <div><strong>Banco:</strong> Transferencia Bancaria Directa</div>
         <div><strong>Titular:</strong> ${profile.name}</div>
         <div><strong>CBU/IBAN/Alias:</strong> <span style="color: #67e8f9; font-weight: 800;">ALIAS.AGENCIA.IA</span></div>
-        <div><strong>Monto Exacto:</strong> $${price} USD / mes</div>
+        <div><strong>Monto Exacto:</strong> $${price} ${currency} / ${period}</div>
       `;
     }
   }
@@ -2045,10 +2368,10 @@ function openAgencyRealCheckout(planKey) {
   // Update Gateway Button Text
   const btnGateway = document.getElementById('btnCheckoutPayGateway');
   if (btnGateway) {
-    if (gatewayLink) {
-      btnGateway.innerHTML = `<i class="fa-solid fa-lock"></i> Pagar $${price} USD con Tarjeta (Enlace Seguro)`;
+    if (gatewayLink && gatewayLink.startsWith('http')) {
+      btnGateway.innerHTML = `<i class="fa-solid fa-lock"></i> Pagar $${price} ${currency} con Tarjeta (Pasarela Segura)`;
     } else {
-      btnGateway.innerHTML = `<i class="fa-solid fa-credit-card"></i> Pagar con Tarjeta (Configurar enlace en Marca Blanca)`;
+      btnGateway.innerHTML = `<i class="fa-solid fa-credit-card"></i> Pagar con Tarjeta (Enlace Stripe / MP)`;
     }
   }
 
@@ -2057,23 +2380,26 @@ function openAgencyRealCheckout(planKey) {
 
 function executeGatewayPayment() {
   const profile = getAgencyProfile();
-  const isPro = activeCheckoutPlan === 'pro';
-  const gatewayLink = isPro ? profile.paymentLinkPro : profile.paymentLinkStarter;
+  const plans = getAgencyPlans(profile);
+  const selectedPlan = plans.find(p => p.id === activeCheckoutPlanId) || plans[0];
+  const gatewayLink = selectedPlan ? selectedPlan.paymentLink : null;
 
   if (gatewayLink && gatewayLink.startsWith('http')) {
     window.open(gatewayLink, '_blank');
     showToast('Abriendo pasarela de pago segura...', 'success');
   } else {
-    alert(`ℹ️ PASARELA DE PAGO DIRECTA:\n\nEl dueño de la agencia aún no ha pegado el enlace de Stripe/Mercado Pago para este plan.\n\nPuedes pagar mediante Transferencia Bancaria o coordinar directamente por WhatsApp.`);
+    alert(`ℹ️ PASARELA DE PAGO ONLINE:\n\nPuedes configurar el enlace directo de Stripe o Mercado Pago para este plan en la pestaña 'Marca Blanca'.\n\nPor ahora puedes realizar el pago mediante Transferencia Bancaria o coordinar directamente por WhatsApp con el equipo.`);
   }
 }
 
 function copyBankDetails() {
   const profile = getAgencyProfile();
-  const isPro = activeCheckoutPlan === 'pro';
-  const price = isPro ? (profile.pricePro || '690') : (profile.priceStarter || '290');
+  const plans = getAgencyPlans(profile);
+  const selectedPlan = plans.find(p => p.id === activeCheckoutPlanId) || plans[0];
+  const price = selectedPlan ? selectedPlan.price : '690';
+  const currency = selectedPlan ? (selectedPlan.currency || 'USD') : 'USD';
   
-  const text = `DATOS DE TRANSFERENCIA (${profile.name}):\nBanco: ${profile.bankName || 'Santander/BBVA'}\nTitular: ${profile.bankHolder || profile.name}\nCBU/IBAN/Alias: ${profile.bankCbu || 'ALIAS.AGENCIA.IA'}\nMonto: $${price} USD`;
+  const text = `DATOS DE TRANSFERENCIA (${profile.name}):\nBanco: ${profile.bankName || 'Santander/BBVA/Mercado Pago'}\nTitular: ${profile.bankHolder || profile.name}\nCBU/IBAN/Alias: ${profile.bankCbu || 'ALIAS.AGENCIA.IA'}\nMonto a Transferir: $${price} ${currency}`;
   
   navigator.clipboard.writeText(text);
   showToast('📋 Datos bancarios copiados al portapapeles', 'success');
@@ -2081,11 +2407,15 @@ function copyBankDetails() {
 
 function sendCheckoutWhatsApp() {
   const profile = getAgencyProfile();
-  const isPro = activeCheckoutPlan === 'pro';
-  const planName = isPro ? 'Plan Growth Pro ($' + (profile.pricePro || '690') + ' USD/mes)' : 'Plan Starter ($' + (profile.priceStarter || '290') + ' USD/mes)';
+  const plans = getAgencyPlans(profile);
+  const selectedPlan = plans.find(p => p.id === activeCheckoutPlanId) || plans[0];
+  const planName = selectedPlan ? selectedPlan.name : 'Plan Growth Pro Multi-Flujo';
+  const price = selectedPlan ? selectedPlan.price : '690';
+  const currency = selectedPlan ? (selectedPlan.currency || 'USD') : 'USD';
+  const period = selectedPlan ? (selectedPlan.billingPeriod || 'mes') : 'mes';
   const phone = profile.billingPhone || '5491148923310';
   
-  const msg = encodeURIComponent(`🚀 ¡Hola ${profile.name}! Quiero contratar el ${planName} para mi empresa.\n\n¿Me facilitan los datos de pago / factura para activar mi Agente de IA hoy mismo?`);
+  const msg = encodeURIComponent(`🚀 ¡Hola ${profile.name}! Quiero contratar el *${planName}* ($${price} ${currency}/${period}) para mi empresa.\n\n¿Me facilitan los datos de pago / factura para activar mi Asistente de IA hoy mismo?`);
   window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
 }
 
