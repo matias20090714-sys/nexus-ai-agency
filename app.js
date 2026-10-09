@@ -1,5 +1,15 @@
 // NEXUS AI - Multi-Agency Operating System Engine (Complete Tenant Isolation)
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Multi-Agency Registry System
 function getAgenciesRegistry() {
   const data = localStorage.getItem('nexus_all_agencies_registry');
@@ -50,6 +60,18 @@ function saveAgencyLeads(leads) {
 function getAgencyProfile() {
   const reg = getAgenciesRegistry();
   return reg.find(a => a.id === currentAgencyId) || reg[0];
+}
+
+function saveAgencyProfile(profile) {
+  if (!profile) return;
+  const reg = getAgenciesRegistry();
+  const idx = reg.findIndex(a => a.id === (profile.id || currentAgencyId));
+  if (idx !== -1) {
+    reg[idx] = profile;
+  } else {
+    reg.push(profile);
+  }
+  saveAgenciesRegistry(reg);
 }
 
 // State variables for currently active agency context
