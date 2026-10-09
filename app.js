@@ -1177,6 +1177,7 @@ async function sendRealReplyFromInbox() {
       body: JSON.stringify({
         to: lead.phone,
         message: text,
+        sessionId: `agency_${currentAgencyId}`,
         token: DEFAULT_META_TOKEN,
         phoneId: DEFAULT_PHONE_ID
       })
@@ -1187,15 +1188,37 @@ async function sendRealReplyFromInbox() {
       if (!lead.history) lead.history = [];
       lead.history.push({ sender: 'agent', text: text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
       lead.lastMessage = text;
-      saveRealLeads(realLeads);
+      saveAgencyLeads(realLeads);
       input.value = '';
       selectRealInboxLead(lead.id);
       showToast('✅ WhatsApp enviado al teléfono del cliente', 'success');
     } else {
-      showToast(`Error de Meta: ${data.error}`, 'error');
+      // Fallback: Add to local chat and open WhatsApp Web direct chat
+      if (!lead.history) lead.history = [];
+      lead.history.push({ sender: 'agent', text: text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+      lead.lastMessage = text;
+      saveAgencyLeads(realLeads);
+      input.value = '';
+      selectRealInboxLead(lead.id);
+      
+      const clean = lead.phone.replace(/\D/g, '');
+      const encoded = encodeURIComponent(text);
+      window.open(`https://wa.me/${clean}?text=${encoded}`, '_blank');
+      showToast('📲 Abriendo WhatsApp Web / App para enviar...', 'info');
     }
   } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
+    // Fallback on network/local offline: open wa.me
+    if (!lead.history) lead.history = [];
+    lead.history.push({ sender: 'agent', text: text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+    lead.lastMessage = text;
+    saveAgencyLeads(realLeads);
+    input.value = '';
+    selectRealInboxLead(lead.id);
+
+    const clean = lead.phone.replace(/\D/g, '');
+    const encoded = encodeURIComponent(text);
+    window.open(`https://wa.me/${clean}?text=${encoded}`, '_blank');
+    showToast('📲 Abriendo chat de WhatsApp...', 'info');
   }
 }
 
@@ -1222,44 +1245,83 @@ async function submitModalRealWhatsApp() {
       body: JSON.stringify({
         to: phone,
         message: message,
+        sessionId: `agency_${currentAgencyId}`,
         token: DEFAULT_META_TOKEN,
         phoneId: DEFAULT_PHONE_ID
       })
     });
 
     const data = await res.json();
-    if (data.success) {
-      // Add or update lead in real storage
-      let existing = realLeads.find(l => l.phone === phone);
-      if (!existing) {
-        existing = {
-          id: 'lead-' + Date.now(),
-          phone: phone,
-          name: `Cliente (+${phone.slice(-4)})`,
-          company: 'Contacto WhatsApp',
-          timestamp: 'Ahora',
-          lastMessage: message,
-          history: [{ sender: 'agent', text: message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]
-        };
-        realLeads.unshift(existing);
-      } else {
-        existing.history.push({ sender: 'agent', text: message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-        existing.lastMessage = message;
-      }
-      saveRealLeads(realLeads);
+    
+    // Add or update lead in real storage
+    let existing = realLeads.find(l => l.phone.replace(/\D/g, '') === phone.replace(/\D/g, ''));
+    if (!existing) {
+      existing = {
+        id: 'lead-' + Date.now(),
+        phone: phone,
+        name: `Cliente (+${phone.replace(/\D/g, '').slice(-4)})`,
+        company: 'Contacto WhatsApp',
+        stage: 'Primer Contacto',
+        timestamp: 'Ahora',
+        lastMessage: message,
+        history: [{ sender: 'agent', text: message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]
+      };
+      realLeads.unshift(existing);
+    } else {
+      if (!existing.history) existing.history = [];
+      existing.history.push({ sender: 'agent', text: message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+      existing.lastMessage = message;
+    }
+    saveAgencyLeads(realLeads);
 
-      closeModal('sendRealWaModal');
-      renderRealInbox();
-      renderRealKanban();
-      renderAgencyDashboard();
-      selectRealInboxLead(existing.id);
-      switchTab('inbox');
+    closeModal('sendRealWaModal');
+    renderRealInbox();
+    renderRealKanban();
+    renderAgencyDashboard();
+    selectRealInboxLead(existing.id);
+    switchTab('inbox');
+
+    if (data.success) {
       showToast('✅ ¡Mensaje de WhatsApp REAL enviado con éxito!', 'success');
     } else {
-      showToast(`❌ Error de Meta: ${data.error}`, 'error');
+      const clean = phone.replace(/\D/g, '');
+      const encoded = encodeURIComponent(message);
+      window.open(`https://wa.me/${clean}?text=${encoded}`, '_blank');
+      showToast('📲 Abriendo WhatsApp para enviar mensaje...', 'info');
     }
   } catch (err) {
-    showToast(`❌ Error al conectar con el servidor: ${err.message}`, 'error');
+    // Fallback: record and open wa.me
+    let existing = realLeads.find(l => l.phone.replace(/\D/g, '') === phone.replace(/\D/g, ''));
+    if (!existing) {
+      existing = {
+        id: 'lead-' + Date.now(),
+        phone: phone,
+        name: `Cliente (+${phone.replace(/\D/g, '').slice(-4)})`,
+        company: 'Contacto WhatsApp',
+        stage: 'Primer Contacto',
+        timestamp: 'Ahora',
+        lastMessage: message,
+        history: [{ sender: 'agent', text: message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]
+      };
+      realLeads.unshift(existing);
+    } else {
+      if (!existing.history) existing.history = [];
+      existing.history.push({ sender: 'agent', text: message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+      existing.lastMessage = message;
+    }
+    saveAgencyLeads(realLeads);
+
+    closeModal('sendRealWaModal');
+    renderRealInbox();
+    renderRealKanban();
+    renderAgencyDashboard();
+    selectRealInboxLead(existing.id);
+    switchTab('inbox');
+
+    const clean = phone.replace(/\D/g, '');
+    const encoded = encodeURIComponent(message);
+    window.open(`https://wa.me/${clean}?text=${encoded}`, '_blank');
+    showToast('📲 Abriendo WhatsApp para enviar mensaje...', 'info');
   }
 }
 
