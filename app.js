@@ -90,11 +90,17 @@ function loadAgencyWorkspace(agencyId) {
   const profile = getAgencyProfile();
   
   // Update Top Bar & Sidebar & Portal
-  document.getElementById('topAgencyName').innerText = profile.name;
-  document.getElementById('topAgencyId').innerText = `ID: #${profile.id.toUpperCase().slice(-6)}`;
-  document.getElementById('topAgencyAvatar').innerText = profile.name ? profile.name[0].toUpperCase() : 'A';
-  document.getElementById('sidebarBrandName').innerText = profile.name;
-  document.getElementById('wlBrandName').value = profile.name;
+  const topName = document.getElementById('topAgencyName');
+  const topId = document.getElementById('topAgencyId');
+  const topAvatar = document.getElementById('topAgencyAvatar');
+  const sideName = document.getElementById('sidebarBrandName');
+  const wlBrand = document.getElementById('wlBrandName');
+
+  if (topName) topName.innerText = profile.name;
+  if (topId) topId.innerText = `ID: #${profile.id.toUpperCase().slice(-6)}`;
+  if (topAvatar) topAvatar.innerText = profile.name ? profile.name[0].toUpperCase() : 'A';
+  if (sideName) sideName.innerText = profile.name;
+  if (wlBrand) wlBrand.value = profile.name;
 
   // Update Playbook & Pricing personalized elements
   const starterPrice = profile.priceStarter || '290';
