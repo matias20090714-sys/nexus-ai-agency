@@ -494,13 +494,10 @@ function renderAgentCatalogTable() {
   const tbody = document.getElementById('agentCatalogTableBody');
   if (!tbody) return;
 
-  const catalog = (client && client.catalog) ? client.catalog : [
-    { id: 'srv_std_1', name: 'Plan Starter de IA para WhatsApp', price: 290, duration: '48 hs', description: 'Bot conversacional 24/7, catálogo y respuestas ilimitadas.' },
-    { id: 'srv_std_2', name: 'Plan Growth Pro Multi-Flujo', price: 690, duration: '24 hs', description: 'Agendamiento con Google Calendar, CRM y Pasarelas de Pago.' }
-  ];
+  const catalog = (client && client.catalog) ? client.catalog : [];
 
   if (catalog.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: var(--text-dim);">No hay ítems en el catálogo de esta empresa. Haz clic en 'Agregar Nuevo Ítem'.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="padding: 24px; text-align: center; color: var(--text-dim);"><i class="fa-solid fa-tags" style="font-size: 24px; margin-bottom: 8px; display: block; opacity: 0.3;"></i>Aún no hay servicios en el catálogo de esta empresa.<br>Haz clic en '+ Agregar Nuevo Ítem' o carga una plantilla de rubro en la pestaña 1.</td></tr>`;
     return;
   }
 
@@ -660,9 +657,7 @@ function saveActiveAgentConfig() {
 }
 
 // ==================== SMART QUOTATIONS & BILLING ENGINE ====================
-let currentQuoteItems = [
-  { name: 'Implementación de Agente IA WhatsApp Multi-Flujo', qty: 1, price: 490 }
-];
+let currentQuoteItems = [];
 
 function renderQuotesModule() {
   // Populate Emitting Company Selector
@@ -698,10 +693,14 @@ function populateQuickCatalogDropdown() {
 
   const compId = document.getElementById('quoteCompanySelector')?.value || activeClientId;
   const client = agencyClients.find(c => c.id === compId);
-  const catalog = (client && client.catalog) ? client.catalog : (AGENCY_BLUEPRINTS[0].defaultCatalog || []);
+  const catalog = (client && client.catalog) ? client.catalog : [];
 
-  quickSelect.innerHTML = `<option value="">-- Cargar del Catálogo --</option>` +
-    catalog.map(it => `<option value="${it.id}" data-name="${it.name}" data-price="${it.price}">🛍️ ${it.name} ($${it.price} USD)</option>`).join('');
+  if (catalog.length === 0) {
+    quickSelect.innerHTML = `<option value="">(Catálogo vacío - agrega ítems manuales)</option>`;
+  } else {
+    quickSelect.innerHTML = `<option value="">-- Cargar del Catálogo --</option>` +
+      catalog.map(it => `<option value="${it.id}" data-name="${it.name}" data-price="${it.price}">🛍️ ${it.name} ($${it.price} USD)</option>`).join('');
+  }
 }
 
 function onQuoteCompanyChange(companyId) {
@@ -1259,30 +1258,48 @@ function renderRealKanban() {
   const container = document.getElementById('realKanbanContainer');
   if (!container) return;
 
+  const stages = [
+    { key: 'Nuevo', label: 'Nuevos Contactos', icon: 'fa-user-plus', color: '#818cf8' },
+    { key: 'Calificado', label: 'Calificados / Interesados', icon: 'fa-user-check', color: '#22d3ee' },
+    { key: 'Cotización Enviada', label: 'Cotización Enviada', icon: 'fa-file-invoice-dollar', color: '#fbbf24' },
+    { key: 'Cerrado Ganado', label: 'Cerrado / Pagado', icon: 'fa-circle-check', color: '#34d399' }
+  ];
+
   if (realLeads.length === 0) {
     container.innerHTML = `
-      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: var(--text-dim);">
-        <i class="fa-solid fa-bars-progress" style="font-size: 40px; color: rgba(255,255,255,0.1); margin-bottom: 12px; display: block;"></i>
-        <strong style="color: white; font-size: 15px; display: block; margin-bottom: 4px;">Pipeline Limpio</strong>
-        <p style="font-size: 13px; max-width: 450px; margin: 0 auto;">Los contactos reales capturados por tus líneas de WhatsApp aparecerán aquí organizados por etapas de venta.</p>
+      <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; color: var(--text-dim); background: rgba(10, 13, 28, 0.4); border: 1px dashed var(--border-subtle); border-radius: var(--radius-lg);">
+        <i class="fa-solid fa-bars-progress" style="font-size: 40px; color: rgba(255,255,255,0.15); margin-bottom: 12px; display: block;"></i>
+        <strong style="color: white; font-size: 16px; display: block; margin-bottom: 4px;">Pipeline Listo y en Cero</strong>
+        <p style="font-size: 13px; max-width: 480px; margin: 0 auto 16px auto; color: var(--text-muted);">Tus contactos reales que escriban a tus números de WhatsApp o registres manualmente aparecerán aquí clasificados por etapa de venta.</p>
+        <button class="btn btn-primary btn-sm" onclick="openNewLeadModal()"><i class="fa-solid fa-plus"></i> Registrar Primer Lead Manual</button>
       </div>
     `;
     return;
   }
 
-  container.innerHTML = `
-    <div class="kanban-column">
-      <div class="kanban-col-header"><strong style="color: white;">Nuevos Contactos</strong><span class="kanban-count-badge">${realLeads.length}</span></div>
-      <div class="kanban-cards-list">
-        ${realLeads.map(l => `
-          <div class="kanban-card" onclick="selectRealInboxLead('${l.id}'); switchTab('inbox');">
-            <div class="card-client-name">${l.name || l.phone}</div>
-            <div class="card-meta-text">${l.phone}</div>
-          </div>
-        `).join('')}
+  container.innerHTML = stages.map(st => {
+    const stageLeads = realLeads.filter(l => (l.stage || 'Nuevo') === st.key);
+    return `
+      <div class="kanban-column">
+        <div class="kanban-col-header" style="border-bottom: 2px solid ${st.color}; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+          <strong style="color: white; font-size: 13.5px;"><i class="fa-solid ${st.icon}" style="color: ${st.color}; margin-right: 6px;"></i> ${st.label}</strong>
+          <span class="kanban-count-badge" style="background: rgba(255,255,255,0.1); color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px;">${stageLeads.length}</span>
+        </div>
+        <div class="kanban-cards-list">
+          ${stageLeads.length === 0 ? `<div style="font-size: 11.5px; color: var(--text-dim); text-align: center; padding: 16px 8px;">Sin leads en esta etapa</div>` : stageLeads.map(l => `
+            <div class="kanban-card" onclick="selectRealInboxLead('${l.id}'); switchTab('inbox');" style="cursor: pointer; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; margin-bottom: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px;">
+                <strong style="color: white; font-size: 13px;">${l.name || l.phone}</strong>
+                ${l.estimatedValue ? `<span class="brand-badge" style="background: rgba(52,211,153,0.15); color: #34d399; font-size: 10.5px;">${l.estimatedValue}</span>` : ''}
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 4px;"><i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> ${l.phone}</div>
+              <div style="font-size: 11px; color: var(--text-dim);">${l.lastMessage || 'Contacto iniciado'}</div>
+            </div>
+          `).join('')}
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  }).join('');
 }
 
 // ==================== DATABASE REACTIVATION ENGINE ====================
