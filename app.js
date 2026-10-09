@@ -1613,6 +1613,41 @@ function switchAgencyDirectly(agencyId) {
 }
 
 // ==================== PUBLIC PORTAL HELPERS ====================
+function updateLossCalculator() {
+  const leadsInput = document.getElementById('calcLeadsInput');
+  const ticketInput = document.getElementById('calcTicketInput');
+  const lossPercentInput = document.getElementById('calcLossPercentInput');
+
+  if (!leadsInput || !ticketInput || !lossPercentInput) return;
+
+  const leads = parseInt(leadsInput.value) || 200;
+  const ticket = parseInt(ticketInput.value) || 120;
+  const lossPercent = parseInt(lossPercentInput.value) || 35;
+
+  // Update labels
+  const lblLeads = document.getElementById('calcLeadsValue');
+  const lblTicket = document.getElementById('calcTicketValue');
+  const lblLoss = document.getElementById('calcLossPercentValue');
+
+  if (lblLeads) lblLeads.textContent = `${leads} consultas/mes`;
+  if (lblTicket) lblTicket.textContent = `$${ticket} USD`;
+  if (lblLoss) lblLoss.textContent = `${lossPercent}% perdidas`;
+
+  // Calculate losses
+  const lostLeadsMonthly = Math.round(leads * (lossPercent / 100));
+  const lostRevenueMonthly = lostLeadsMonthly * ticket;
+  const lostRevenueYearly = lostRevenueMonthly * 12;
+  const recoveredRevenueMonthly = Math.round(lostRevenueMonthly * 0.20);
+
+  const elLostMonthly = document.getElementById('calcLostMonthly');
+  const elLostYearly = document.getElementById('calcLostYearly');
+  const elRecoveredMonthly = document.getElementById('calcRecoveredMonthly');
+
+  if (elLostMonthly) elLostMonthly.textContent = `-$${lostRevenueMonthly.toLocaleString()} USD`;
+  if (elLostYearly) elLostYearly.textContent = `-$${lostRevenueYearly.toLocaleString()} USD`;
+  if (elRecoveredMonthly) elRecoveredMonthly.textContent = `+$${recoveredRevenueMonthly.toLocaleString()} USD extras/mes`;
+}
+
 function simulatePortalReply(type) {
   const container = document.getElementById('portalSimChatBody');
   if (!container) return;
@@ -1625,13 +1660,15 @@ function simulatePortalReply(type) {
   const userMessages = {
     'turnos': '🦷 Hola, ¿tienen turnos disponibles para hoy?',
     'precios': '💵 Hola, ¿cuánto cuesta el servicio y qué planes tienen?',
+    'cotizacion': '📄 Hola, necesito una cotización formal para mi empresa.',
     'ubicacion': '📍 ¿Dónde están ubicados y cuáles son sus horarios de atención?'
   };
 
   const agentReplies = {
-    'turnos': `¡Hola! Con gusto te ayudo 📅 Sí, para el día de hoy tenemos los siguientes espacios libres:<br><br>• <strong>15:30 hs</strong><br>• <strong>18:00 hs</strong><br><br>¿Cuál de estos horarios te queda más cómodo para reservarte el turno a tu nombre?`,
-    'precios': `¡Hola! En <strong>${agencyName}</strong> contamos con 2 planes según tu necesidad:<br><br>• <strong>Plan Starter:</strong> $${priceStarter} USD/mes (Agente WhatsApp 24/7)<br>• <strong>Plan Growth Pro:</strong> $${pricePro} USD/mes (Agente + Agenda Calendar + CRM de Leads)<br><br>Ambos sin contratos de permanencia. ¿Te gustaría activar el tuyo hoy?`,
-    'ubicacion': `¡Hola! 📍 Nuestra sede central atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong> y <strong>Sábados de 10:00 a 14:00 hs</strong>.<br><br>Sin embargo, ¡nuestro Asistente de IA te atiende por aquí las <strong>24 horas del día</strong> sin interrupciones! ¿En qué más te puedo colaborar?`
+    'turnos': `¡Hola! Con gusto te ayudo 📅 Sí, para el día de hoy tenemos los siguientes espacios libres:<br><br>• <strong>15:30 hs</strong><br>• <strong>18:00 hs</strong><br><br>¿Cuál de estos horarios te queda más cómodo para reservarte el turno a tu nombre en Google Calendar?`,
+    'precios': `¡Hola! En <strong>${agencyName}</strong> contamos con planes llave en mano:<br><br>• <strong>Plan Starter:</strong> $${priceStarter} USD/mes (Agente WhatsApp 24/7)<br>• <strong>Plan Growth Pro:</strong> $${pricePro} USD/mes (Agente + Citas Calendar + Cotizador + CRM)<br><br>Ambos sin contratos forzados. ¿Te gustaría activar tu prueba de 48 horas?`,
+    'cotizacion': `¡Excelente! 📑 Te preparo una propuesta formal en PDF de inmediato.<br><br>Incluye: <strong>Configuración Multi-Flujo 24/7 + Conexión WhatsApp + Dashboard de Control</strong>.<br><br>🔗 Puedes ver y abonar la cotización oficial aquí: <a href="javascript:void(0)" onclick="openAgencyRealCheckout('pro')" style="color:#38bdf8; text-decoration:underline; font-weight:bold;">Ver Cotización con Link de Pago</a>`,
+    'ubicacion': `¡Hola! 📍 Nuestra sede central atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong>.<br><br>Sin embargo, ¡nuestro Asistente de IA te atiende por aquí las <strong>24 horas del día, los 365 días del año</strong>! ¿En qué más te puedo colaborar?`
   };
 
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

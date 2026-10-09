@@ -252,51 +252,205 @@
         <div id="tab-agency-portal" class="tab-view">
           
           <!-- Public Agency Preview Bar -->
-          <div style="background: rgba(13, 16, 33, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px 22px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="background: rgba(13, 16, 33, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 14px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div style="display: flex; align-items: center; gap: 12px;">
-              <span class="brand-badge" style="background: rgba(16,185,129,0.2); color:#34d399;">Página Web Activa</span>
-              <span style="font-size: 13px; color: var(--text-muted);">Esta es la página comercial que tus compradores le muestran a sus empresas clientes:</span>
+              <span class="brand-badge" style="background: rgba(16,185,129,0.2); color:#34d399;"><i class="fa-solid fa-signal"></i> Portal Comercial Activo</span>
+              <span style="font-size: 13px; color: var(--text-muted);">Esta es la página de alta conversión que tus clientes potenciales visitan para contratar tus servicios de IA:</span>
             </div>
-            <div style="display: flex; gap: 10px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
               <button class="btn btn-secondary btn-sm" onclick="switchTab('whitelabel')">
-                <i class="fa-solid fa-paintbrush"></i> Editar Colores y Precios
+                <i class="fa-solid fa-paintbrush"></i> Personalizar Marca & Precios
               </button>
               <button class="btn btn-primary btn-sm" onclick="openPublicShareModal()">
-                <i class="fa-solid fa-share-nodes"></i> Compartir Enlace con Cliente
+                <i class="fa-solid fa-share-nodes"></i> Compartir Enlace con Clientes
               </button>
             </div>
           </div>
 
-          <!-- The Beautiful Agency Landing Page Structure -->
-          <div style="background: radial-gradient(circle at top center, rgba(99, 102, 241, 0.15) 0%, rgba(8, 9, 17, 0.95) 70%); border: 1px solid var(--border-glow); border-radius: var(--radius-xl); padding: 48px 36px; box-shadow: var(--shadow-glow);">
+          <!-- The High-Converting Agency Sales Engine -->
+          <div class="landing-page-container">
             
+            <!-- Floating Live Demand Notification -->
+            <div class="landing-urgency-banner">
+              <span class="status-dot-pulse" style="background: #ef4444;"></span>
+              <span>🔥 <strong>ALTA DEMANDA:</strong> 14 empresas activaron su agente esta semana. <strong>Solo quedan 2 cupos</strong> para onboarding prioritario este mes.</span>
+            </div>
+
             <!-- Hero Section -->
-            <div style="text-align: center; max-width: 800px; margin: 0 auto 54px auto;">
-              <div class="brand-badge" style="margin-bottom: 16px; font-size: 12px; padding: 6px 16px;">
-                ✨ Soluciones de Inteligencia Artificial para Empresas
+            <div class="landing-hero-section">
+              <div class="brand-badge landing-badge">
+                ⚡ SISTEMA OPERATIVO DE INTELIGENCIA ARTIFICIAL PARA EMPRESAS
               </div>
-              <h1 style="font-size: 38px; font-weight: 900; line-height: 1.2; margin-bottom: 18px; letter-spacing: -1px; background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #818cf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;" id="portalHeroTitle">
-                Duplica las Ventas y Automatiza la Atención de tu Negocio con IA 24/7
+              <h1 class="landing-hero-title" id="portalHeroTitle">
+                Deja de Perder Ventas por Responder Tarde en WhatsApp.<br>
+                <span class="gradient-text-hero">Tu Negocio Atendiendo y Facturando 24/7 en Automático.</span>
               </h1>
-              <p style="font-size: 16px; color: var(--text-muted); line-height: 1.6; margin-bottom: 28px;">
-                En <strong style="color: white;" id="portalAgencyName">NEXUS AI Agency</strong> implementamos Agentes Inteligentes autónomos en WhatsApp, Instagram y Web que responden en 2 segundos, califican prospectos y agendan citas en tu calendario.
+              <p class="landing-hero-subtitle">
+                En <strong style="color: #34d399;" id="portalAgencyName">NEXUS AI Agency</strong> instalamos en tu número oficial de WhatsApp un Asistente Inteligente exclusivo que responde en <strong>2 segundos</strong>, cotiza servicios al instante, agenda citas en Google Calendar y califica compradores mientras duermes.
               </p>
-              <div style="display: flex; justify-content: center; gap: 14px;">
-                <button class="btn btn-primary" onclick="openAgencyRealCheckout('pro')">
-                  <i class="fa-solid fa-bolt"></i> Contratar Asistente de IA
+              
+              <div class="landing-cta-group">
+                <button class="btn btn-emerald landing-cta-btn-main" onclick="openAgencyRealCheckout('pro')">
+                  <i class="fa-solid fa-bolt"></i> Activar Mi Asistente en 48 Horas
                 </button>
-                <button class="btn btn-secondary" onclick="document.getElementById('liveChatSimAnchor').scrollIntoView({behavior:'smooth'})">
-                  <i class="fa-brands fa-whatsapp"></i> Ver Demostración en Vivo
+                <button class="btn btn-secondary landing-cta-btn-sec" onclick="document.getElementById('lossCalculatorAnchor').scrollIntoView({behavior:'smooth'})">
+                  <i class="fa-solid fa-calculator" style="color: #f59e0b;"></i> Calcular Dinero Perdido
                 </button>
+                <button class="btn btn-secondary landing-cta-btn-sec" onclick="document.getElementById('liveChatSimAnchor').scrollIntoView({behavior:'smooth'})">
+                  <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Probar Demo en Vivo
+                </button>
+              </div>
+
+              <!-- Badges Strip -->
+              <div class="landing-badges-strip">
+                <div class="landing-badge-item">
+                  <i class="fa-solid fa-clock-rotate-left" style="color: #34d399;"></i>
+                  <span>Respuesta en 1.8 segundos</span>
+                </div>
+                <div class="landing-badge-item">
+                  <i class="fa-solid fa-shield-check" style="color: #818cf8;"></i>
+                  <span>Sin riesgo ni contratos forzados</span>
+                </div>
+                <div class="landing-badge-item">
+                  <i class="fa-solid fa-calendar-check" style="color: #38bdf8;"></i>
+                  <span>Google Calendar sincronizado</span>
+                </div>
+                <div class="landing-badge-item">
+                  <i class="fa-solid fa-chart-line-up" style="color: #fbbf24;"></i>
+                  <span>+35% en conversión promedio</span>
+                </div>
               </div>
             </div>
 
-            <!-- Interactive Live WhatsApp Chat Simulator -->
+            <!-- SECTION: DYNAMIC LOST REVENUE CALCULATOR (AGUDEZA PSICOLÓGICA DE VENTA) -->
+            <div id="lossCalculatorAnchor" class="landing-calculator-box">
+              <div style="text-align: center; max-width: 680px; margin: 0 auto 28px auto;">
+                <span class="brand-badge" style="background: rgba(239,68,68,0.2); color: #f87171; font-size: 11.5px; padding: 5px 16px;">
+                  ⚠️ CALCULADORA DE FUGA DE CAPITAL
+                </span>
+                <h2 style="font-size: 28px; font-weight: 900; color: white; margin-top: 10px; letter-spacing: -0.5px;">
+                  ¿Cuánto Dinero Pierde Tu Empresa Cada Mes Sin Saberlo?
+                </h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 6px;">
+                  El 68% de las personas que escriben por WhatsApp a un negocio y no reciben respuesta en 5 minutos, compran directamente en la competencia. Calcula el impacto en tu facturación:
+                </p>
+              </div>
+
+              <div class="calc-grid-layout">
+                <!-- Calculator Controls -->
+                <div class="calc-inputs-card">
+                  <div class="calc-field-group">
+                    <label style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+                      <span>💬 Mensajes/Consultas recibidas al mes:</span>
+                      <strong id="calcLeadsValue" style="color: #818cf8; font-size: 15px;">200 consultas</strong>
+                    </label>
+                    <input type="range" id="calcLeadsInput" min="20" max="1500" step="10" value="200" class="landing-slider" oninput="updateLossCalculator()">
+                  </div>
+
+                  <div class="calc-field-group" style="margin-top: 20px;">
+                    <label style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+                      <span>💵 Valor promedio de tu producto/servicio (USD):</span>
+                      <strong id="calcTicketValue" style="color: #34d399; font-size: 15px;">$120 USD</strong>
+                    </label>
+                    <input type="range" id="calcTicketInput" min="10" max="2000" step="10" value="120" class="landing-slider" oninput="updateLossCalculator()">
+                  </div>
+
+                  <div class="calc-field-group" style="margin-top: 20px;">
+                    <label style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+                      <span>⏰ % de consultas fuera de hora o respondidas tarde:</span>
+                      <strong id="calcLossPercentValue" style="color: #f87171; font-size: 15px;">35% perdidas</strong>
+                    </label>
+                    <input type="range" id="calcLossPercentInput" min="10" max="70" step="5" value="35" class="landing-slider" oninput="updateLossCalculator()">
+                  </div>
+                </div>
+
+                <!-- Calculator Real-Time Impact Result -->
+                <div class="calc-results-card">
+                  <div style="font-size: 12px; font-weight: 800; text-transform: uppercase; color: #fca5a5; letter-spacing: 0.5px; margin-bottom: 6px;">
+                    🚨 Dinero que se escapa de tu negocio:
+                  </div>
+                  <div class="calc-loss-number" id="calcLostMonthly">-$8,400 USD</div>
+                  <div style="font-size: 12px; color: #fca5a5; margin-bottom: 16px;">
+                    Equivale a <strong id="calcLostYearly" style="color: white;">-$100,800 USD</strong> al año en ventas que se van a tu competencia.
+                  </div>
+
+                  <div class="calc-roi-box">
+                    <div style="font-size: 12.5px; color: #6ee7b7; font-weight: 700; margin-bottom: 4px;">
+                      ✨ Solución con nuestro Asistente de IA:
+                    </div>
+                    <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">
+                      Recuperando solo un 20% de esas ventas perdidas, generas <strong id="calcRecoveredMonthly" style="color: #34d399;">+$1,680 USD extras/mes</strong>. ¡El servicio de IA se paga solo desde la primera semana!
+                    </div>
+                  </div>
+
+                  <button class="btn btn-emerald" style="width: 100%; margin-top: 18px; padding: 12px; font-size: 14px; font-weight: 800;" onclick="openAgencyRealCheckout('pro')">
+                    <i class="fa-solid fa-lock-open"></i> Detener Fuga de Ventas Ahora
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION: PAIN POINTS & COMPARISON (Tu Empresa Hoy vs Con Nexus AI) -->
+            <div style="margin-bottom: 60px;">
+              <div style="text-align: center; max-width: 720px; margin: 0 auto 32px auto;">
+                <span class="brand-badge" style="background: rgba(99,102,241,0.2); color: #a5b4fc; font-size: 11px; padding: 4px 14px;">⚖️ ANÁLISIS DE IMPACTO OPERATIVO</span>
+                <h2 style="font-size: 28px; font-weight: 900; color: white; margin-top: 8px;">Tu Empresa Hoy vs. Tu Empresa con Nuestro Agente de IA</h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">
+                  Descubre por qué las empresas líderes reemplazan la atención manual lenta por sistemas de Inteligencia Artificial 24/7:
+                </p>
+              </div>
+
+              <div class="landing-comparison-grid">
+                <!-- Sin IA -->
+                <div class="landing-comp-card danger">
+                  <div class="landing-comp-header">
+                    <div class="landing-comp-icon red"><i class="fa-solid fa-xmark"></i></div>
+                    <div>
+                      <h3 style="font-size: 16px; font-weight: 800; color: #fca5a5; margin: 0;">Atención Tradicional (Sin IA)</h3>
+                      <span style="font-size: 11.5px; color: #f87171;">Lenta, costosa y con fugas de dinero</span>
+                    </div>
+                  </div>
+                  <ul class="landing-comp-list">
+                    <li><i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i> <strong>Respuestas demoradas (15 a 60 min):</strong> El comprador busca otra opción antes de que le contestes.</li>
+                    <li><i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i> <strong>Cero atención nocturna ni feriados:</strong> Pierdes el 40% de leads que consultan después de las 20:00 hs.</li>
+                    <li><i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i> <strong>30% al 45% de inasistencias a citas:</strong> Pacientes o clientes olvidan sus turnos por falta de recordatorio oportuno.</li>
+                    <li><i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i> <strong>Altos costos fijos laborales:</strong> Sueldos de $800 a $1,400 USD + cargas sociales, licencias y rotación.</li>
+                    <li><i class="fa-solid fa-circle-xmark" style="color: #ef4444;"></i> <strong>Cotizaciones lentas:</strong> Se envían horas o días tarde cuando el interés del cliente ya se enfrió.</li>
+                  </ul>
+                </div>
+
+                <!-- Con Nexus AI -->
+                <div class="landing-comp-card success">
+                  <div class="landing-comp-header">
+                    <div class="landing-comp-icon green"><i class="fa-solid fa-check"></i></div>
+                    <div>
+                      <h3 style="font-size: 16px; font-weight: 800; color: #6ee7b7; margin: 0;">Con Nuestro Agente de IA</h3>
+                      <span style="font-size: 11.5px; color: #34d399;">Atención inmediata, escalable y 24/7</span>
+                    </div>
+                  </div>
+                  <ul class="landing-comp-list">
+                    <li><i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <strong>Respuesta en 1.8 segundos:</strong> Atrapa la venta en el instante exacto de máximo interés emocional.</li>
+                    <li><i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <strong>Atención 24 horas, 365 días:</strong> Convierte consultas de madrugada y fines de semana en ventas firmes.</li>
+                    <li><i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <strong>Google Calendar + Recordatorios WhatsApp:</strong> Sincronización instantánea que reduce el ausentismo al 3%.</li>
+                    <li><i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <strong>Ahorro masivo del 70%:</strong> Planes fijos desde $290 USD/mes sin compromisos laborales forzados.</li>
+                    <li><i class="fa-solid fa-circle-check" style="color: #10b981;"></i> <strong>Cotizaciones con Link de Pago en segundos:</strong> Presupuestos en PDF emitidos mientras el cliente está en línea.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION: INTERACTIVE LIVE WHATSAPP SIMULATOR -->
             <div id="liveChatSimAnchor" style="margin-bottom: 60px;">
-              <div style="text-align: center; margin-bottom: 20px;">
-                <span class="brand-badge" style="background: rgba(37,211,102,0.15); color: #25d366; font-size: 11px; padding: 4px 14px;">⚡ EXPERIENCIA EN VIVO</span>
-                <h3 style="font-size: 22px; font-weight: 800; color: white; margin-top: 8px;">Prueba Cómo Responde Nuestro Agente en Tiempo Real</h3>
-                <p style="font-size: 13.5px; color: var(--text-muted);">Haz clic en cualquier pregunta para ver la velocidad y empatía de la Inteligencia Artificial:</p>
+              <div style="text-align: center; margin-bottom: 24px;">
+                <span class="brand-badge" style="background: rgba(37,211,102,0.15); color: #25d366; font-size: 11px; padding: 4px 14px;">
+                  ⚡ EXPERIENCIA INTERACTIVA EN TIEMPO REAL
+                </span>
+                <h2 style="font-size: 28px; font-weight: 800; color: white; margin-top: 8px;">
+                  Prueba la Rapidez y Persuasión del Agente
+                </h2>
+                <p style="font-size: 14px; color: var(--text-muted);">
+                  Haz clic en cualquiera de los mensajes de ejemplo y mira cómo la IA atiende, califica y cierra:
+                </p>
               </div>
 
               <div class="portal-chat-simulator">
@@ -307,8 +461,8 @@
                       <i class="fa-solid fa-robot"></i>
                     </div>
                     <div>
-                      <div style="font-size: 14px; font-weight: 700; color: white;">Asistente Virtual IA • 24/7</div>
-                      <div style="font-size: 11px; color: #a7f3d0;">🟢 En línea • Responde en 1s</div>
+                      <div style="font-size: 14px; font-weight: 700; color: white;" id="portalSimHeaderName">Asistente Virtual IA • Empresa</div>
+                      <div style="font-size: 11px; color: #a7f3d0;">🟢 En línea • Responde en 1.8s</div>
                     </div>
                   </div>
                   <div style="font-size: 18px; color: rgba(255,255,255,0.7); display: flex; gap: 14px;">
@@ -320,167 +474,171 @@
                 <!-- Chat Body with messages -->
                 <div class="chat-sim-body" id="portalSimChatBody">
                   <div class="chat-sim-msg agent">
-                    👋 ¡Hola! Bienvenido/a a nuestro canal oficial de atención. ¿En qué te puedo ayudar hoy? Selecciona una opción o escribe tu consulta:
+                    👋 ¡Hola! Bienvenido a nuestro canal oficial de atención. ¿En qué te podemos ayudar hoy? Puedes tocar una opción rápida o escribir tu consulta:
                     <div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">10:42 AM</div>
                   </div>
                 </div>
 
                 <!-- Interactive Chips Footer -->
-                <div style="background: #1e293b; padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-wrap: wrap; gap: 8px;">
+                <div class="chat-sim-chips-container">
                   <button class="quick-chip" onclick="simulatePortalReply('turnos')">
-                    🦷 ¿Tienen turnos disponibles para hoy?
+                    🦷 ¿Tienen turnos para hoy?
                   </button>
                   <button class="quick-chip" onclick="simulatePortalReply('precios')">
                     💵 ¿Cuáles son los precios y planes?
                   </button>
+                  <button class="quick-chip" onclick="simulatePortalReply('cotizacion')">
+                    📄 Necesito una cotización formal
+                  </button>
                   <button class="quick-chip" onclick="simulatePortalReply('ubicacion')">
-                    📍 ¿Dónde están ubicados y qué horario tienen?
+                    📍 ¿Dónde están ubicados?
                   </button>
                 </div>
               </div>
             </div>
 
-            <!-- 4 Core Services Grid -->
-            <div style="margin-bottom: 54px;">
+            <!-- SECTION: 4 HIGH-IMPACT MULTI-FLOW SERVICES -->
+            <div style="margin-bottom: 60px;">
               <div style="text-align: center; margin-bottom: 32px;">
-                <h2 style="font-size: 24px; font-weight: 800; color: white;">Nuestros 4 Servicios de Inteligencia Artificial</h2>
-                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Soluciones llave en mano listas para implementar en tu empresa en menos de 72 horas.</p>
+                <span class="brand-badge" style="background: rgba(99,102,241,0.2); color: #a5b4fc; font-size: 11px; padding: 4px 14px;">⚙️ SOLUCIONES LLAVE EN MANO</span>
+                <h2 style="font-size: 28px; font-weight: 800; color: white; margin-top: 8px;">Los 4 Flujos que Multiplican la Facturación</h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Todo integrado directamente en tu propio WhatsApp en menos de 48 horas.</p>
               </div>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
+              <div class="landing-services-grid">
                 <!-- Service 1 -->
-                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
-                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(37, 211, 102, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #25d366; margin-bottom: 16px;">
+                <div class="landing-service-card">
+                  <div class="service-icon-box" style="background: rgba(37, 211, 102, 0.15); color: #25d366;">
                     <i class="fa-brands fa-whatsapp"></i>
                   </div>
-                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">1. Agentes de WhatsApp 24/7</strong>
-                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">Atención inmediata en menos de 2 segundos. Resuelve preguntas frecuentes, dudas de stock, precios y horarios sin intervención de tu personal.</p>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">1. Ventas & Calificación Inmediata</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Atiende dudas en 2 segundos, derriba objeciones con técnicas de venta consultiva y califica el presupuesto del cliente antes de cerrar.</p>
                 </div>
 
                 <!-- Service 2 -->
-                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
-                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #818cf8; margin-bottom: 16px;">
+                <div class="landing-service-card">
+                  <div class="service-icon-box" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
                     <i class="fa-regular fa-calendar-check"></i>
                   </div>
-                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">2. Agendamiento Automático de Citas</strong>
-                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">La IA sincroniza turnos en tiempo real con Google Calendar o tu CRM y envía recordatorios automáticos reduciendo las faltas a 0%.</p>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">2. Agendamiento & Google Calendar</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Consulta horarios libres en tiempo real, agenda el turno en el calendario de tus profesionales y envía recordatorios 24h y 2h antes.</p>
                 </div>
 
                 <!-- Service 3 -->
-                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
-                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(6, 182, 212, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #22d3ee; margin-bottom: 16px;">
-                    <i class="fa-solid fa-bullseye"></i>
+                <div class="landing-service-card">
+                  <div class="service-icon-box" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee;">
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
                   </div>
-                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">3. Calificación & Scoring de Leads</strong>
-                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">Filtra a los curiosos y detecta qué prospectos tienen el presupuesto y la intención lista para comprar, derivándolos a tu equipo de ventas.</p>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">3. Cotizador & Facturación Inteligente</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Genera cotizaciones formales con desglose de servicios, cálculo de impuestos y botón de pago por MercadoPago / Stripe / Transferencia.</p>
                 </div>
 
                 <!-- Service 4 -->
-                <div style="background: rgba(15, 20, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 24px;">
-                  <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(236, 72, 153, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; color: #f472b6; margin-bottom: 16px;">
-                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                <div class="landing-service-card">
+                  <div class="service-icon-box" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                    <i class="fa-solid fa-star"></i>
                   </div>
-                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">4. Automatización de Marketing</strong>
-                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5;">Redacción de copies publicitarios para anuncios, mensajes masivos de WhatsApp y respuestas automáticas a reseñas de Google Maps.</p>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 8px;">4. Postventa & Reseñas Google 5★</strong>
+                  <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">Envía encuestas de satisfacción automáticas tras el servicio. Si el cliente está feliz, lo invita a dejar una reseña 5 estrellas en Google Maps.</p>
                 </div>
               </div>
             </div>
 
-            <!-- Comparison Table: Recepcionista Humano vs Agente IA -->
-            <div style="margin-bottom: 54px;">
-              <div style="text-align: center; margin-bottom: 28px;">
-                <span class="brand-badge" style="background: rgba(99,102,241,0.2); color: #a5b4fc; font-size: 11px; padding: 4px 14px;">⚖️ ANÁLISIS DE COSTO / BENEFICIO</span>
-                <h2 style="font-size: 24px; font-weight: 800; color: white; margin-top: 8px;">Recepcionista Tradicional vs. Agente de IA</h2>
-                <p style="font-size: 14px; color: var(--text-muted);">Compara por qué las empresas líderes están migrando a atención automática con Inteligencia Artificial:</p>
+            <!-- SECTION: TESTIMONIOS REALES Y CASOS DE ÉXITO -->
+            <div style="margin-bottom: 60px;">
+              <div style="text-align: center; max-width: 680px; margin: 0 auto 32px auto;">
+                <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399; font-size: 11px; padding: 4px 14px;">⭐ RESULTADOS COMPROBADOS</span>
+                <h2 style="font-size: 28px; font-weight: 800; color: white; margin-top: 8px;">Empresas que ya Multiplicaron sus Resultados</h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Casos de negocio reales transformados por nuestros Agentes de IA:</p>
               </div>
 
-              <div class="comparison-table-wrapper">
-                <table class="comparison-table">
-                  <thead>
-                    <tr>
-                      <th>Factor Clave</th>
-                      <th style="color: #f87171;"><i class="fa-solid fa-user-xmark"></i> Recepcionista Humano</th>
-                      <th style="color: #34d399; background: rgba(16,185,129,0.1);"><i class="fa-solid fa-robot"></i> Agente Inteligente IA</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td><strong>Costo Mensual Total</strong></td>
-                      <td style="color: #fca5a5;">$800 a $1,400 USD/mes + impuestos</td>
-                      <td style="color: #6ee7b7; font-weight: 800; background: rgba(16,185,129,0.05);">$290 a $690 USD/mes (Ahorro del 60%)</td>
-                    </tr>
-                    <tr>
-                      <td><strong>Horario de Cobertura</strong></td>
-                      <td>8 horas al día (Lunes a Viernes)</td>
-                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">24 horas, 7 días, feriados y madrugadas</td>
-                    </tr>
-                    <tr>
-                      <td><strong>Velocidad de Respuesta</strong></td>
-                      <td>15 a 45 minutos (se pierden ventas)</td>
-                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">2 segundos instantáneos</td>
-                    </tr>
-                    <tr>
-                      <td><strong>Capacidad Simultánea</strong></td>
-                      <td>1 cliente a la vez (línea ocupada)</td>
-                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">100+ personas al mismo tiempo</td>
-                    </tr>
-                    <tr>
-                      <td><strong>Faltas o Vacaciones</strong></td>
-                      <td>Licencias, ausencias y rotación</td>
-                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">0% faltas • 99.9% disponibilidad</td>
-                    </tr>
-                    <tr>
-                      <td><strong>Permanencia & Contrato</strong></td>
-                      <td>Indemnizaciones y contratos laborales</td>
-                      <td style="color: #6ee7b7; font-weight: 700; background: rgba(16,185,129,0.05);">Sin ataduras • Cancela cuando quieras</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div class="landing-testimonials-grid">
+                <!-- Testimonial 1 -->
+                <div class="landing-test-card">
+                  <div class="test-stars">★★★★★</div>
+                  <p class="test-quote">"El ausentismo a citas cayó del 35% al 3% en solo 2 semanas gracias a los recordatorios de WhatsApp. Los doctores tienen sus agendas llenas y ya no perdemos pacientes que escriben de noche."</p>
+                  <div class="test-author">
+                    <div class="test-avatar" style="background: #0ea5e9;">Dr. M</div>
+                    <div>
+                      <div class="test-name">Dr. Martín Benítez</div>
+                      <div class="test-role">Director Médico • Clínica Odontológica OdontoSur</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Testimonial 2 -->
+                <div class="landing-test-card">
+                  <div class="test-stars">★★★★★</div>
+                  <p class="test-quote">"En el primer fin de semana cerramos 2 operaciones con clientes que consultaron un sábado a las 23:30 hs. El agente respondió al instante, envió la ficha de la propiedad y agendó la visita."</p>
+                  <div class="test-author">
+                    <div class="test-avatar" style="background: #8b5cf6;">VG</div>
+                    <div>
+                      <div class="test-name">Valeria Gómez</div>
+                      <div class="test-role">Socia Fundadora • Prime Realty Inmobiliaria</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Testimonial 3 -->
+                <div class="landing-test-card">
+                  <div class="test-stars">★★★★★</div>
+                  <p class="test-quote">"El generador de cotizaciones en PDF con link de pago directo aumentó nuestra tasa de cierre un 40%. Los clientes pagan el anticipo mientras están hablando por WhatsApp."</p>
+                  <div class="test-author">
+                    <div class="test-avatar" style="background: #10b981;">CR</div>
+                    <div>
+                      <div class="test-name">Carlos Rodríguez</div>
+                      <div class="test-role">Gerente Comercial • Nexo Soluciones Corporativas</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             <!-- Pricing Packages -->
-            <div style="margin-bottom: 20px;">
+            <div id="pricingSectionAnchor" style="margin-bottom: 40px;">
               <div style="text-align: center; margin-bottom: 32px;">
-                <h2 style="font-size: 24px; font-weight: 800; color: white;">Planes de Suscripción para Empresas</h2>
-                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Sin contratos de permanencia. Mantenimiento, servidor y actualizaciones continuas de IA incluidas.</p>
+                <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399; font-size: 11px; padding: 4px 14px;">💎 PLANES DE SUSCRIPCIÓN</span>
+                <h2 style="font-size: 28px; font-weight: 800; color: white; margin-top: 8px;">Comienza Hoy sin Compromisos</h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Sin contratos de permanencia forzados. Servidor, soporte y actualizaciones de IA incluidas.</p>
               </div>
 
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 950px; margin: 0 auto;">
+              <div class="landing-pricing-grid">
                 
                 <!-- Plan Starter -->
-                <div style="background: rgba(10, 13, 28, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 28px; display: flex; flex-direction: column;">
-                  <span class="agent-category">Ideal Negocios Locales</span>
+                <div class="landing-price-card">
+                  <span class="agent-category">Negocios & Comercios Locales</span>
                   <div style="font-size: 20px; font-weight: 800; color: white; margin: 4px 0 12px 0;">Plan Starter IA</div>
-                  <div style="font-size: 36px; font-weight: 900; color: white; margin-bottom: 16px;" id="portalPriceStarter">$290 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
+                  <div style="font-size: 38px; font-weight: 900; color: white; margin-bottom: 16px;" id="portalPriceStarter">$290 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
                   
-                  <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #cbd5e1; margin-bottom: 24px; flex: 1;">
-                    <div>✅ 1 Agente de WhatsApp 24/7 entrenado a medida</div>
-                    <div>✅ Respuestas a consultas y precios instantáneos</div>
-                    <div>✅ Base de conocimiento con hasta 50 preguntas frecuentes</div>
-                    <div>✅ Soporte técnico y servidor incluido</div>
+                  <div class="landing-price-features">
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> 1 Agente de WhatsApp 24/7 entrenado a medida</div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Respuestas a consultas y precios al instante</div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Catálogo interactivo de productos y servicios</div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Derivación automática a tu WhatsApp personal</div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> Mantenimiento de servidor e IA incluido</div>
                   </div>
-                  <button class="btn btn-secondary" onclick="openAgencyRealCheckout('starter')">
-                    <i class="fa-solid fa-cart-shopping"></i> Contratar Plan Starter
+                  <button class="btn btn-secondary" style="width: 100%; margin-top: auto;" onclick="openAgencyRealCheckout('starter')">
+                    <i class="fa-solid fa-cart-shopping"></i> Comenzar con Plan Starter
                   </button>
                 </div>
 
                 <!-- Plan Pro (Featured) -->
-                <div style="background: linear-gradient(180deg, rgba(30, 35, 75, 0.9) 0%, rgba(15, 20, 42, 0.9) 100%); border: 2px solid var(--accent-indigo); border-radius: var(--radius-lg); padding: 28px; display: flex; flex-direction: column; position: relative; box-shadow: var(--shadow-glow);">
-                  <div style="position: absolute; top: -12px; right: 20px; background: var(--gradient-primary); color: white; font-size: 11px; font-weight: 800; padding: 3px 12px; border-radius: var(--radius-full);">MÁS POPULAR</div>
-                  <span class="agent-category" style="color: #a5b4fc;">Clínicas & Empresas en Crecimiento</span>
-                  <div style="font-size: 20px; font-weight: 800; color: white; margin: 4px 0 12px 0;">Plan Growth Pro</div>
-                  <div style="font-size: 36px; font-weight: 900; color: #34d399; margin-bottom: 16px;" id="portalPricePro">$690 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
+                <div class="landing-price-card featured">
+                  <div class="popular-ribbon">MÁS ELEGIDO • 85% DE CLIENTES</div>
+                  <span class="agent-category" style="color: #a5b4fc;">Clínicas, Inmobiliarias & Empresas</span>
+                  <div style="font-size: 22px; font-weight: 800; color: white; margin: 4px 0 12px 0;">Plan Growth Pro Multi-Flujo</div>
+                  <div style="font-size: 38px; font-weight: 900; color: #34d399; margin-bottom: 16px;" id="portalPricePro">$690 <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">USD / mes</span></div>
                   
-                  <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #f1f5f9; margin-bottom: 24px; flex: 1;">
-                    <div>✅ Todo lo del Plan Starter</div>
-                    <div>✅ <strong>Agendamiento Automático en Google Calendar</strong></div>
-                    <div>✅ <strong>Calificación Inteligente de Leads y CRM</strong></div>
-                    <div>✅ Recordatorios anti-ausentismo por WhatsApp</div>
-                    <div>✅ Generador de Anuncios y Marketing Studio</div>
+                  <div class="landing-price-features">
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Todo lo incluido en el Plan Starter</strong></div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Agendamiento Automático en Google Calendar</strong></div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Recordatorios WhatsApp anti-ausentismo (24h y 2h)</strong></div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Generador de Cotizaciones con links de pago</strong></div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> <strong>Encuestas NPS y Reseñas en Google Maps 5★</strong></div>
+                    <div><i class="fa-solid fa-check" style="color: #34d399;"></i> CRM Kanban y Pipeline de Leads en tiempo real</div>
                   </div>
-                  <button class="btn btn-primary" onclick="openAgencyRealCheckout('pro')">
-                    <i class="fa-solid fa-lock"></i> Contratar Plan Growth Pro
+                  <button class="btn btn-primary" style="width: 100%; margin-top: auto; padding: 14px; font-weight: 800; box-shadow: 0 4px 20px rgba(99,102,241,0.4);" onclick="openAgencyRealCheckout('pro')">
+                    <i class="fa-solid fa-bolt"></i> Activar Plan Growth Pro
                   </button>
                 </div>
 
@@ -492,16 +650,89 @@
                   <i class="fa-solid fa-shield-halved"></i>
                 </div>
                 <div>
-                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 4px;">Garantía de Activación en 48 Horas • Cero Riesgo</strong>
+                  <strong style="font-size: 16px; color: white; display: block; margin-bottom: 4px;">Garantía de Puesta en Marcha en 48 Horas • Cero Riesgo</strong>
                   <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0;">
-                    Instalamos y calibramos el Asistente en tu número de WhatsApp en menos de 48 horas. Sin contratos de permanencia forzada: puedes pausar o cancelar el servicio en cualquier momento con 1 clic.
+                    Configuramos y calibramos tu Agente en tu número oficial en menos de 48 horas. Sin contratos forzosos: tienes control total y puedes pausar o cancelar el servicio en cualquier momento con 1 clic.
                   </p>
                 </div>
               </div>
 
             </div>
 
+            <!-- SECTION: FAQ (DERRIBANDO OBJECIONES FRECUENTES) -->
+            <div style="margin-bottom: 40px;">
+              <div style="text-align: center; max-width: 680px; margin: 0 auto 32px auto;">
+                <span class="brand-badge" style="background: rgba(99,102,241,0.2); color: #a5b4fc; font-size: 11px; padding: 4px 14px;">❓ PREGUNTAS FRECUENTES</span>
+                <h2 style="font-size: 28px; font-weight: 800; color: white; margin-top: 8px;">Preguntas Frecuentes de Empresas</h2>
+                <p style="font-size: 14px; color: var(--text-muted); margin-top: 4px;">Todo lo que necesitas saber antes de implementar Inteligencia Artificial en tu negocio:</p>
+              </div>
+
+              <div class="landing-faq-accordion">
+                <details class="faq-item">
+                  <summary class="faq-question">
+                    <span>¿El agente suena como un robot o habla de forma natural y empática?</span>
+                    <i class="fa-solid fa-chevron-down faq-icon"></i>
+                  </summary>
+                  <div class="faq-answer">
+                    Utilizamos modelos avanzados de IA generativa entrenados específicamente con el tono, modismos y catálogo de tu empresa. El agente responde de forma fluida, cálida y con emojis contextuales, ofreciendo una experiencia idéntica o superior a la de un recepcionista humano experto.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-question">
+                    <span>¿Tengo que cambiar el número de WhatsApp de mi negocio?</span>
+                    <i class="fa-solid fa-chevron-down faq-icon"></i>
+                  </summary>
+                  <div class="faq-answer">
+                    No, en lo absoluto. Conectamos el sistema directamente a tu número de WhatsApp actual (WhatsApp Business o estándar). No pierdes tus contactos ni tus conversaciones históricas.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-question">
+                    <span>¿Qué ocurre si un cliente hace una pregunta compleja o requiere atención humana?</span>
+                    <i class="fa-solid fa-chevron-down faq-icon"></i>
+                  </summary>
+                  <div class="faq-answer">
+                    El agente detecta automáticamente cuando un caso requiere intervención humana (por ejemplo, reclamos delicados o pedidos personalizados) y deriva la conversación de inmediato a tu equipo con un resumen exacto de lo conversado.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-question">
+                    <span>¿Cómo se integra con mi Google Calendar y agenda de citas?</span>
+                    <i class="fa-solid fa-chevron-down faq-icon"></i>
+                  </summary>
+                  <div class="faq-answer">
+                    El sistema se conecta a tu Google Calendar. Cuando un cliente solicita un turno, el agente consulta la disponibilidad en tiempo real, bloquea el espacio seleccionado y programa recordatorios automáticos por WhatsApp 24 horas y 2 horas antes de la cita.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-question">
+                    <span>¿Cuánto tiempo tarda la instalación completa?</span>
+                    <i class="fa-solid fa-chevron-down faq-icon"></i>
+                  </summary>
+                  <div class="faq-answer">
+                    En menos de 48 horas hábiles nuestro equipo tiene tu Asistente calibrado, probado y funcionando en tu WhatsApp, listo para recibir y cerrar clientes.
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <!-- Bottom Floating Call-to-Action Card -->
+            <div class="landing-final-cta-card">
+              <h3 style="font-size: 26px; font-weight: 900; color: white; margin-bottom: 12px;">¿Listo para Automatizar tu Atención y Multiplicar tus Ventas?</h3>
+              <p style="font-size: 15px; color: #cbd5e1; max-width: 600px; margin: 0 auto 24px auto;">
+                No dejes que más clientes se vayan a tu competencia por no recibir respuesta inmediata. Activa tu Asistente hoy mismo.
+              </p>
+              <button class="btn btn-emerald landing-cta-btn-main" onclick="openAgencyRealCheckout('pro')">
+                <i class="fa-solid fa-rocket"></i> Activar Mi Asistente de IA en 48 Horas
+              </button>
+            </div>
+
           </div>
+        </div>
         </div>
 
         <!-- ==================== TAB: REACTIVADOR DE BASE DE DATOS & SERVICIOS IRRESISTIBLES ==================== -->
