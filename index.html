@@ -1038,10 +1038,10 @@
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px;">
+            <div class="quotes-split-layout">
               
               <!-- Left: Quote Interactive Builder -->
-              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px;">
+              <div class="quote-builder-card">
                 <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
                   <i class="fa-solid fa-sliders" style="color: var(--accent-cyan);"></i> 1. Datos del Cliente & Empresa Emisora
                 </strong>
@@ -1088,11 +1088,11 @@
 
                 <!-- Line Items Adder from Catalog -->
                 <div style="margin-top: 18px; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                     <strong style="font-size: 14px; color: white;">
                       <i class="fa-solid fa-cart-plus" style="color: #34d399;"></i> 2. Ítems y Servicios a Cotizar
                     </strong>
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                       <select id="quoteQuickCatalogSelect" class="form-control" style="font-size: 12px; padding: 4px 8px; width: auto;">
                         <option value="">-- Cargar del Catálogo --</option>
                       </select>
@@ -1132,46 +1132,46 @@
               </div>
 
               <!-- Right: Live Quote Preview Card (High-Resolution Visual Invoice) -->
-              <div id="quoteOfficialDocumentWrapper" style="background: #ffffff; color: #0f172a; border-radius: var(--radius-lg); padding: 26px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); font-family: system-ui, -apple-system, sans-serif; position: relative;">
+              <div id="quoteOfficialDocumentWrapper" class="quote-document-wrapper">
                 
                 <!-- Quote Letterhead Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 18px;">
+                <div class="quote-doc-header">
                   <div>
-                    <div style="font-size: 22px; font-weight: 900; color: #4338ca; letter-spacing: -0.5px;" id="prevQuoteCompanyName">NEXUS AI Agency</div>
-                    <div style="font-size: 12px; color: #64748b; margin-top: 2px;" id="prevQuoteCompanySubtitle">Soluciones de Inteligencia Artificial & Automatización</div>
-                    <div style="font-size: 11px; color: #94a3b8;" id="prevQuoteCompanyContact">contacto@nexus-ai.agency • WhatsApp Oficial</div>
+                    <div style="font-size: 20px; font-weight: 900; color: #4338ca; letter-spacing: -0.5px;" id="prevQuoteCompanyName">NEXUS AI Agency</div>
+                    <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;" id="prevQuoteCompanySubtitle">Soluciones de Inteligencia Artificial & Automatización</div>
+                    <div style="font-size: 10.5px; color: #94a3b8;" id="prevQuoteCompanyContact">contacto@nexus-ai.agency • WhatsApp Oficial</div>
                   </div>
-                  <div style="text-align: right;">
-                    <div style="font-size: 12px; font-weight: 800; color: #4338ca; text-transform: uppercase; letter-spacing: 1px;">COTIZACIÓN COMERCIAL</div>
-                    <div style="font-size: 16px; font-weight: 900; color: #0f172a;" id="prevQuoteFolio">#COT-2026-001</div>
-                    <div style="font-size: 11.5px; color: #64748b;" id="prevQuoteDate">Fecha: 09/10/2026</div>
+                  <div>
+                    <div style="font-size: 11px; font-weight: 800; color: #4338ca; text-transform: uppercase; letter-spacing: 0.5px;">COTIZACIÓN COMERCIAL</div>
+                    <div style="font-size: 15px; font-weight: 900; color: #0f172a;" id="prevQuoteFolio">#COT-2026-001</div>
+                    <div style="font-size: 11px; color: #64748b;" id="prevQuoteDate">Fecha: 09/10/2026</div>
                   </div>
                 </div>
 
                 <!-- Client Details Box -->
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; display: flex; justify-content: space-between; font-size: 12px;">
+                <div class="quote-client-meta-box">
                   <div>
-                    <strong style="color: #334155; display: block; margin-bottom: 2px;">PREPARADO PARA:</strong>
-                    <div style="font-size: 14px; font-weight: 800; color: #0f172a;" id="prevQuoteClientName">Cliente Destinatario</div>
-                    <div style="color: #64748b;" id="prevQuoteClientPhone">+54 9 11 0000-0000</div>
-                    <div style="color: #64748b;" id="prevQuoteClientEmail">cliente@empresa.com</div>
+                    <strong style="color: #334155; display: block; margin-bottom: 2px; font-size: 11px;">PREPARADO PARA:</strong>
+                    <div style="font-size: 13.5px; font-weight: 800; color: #0f172a;" id="prevQuoteClientName">Cliente Destinatario</div>
+                    <div style="color: #64748b; font-size: 11.5px;" id="prevQuoteClientPhone">+54 9 11 0000-0000</div>
+                    <div style="color: #64748b; font-size: 11px;" id="prevQuoteClientEmail">cliente@empresa.com</div>
                   </div>
-                  <div style="text-align: right;">
-                    <strong style="color: #334155; display: block; margin-bottom: 2px;">VALIDEZ:</strong>
+                  <div>
+                    <strong style="color: #334155; display: block; margin-bottom: 2px; font-size: 11px;">VALIDEZ:</strong>
                     <div style="font-weight: 700; color: #059669;" id="prevQuoteValidity">15 Días</div>
-                    <div style="color: #64748b; font-size: 11px;">Moneda: USD Dólares</div>
+                    <div style="color: #64748b; font-size: 10.5px;">Moneda: USD Dólares</div>
                   </div>
                 </div>
 
                 <!-- Items Table Preview -->
-                <div style="margin-bottom: 16px; overflow-x: auto;">
-                  <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                <div style="margin-bottom: 16px; overflow-x: auto; width: 100%;">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; text-align: left; min-width: 240px;">
                     <thead>
                       <tr style="border-bottom: 2px solid #cbd5e1; color: #475569; font-weight: 700;">
-                        <th style="padding: 8px 6px;">DESCRIPCIÓN</th>
-                        <th style="padding: 8px 6px; text-align: center;">CANT</th>
-                        <th style="padding: 8px 6px; text-align: right;">PRECIO UNIT</th>
-                        <th style="padding: 8px 6px; text-align: right;">SUBTOTAL</th>
+                        <th style="padding: 6px 4px;">DESCRIPCIÓN</th>
+                        <th style="padding: 6px 4px; text-align: center;">CANT</th>
+                        <th style="padding: 6px 4px; text-align: right;">PRECIO</th>
+                        <th style="padding: 6px 4px; text-align: right;">SUBTOTAL</th>
                       </tr>
                     </thead>
                     <tbody id="prevQuoteItemsBody">
@@ -1181,8 +1181,8 @@
                 </div>
 
                 <!-- Totals Calculation -->
-                <div style="border-top: 2px solid #e2e8f0; padding-top: 12px; margin-bottom: 16px; display: flex; justify-content: flex-end;">
-                  <div style="width: 220px; font-size: 12.5px;">
+                <div style="border-top: 2px solid #e2e8f0; padding-top: 10px; margin-bottom: 14px; display: flex; justify-content: flex-end;">
+                  <div class="quote-total-box">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #475569;">
                       <span>Subtotal:</span>
                       <strong id="prevQuoteSubtotal" style="color: #0f172a;">$0.00</strong>
@@ -1191,11 +1191,11 @@
                       <span>Descuento (<span id="prevQuoteDiscountLabel">0%</span>):</span>
                       <strong id="prevQuoteDiscountVal">-$0.00</strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #475569;" id="prevQuoteTaxRow">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #475569;" id="prevQuoteTaxRow">
                       <span>IVA / Impuesto (<span id="prevQuoteTaxLabel">0%</span>):</span>
                       <strong id="prevQuoteTaxVal">+$0.00</strong>
                     </div>
-                    <div style="display: flex; justify-content: space-between; border-top: 2px solid #0f172a; padding-top: 6px; font-size: 16px; font-weight: 900; color: #4338ca;">
+                    <div style="display: flex; justify-content: space-between; border-top: 2px solid #0f172a; padding-top: 6px; font-size: 15px; font-weight: 900; color: #4338ca;">
                       <span>TOTAL USD:</span>
                       <span id="prevQuoteTotal">$0.00</span>
                     </div>
@@ -1203,13 +1203,13 @@
                 </div>
 
                 <!-- Notes & Payment Guarantee Footnote -->
-                <div style="background: #f1f5f9; border-radius: 6px; padding: 10px 12px; font-size: 11px; color: #475569; line-height: 1.4; margin-bottom: 16px;">
+                <div style="background: #f1f5f9; border-radius: 6px; padding: 8px 10px; font-size: 10.5px; color: #475569; line-height: 1.4; margin-bottom: 14px;">
                   <strong style="color: #0f172a; display: block; margin-bottom: 2px;">Condiciones Comerciales:</strong>
                   <span id="prevQuoteNotes">50% de anticipo para reserva y 50% contra entrega. Facturación oficial inmediata.</span>
                 </div>
 
                 <!-- Direct Payment Buttons in Invoice -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div class="quote-action-buttons">
                   <button class="btn btn-emerald btn-sm" style="font-size: 11.5px; padding: 6px 10px; width: 100%;" onclick="openDirectQuotePaymentGateway()">
                     <i class="fa-solid fa-lock"></i> Pagar Online Seguro
                   </button>
