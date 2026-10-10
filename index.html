@@ -1877,113 +1877,116 @@
             <!-- QR PAIRING SECTION (Default / Zero-Config) -->
             <div id="sectionConnQr" style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px;">
               
-              <!-- QR Scanner Card -->
-              <div class="qr-connection-box" id="qrUnpairedView">
-                <div style="font-size: 16px; font-weight: 800; color: white; margin-bottom: 4px;">
-                <!-- Sub-tabs: QR vs Pairing Code -->
-                <div style="display: flex; gap: 6px; background: rgba(15,23,42,0.6); padding: 4px; border-radius: var(--radius-md); margin-bottom: 12px; width: 100%;">
-                  <button class="conn-tab-btn active" id="btnPairMethodQr" style="padding: 6px 12px; font-size: 12px;" onclick="setPairMethod('qr')">
-                    <i class="fa-solid fa-qrcode"></i> Escanear Código QR
-                  </button>
-                  <button class="conn-tab-btn" id="btnPairMethodCode" style="padding: 6px 12px; font-size: 12px;" onclick="setPairMethod('code')">
-                    <i class="fa-solid fa-keyboard"></i> Código de 8 Dígitos (Sin Cámara)
-                  </button>
-                </div>
+              <!-- Column 1: QR & Pairing Scanner -->
+              <div>
+                <!-- QR Scanner Card (When Disconnected) -->
+                <div class="qr-connection-box" id="qrUnpairedView">
+                  <!-- Sub-tabs: QR vs Pairing Code -->
+                  <div style="display: flex; gap: 6px; background: rgba(15,23,42,0.6); padding: 4px; border-radius: var(--radius-md); margin-bottom: 12px; width: 100%;">
+                    <button class="conn-tab-btn active" id="btnPairMethodQr" style="padding: 6px 12px; font-size: 12px;" onclick="setPairMethod('qr')">
+                      <i class="fa-solid fa-qrcode"></i> Escanear Código QR
+                    </button>
+                    <button class="conn-tab-btn" id="btnPairMethodCode" style="padding: 6px 12px; font-size: 12px;" onclick="setPairMethod('code')">
+                      <i class="fa-solid fa-keyboard"></i> Código de 8 Dígitos (Sin Cámara)
+                    </button>
+                  </div>
 
-                <!-- Method A: Clean QR Code (No overlays for perfect camera scanning) -->
-                <div id="pairMethodQrBox" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
-                  <div class="qr-code-frame" id="qrRealImageContainer" style="background: white; padding: 12px; border: 4px solid #25d366; border-radius: 12px;">
-                    <!-- Live Baileys WhatsApp QR rendered dynamically -->
-                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #0f172a; font-size: 12px;">
-                      <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #25d366; margin-bottom: 8px;"></i>
-                      <span>Generando QR Oficial...</span>
+                  <!-- Method A: Clean QR Code (No overlays for perfect camera scanning) -->
+                  <div id="pairMethodQrBox" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                    <div class="qr-code-frame" id="qrRealImageContainer" style="background: white; padding: 12px; border: 4px solid #25d366; border-radius: 12px;">
+                      <!-- Live Baileys WhatsApp QR rendered dynamically -->
+                      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #0f172a; font-size: 12px;">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #25d366; margin-bottom: 8px;"></i>
+                        <span>Generando QR Oficial...</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #34d399; margin-bottom: 14px;">
-                    <div class="status-dot-pulse" style="background: #34d399;"></div>
-                    <span>Código QR 100% Oficial de WhatsApp Web (Listo para escanear)</span>
-                  </div>
-
-                  <button class="btn btn-secondary btn-sm" style="width: 100%; font-weight: 700;" onclick="refreshWhatsAppQR()">
-                    <i class="fa-solid fa-rotate-right"></i> Regenerar Código QR
-                  </button>
-                </div>
-
-                <!-- Method B: 8-Digit Pairing Code (Phone Number) -->
-                <div id="pairMethodCodeBox" style="width: 100%; display: none; flex-direction: column; gap: 12px; text-align: left; padding: 10px 0;">
-                  <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
-                    <div style="font-weight: 800; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                      <i class="fa-solid fa-circle-info"></i> ¿Cómo funciona la vinculación por código?
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #34d399; margin-bottom: 14px; margin-top: 10px;">
+                      <div class="status-dot-pulse" style="background: #34d399;"></div>
+                      <span>Código QR 100% Oficial de WhatsApp Web (Listo para escanear)</span>
                     </div>
-                    <strong>El código aparecerá aquí mismo en esta pantalla</strong> (WhatsApp no te enviará SMS). Luego lo escribes en tu celular.
+
+                    <button class="btn btn-secondary btn-sm" style="width: 100%; font-weight: 700;" onclick="refreshWhatsAppQR()">
+                      <i class="fa-solid fa-rotate-right"></i> Regenerar Código QR
+                    </button>
                   </div>
 
-                  <div class="form-group" style="margin-bottom: 4px;">
-                    <label class="form-label" style="font-size: 12px; font-weight: 700;">Tu Número de WhatsApp (con código de país sin + ni espacios)</label>
-                    <input type="text" id="pairingPhoneInput" class="form-control" placeholder="Ej: 5491148923310 o 5215512345678" style="font-size: 15px; font-weight: 700; letter-spacing: 0.5px;">
-                  </div>
-
-                  <button class="btn btn-emerald" id="btnGetPairingCode" style="width: 100%; font-weight: 800; padding: 12px;" onclick="request8DigitPairingCode()">
-                    <i class="fa-solid fa-key"></i> Generar Código de 8 Dígitos en Pantalla
-                  </button>
-
-                  <div id="pairingCodeDisplayBox" style="display: none; background: #0b1329; border: 2px solid #25d366; border-radius: 14px; padding: 18px; text-align: center; margin-top: 6px; box-shadow: 0 0 25px rgba(37,211,102,0.2);">
-                    <div style="font-size: 12px; text-transform: uppercase; color: #94a3b8; font-weight: 800; margin-bottom: 4px;">Código para ingresar en tu teléfono:</div>
-                    <div style="font-size: 34px; font-weight: 900; letter-spacing: 6px; color: #25d366; margin: 8px 0; font-family: monospace; background: rgba(37,211,102,0.1); padding: 8px 16px; border-radius: 8px; display: inline-block;" id="pairingCodeText">---- ----</div>
-                    
-                    <div style="text-align: left; background: rgba(15,23,42,0.8); padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 12px; color: white; line-height: 1.6;">
-                      <strong style="color: #34d399; display: block; margin-bottom: 4px;">📱 Pasos para vincularlo en tu celular ahora:</strong>
-                      1. Abre <strong>WhatsApp</strong> en tu teléfono.<br>
-                      2. Ve a <strong>Ajustes</strong> (o 3 puntos arriba) > <strong>Dispositivos vinculados</strong>.<br>
-                      3. Toca <strong>Vincular un dispositivo</strong>.<br>
-                      4. Toca abajo la opción <strong>"Vincular con el número de teléfono"</strong>.<br>
-                      5. Escribe en tu celular el código de 8 letras/números mostrado arriba.
+                  <!-- Method B: 8-Digit Pairing Code (Phone Number) -->
+                  <div id="pairMethodCodeBox" style="width: 100%; display: none; flex-direction: column; gap: 12px; text-align: left; padding: 10px 0;">
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
+                      <div style="font-weight: 800; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-circle-info"></i> ¿Cómo funciona la vinculación por código?
+                      </div>
+                      <strong>El código aparecerá aquí mismo en esta pantalla</strong> (WhatsApp no te enviará SMS). Luego lo escribes en tu celular.
                     </div>
-                  </div>
-                </div>
 
-              <!-- Paired Device Active Card -->
-              <div class="device-connected-card" id="qrPairedView" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 44px; height: 44px; border-radius: var(--radius-full); background: #25d366; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white;">
-                      <i class="fa-brands fa-whatsapp"></i>
+                    <div class="form-group" style="margin-bottom: 4px;">
+                      <label class="form-label" style="font-size: 12px; font-weight: 700;">Tu Número de WhatsApp (con código de país sin + ni espacios)</label>
+                      <input type="text" id="pairingPhoneInput" class="form-control" placeholder="Ej: 5491148923310 o 5215512345678" style="font-size: 15px; font-weight: 700; letter-spacing: 0.5px;">
                     </div>
-                    <div>
-                      <div style="font-size: 16px; font-weight: 800; color: white;">WhatsApp Vinculado con Éxito</div>
-                      <div style="font-size: 12px; color: #34d399;">🟢 Estado: Conectado y En Línea 24/7</div>
-                    </div>
-                  </div>
-                  <span class="brand-badge" style="background: rgba(16,185,129,0.25); color: #34d399; font-weight: 800;">Activo</span>
-                </div>
 
-                <div style="background: rgba(10, 13, 28, 0.6); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-md); padding: 14px; font-size: 13px;">
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="color: var(--text-muted);">Número Conectado:</span>
-                    <strong style="color: white;" id="qrConnectedPhoneDisplay">+54 9 11 4892-3310</strong>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="color: var(--text-muted);">Motor de Conexión:</span>
-                    <strong style="color: #67e8f9;">WhatsApp Web Engine v2.4</strong>
-                  </div>
-                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                    <span style="color: var(--text-muted);">Batería del Teléfono:</span>
-                    <strong style="color: #34d399;">🔋 98% (Excelente)</strong>
-                  </div>
-                  <div style="display: flex; justify-content: space-between;">
-                    <span style="color: var(--text-muted);">Agente IA Auto-Responder:</span>
-                    <strong style="color: #a5b4fc;">⚡ Activo (0.8s tiempo de respuesta)</strong>
+                    <button class="btn btn-emerald" id="btnGetPairingCode" style="width: 100%; font-weight: 800; padding: 12px;" onclick="request8DigitPairingCode()">
+                      <i class="fa-solid fa-key"></i> Generar Código de 8 Dígitos en Pantalla
+                    </button>
+
+                    <div id="pairingCodeDisplayBox" style="display: none; background: #0b1329; border: 2px solid #25d366; border-radius: 14px; padding: 18px; text-align: center; margin-top: 6px; box-shadow: 0 0 25px rgba(37,211,102,0.2);">
+                      <div style="font-size: 12px; text-transform: uppercase; color: #94a3b8; font-weight: 800; margin-bottom: 4px;">Código para ingresar en tu teléfono:</div>
+                      <div style="font-size: 34px; font-weight: 900; letter-spacing: 6px; color: #25d366; margin: 8px 0; font-family: monospace; background: rgba(37,211,102,0.1); padding: 8px 16px; border-radius: 8px; display: inline-block;" id="pairingCodeText">---- ----</div>
+                      
+                      <div style="text-align: left; background: rgba(15,23,42,0.8); padding: 12px; border-radius: 8px; margin-top: 12px; font-size: 12px; color: white; line-height: 1.6;">
+                        <strong style="color: #34d399; display: block; margin-bottom: 4px;">📱 Pasos para vincularlo en tu celular ahora:</strong>
+                        1. Abre <strong>WhatsApp</strong> en tu teléfono.<br>
+                        2. Ve a <strong>Ajustes</strong> (o 3 puntos arriba) > <strong>Dispositivos vinculados</strong>.<br>
+                        3. Toca <strong>Vincular un dispositivo</strong>.<br>
+                        4. Toca abajo la opción <strong>"Vincular con el número de teléfono"</strong>.<br>
+                        5. Escribe en tu celular el código de 8 letras/números mostrado arriba.
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div style="display: flex; gap: 10px;">
-                  <button class="btn btn-emerald btn-sm" style="flex: 1;" onclick="openSendRealWaModal()">
-                    <i class="fa-solid fa-paper-plane"></i> Enviar Mensaje de Prueba
-                  </button>
-                  <button class="btn btn-secondary btn-sm" onclick="unpairWhatsAppQR()">
-                    <i class="fa-solid fa-power-off"></i> Desvincular
-                  </button>
+                <!-- Paired Device Active Card (When Connected) -->
+                <div class="device-connected-card" id="qrPairedView" style="display: none;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div style="width: 44px; height: 44px; border-radius: var(--radius-full); background: #25d366; display: flex; align-items: center; justify-content: center; font-size: 22px; color: white;">
+                        <i class="fa-brands fa-whatsapp"></i>
+                      </div>
+                      <div>
+                        <div style="font-size: 16px; font-weight: 800; color: white;">WhatsApp Vinculado con Éxito</div>
+                        <div style="font-size: 12px; color: #34d399;">🟢 Estado: Conectado y En Línea 24/7</div>
+                      </div>
+                    </div>
+                    <span class="brand-badge" style="background: rgba(16,185,129,0.25); color: #34d399; font-weight: 800;">Activo</span>
+                  </div>
+
+                  <div style="background: rgba(10, 13, 28, 0.6); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-md); padding: 14px; font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                      <span style="color: var(--text-muted);">Número Conectado:</span>
+                      <strong style="color: white;" id="qrConnectedPhoneDisplay">+54 9 11 4892-3310</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                      <span style="color: var(--text-muted);">Motor de Conexión:</span>
+                      <strong style="color: #67e8f9;">WhatsApp Web Engine v2.4</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                      <span style="color: var(--text-muted);">Batería del Teléfono:</span>
+                      <strong style="color: #34d399;">🔋 98% (Excelente)</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                      <span style="color: var(--text-muted);">Agente IA Auto-Responder:</span>
+                      <strong style="color: #a5b4fc;">⚡ Activo (0.8s tiempo de respuesta)</strong>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-emerald btn-sm" style="flex: 1;" onclick="openSendRealWaModal()">
+                      <i class="fa-solid fa-paper-plane"></i> Enviar Mensaje de Prueba
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="unpairWhatsAppQR()">
+                      <i class="fa-solid fa-power-off"></i> Desvincular
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2076,6 +2079,7 @@
                 </button>
               </div>
             </div>
+
           </div>
         </div>
 
