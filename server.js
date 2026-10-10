@@ -160,15 +160,32 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
     }
   });
 
-  // Listen to Real Incoming Messages
+  // Listen to Real Incoming Messages & Auto-Respond with AI
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type === 'notify') {
       for (const msg of messages) {
         if (!msg.key.fromMe && msg.message) {
           const senderJid = msg.key.remoteJid;
-          const senderNumber = senderJid ? senderJid.split('@')[0] : 'Desconocido';
-          const textBody = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-          console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber}: "${textBody}"`);
+          // Avoid replying to status broadcast or groups
+          if (senderJid && !senderJid.includes('@g.us') && !senderJid.includes('status@broadcast')) {
+            const senderNumber = senderJid.split('@')[0];
+            const textBody = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+            console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber}: "${textBody}"`);
+
+            if (textBody && textBody.trim()) {
+              try {
+                // Simulate human delay (1.2s)
+                await new Promise(r => setTimeout(r, 1200));
+                const aiReply = await generateAiAgentResponse(textBody, senderNumber);
+                if (aiReply && sock) {
+                  await sock.sendMessage(senderJid, { text: aiReply });
+                  console.log(`[Baileys - ${sessionId}] 🤖 IA respondió a +${senderNumber}: "${aiReply.slice(0, 40)}..."`);
+                }
+              } catch (replyErr) {
+                console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
+              }
+            }
+          }
         }
       }
     }
@@ -188,6 +205,57 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
   }
 
   return sessionData;
+}
+
+// AI Auto-Responder Engine
+let customAiKey = process.env.GEMINI_API_KEY || '';
+
+async function generateAiAgentResponse(userText, senderPhone) {
+  const text = (userText || '').toLowerCase().trim();
+  if (!text) return null;
+
+  // 1. If Gemini API key is configured, call Gemini 2.5 Flash
+  if (customAiKey) {
+    try {
+      const prompt = `Eres un asistente de inteligencia artificial profesional para una agencia de automatización y servicios. Responde de forma amable, vendedora, concisa (máximo 2 a 3 párrafos cortos) y en español neutro al siguiente mensaje de WhatsApp de un cliente (+${senderPhone}):\n\nMensaje del cliente: "${userText}"\n\nRespuesta:`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customAiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      if (response.ok) {
+        const json = await response.json();
+        const candidate = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidate) return candidate.trim();
+      }
+    } catch (err) {
+      console.log('Gemini API call fallback to smart heuristics:', err.message);
+    }
+  }
+
+  // 2. High-converting smart contextual heuristics fallback
+  if (text.includes('hola') || text.includes('buenos') || text.includes('buenas') || text.includes('info') || text.includes('saludos')) {
+    return `¡Hola! 👋 Gracias por comunicarte con nuestro equipo. Soy el Asistente Virtual con IA 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar planes y servicios de automatización con IA\n2️⃣ Agendar una llamada o demo estratégica\n3️⃣ Solicitar una cotización a medida\n4️⃣ Hablar con un especialista humano`;
+  }
+
+  if (text.includes('precio') || text.includes('costo') || text.includes('cuanto') || text.includes('plan') || text.includes('tarifa') || text.includes('1')) {
+    return `💵 ¡Excelente! Contamos con planes llave en mano para impulsar tu negocio:\n\n⭐ *Plan Starter:* Agente de WhatsApp 24/7 entrenado a medida.\n🚀 *Plan Growth Pro:* Agente + Agendamiento automático en Google Calendar + Generador de Cotizaciones + CRM.\n\n¿Te gustaría que te preparemos una propuesta personalizada para tu rubro?`;
+  }
+
+  if (text.includes('turno') || text.includes('cita') || text.includes('reunion') || text.includes('demo') || text.includes('agendar') || text.includes('2')) {
+    return `📅 ¡Con gusto! Para coordinar una demo o sesión estratégica de 15 minutos, indícanos qué día y horario te queda más cómodo (o déjanos tu correo) y nuestro sistema lo reservará en tu calendario.`;
+  }
+
+  if (text.includes('cotiza') || text.includes('presupuesto') || text.includes('propuesta') || text.includes('3')) {
+    return `📄 ¡Por supuesto! Podemos generarte una cotización oficial con desglose de ítems y link de pago online. ¿Cuál es el nombre de tu empresa y qué solución necesitas implementar?`;
+  }
+
+  if (text.includes('humano') || text.includes('asesor') || text.includes('persona') || text.includes('4')) {
+    return `👤 Entendido. He notificado a uno de nuestros especialistas del equipo para que revise tu consulta y te responda a la brevedad por este mismo chat. ¡Muchas gracias por tu paciencia!`;
+  }
+
+  return `¡Muchas gracias por tu mensaje! 🤖 He recibido tu consulta:\n\n"${userText}"\n\nUn asesor de nuestro equipo se pondrá en contacto contigo a la brevedad. Si deseas conocer nuestros servicios o precios, solo escribe *PRECIOS*.`;
 }
 
 // Meta Cloud API Fallback
