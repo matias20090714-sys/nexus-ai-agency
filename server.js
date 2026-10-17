@@ -13,6 +13,7 @@ const {
   checkAndAlertOwner,
   startAppointmentReminderCron,
   startBroadcastExecution,
+  createGoogleCalendarEvent,
   activeCampaigns
 } = require('./agency-features');
 
@@ -741,6 +742,16 @@ const server = http.createServer(async (req, res) => {
            VALUES ($1, $2, $3, $4, $5, 'confirmed') RETURNING *`,
           [agId, contactName, contactPhone, serviceName || 'Atención General', appointmentDate]
         );
+
+        // Auto-create event in Google Calendar if service account credentials exist
+        const endDt = new Date(new Date(appointmentDate).getTime() + 30 * 60 * 1000).toISOString();
+        createGoogleCalendarEvent(null, {
+          summary: `Cita: ${contactName} - ${serviceName || 'Atención General'}`,
+          description: `Cita agendada por NEXUS AI.\nCliente: ${contactName}\nWhatsApp: +${contactPhone}\nServicio: ${serviceName || 'Atención General'}`,
+          startIso: new Date(appointmentDate).toISOString(),
+          endIso: endDt
+        }).catch(e => console.log('[Google Calendar Note]', e.message));
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, appointment: result.rows[0] }));
       } catch (err) {
@@ -922,6 +933,8 @@ getOrInitBaileysSession('agency_hq')
 startAppointmentReminderCron((targetAgId) => {
   const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
   return sess?.sock;
+});
+
 // Auto-initialize DB schema and default agency if needed
 initDatabase().catch(e => console.log('DB init on boot note:', e.message));
 

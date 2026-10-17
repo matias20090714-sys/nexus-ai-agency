@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const db = require('./db');
 
 // Spintax processor: replaces {option1|option2|option3} with random option
@@ -206,11 +209,98 @@ async function startBroadcastExecution(campaignId, agencyId, messageTemplate, re
   return activeCampaigns[campaignId];
 }
 
+// 5. Direct Google Calendar API Event Creator
+async function getGoogleCalendarAccessToken() {
+  let creds = null;
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    try {
+      creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    } catch (e) {}
+  }
+  if (!creds) {
+    const credsPath = path.join(__dirname, 'google-credentials.json');
+    if (fs.existsSync(credsPath)) {
+      try {
+        creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+      } catch (e) {}
+    }
+  }
+  if (!creds || !creds.client_email || !creds.private_key) return null;
+
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+    const claimSet = Buffer.from(JSON.stringify({
+      iss: creds.client_email,
+      scope: 'https://www.googleapis.com/auth/calendar',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600,
+      iat: now
+    })).toString('base64url');
+
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(header + '.' + claimSet);
+    const signature = sign.sign(creds.private_key, 'base64url');
+    const jwt = header + '.' + claimSet + '.' + signature;
+
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=' + encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') + '&assertion=' + encodeURIComponent(jwt)
+    });
+
+    const data = await res.json();
+    return data.access_token || null;
+  } catch (err) {
+    console.error('Error obteniendo Google access token:', err.message);
+    return null;
+  }
+}
+
+async function createGoogleCalendarEvent(calendarId, { summary, description, startIso, endIso }) {
+  try {
+    const token = await getGoogleCalendarAccessToken();
+    if (!token) return null;
+
+    const targetCal = calendarId || 'primary';
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(targetCal)}/events`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        summary,
+        description,
+        start: { dateTime: startIso },
+        end: { dateTime: endIso }
+      })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      console.log(`[Google Calendar] 📅 Evento creado con éxito en Google Calendar: ${data.htmlLink}`);
+      return data;
+    } else {
+      const err = await res.text();
+      console.log('[Google Calendar] Aviso al insertar evento:', err);
+      return null;
+    }
+  } catch (err) {
+    console.error('Error insertando evento en Google Calendar:', err.message);
+    return null;
+  }
+}
+
 module.exports = {
   parseSpintax,
   getAgencyKnowledgeContext,
   checkAndAlertOwner,
   startAppointmentReminderCron,
   startBroadcastExecution,
+  createGoogleCalendarEvent,
   activeCampaigns
 };
+
