@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: nexus-ai-agency
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 20.x
+      - key: DATABASE_URL
+        value: postgresql://neondb_owner:npg_KdzIZv8FU1pw@ep-shy-paper-awsq0tf3-pooler.c-12.us-east-1.aws.neon.tech/neondb?sslmode=require

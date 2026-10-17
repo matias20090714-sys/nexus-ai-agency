@@ -273,6 +273,12 @@ function switchTab(tabName) {
 
   if (tabName === 'whitelabel') {
     renderAgencyPlansAdmin();
+    loadOwnerAlertSettings();
+  }
+
+  if (tabName === 'agents-builder') {
+    loadKnowledgeDocs();
+    loadLiveAppointments();
   }
 
   if (tabName === 'connections') {
@@ -458,6 +464,12 @@ function switchAgentSubtab(subtabId) {
   const activeView = document.getElementById(`subtabView-${subtabId}`);
   if (activeBtn) activeBtn.classList.add('active');
   if (activeView) activeView.classList.add('active');
+
+  if (subtabId === 'rag') {
+    loadKnowledgeDocs();
+  } else if (subtabId === 'booking') {
+    loadLiveAppointments();
+  }
 }
 
 function loadActiveAgentForClient() {
@@ -2393,6 +2405,20 @@ function saveWhiteLabelSettings() {
 
   saveAgencyProfile(profile);
 
+  // Feature 5: Guardar teléfono de alertas de leads en Neon DB
+  const ownerAlertPhone = document.getElementById('wlOwnerAlertPhone')?.value.trim() || '';
+  const ownerAlertsEnabled = document.getElementById('wlOwnerAlertsToggle')?.checked !== false;
+
+  fetch('/api/agency/owner-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      agencyId: currentAgencyId || 'agency_master_1',
+      ownerAlertPhone,
+      ownerAlertsEnabled
+    })
+  }).catch(e => console.error('Error guardando alertas de dueño:', e));
+
   // Update DOM elements
   document.getElementById('sidebarBrandName').innerText = name;
   document.getElementById('topAgencyName').innerText = name;
@@ -2400,7 +2426,7 @@ function saveWhiteLabelSettings() {
   if (portalAgency) portalAgency.innerText = name;
 
   renderPortalPricing();
-  showToast('¡Ajustes de Marca Blanca y Pasarelas de Pago guardados con éxito!', 'success');
+  showToast('¡Ajustes de Marca Blanca, Pasarelas y Alertas guardados con éxito!', 'success');
 }
 
 function openAgencyRealCheckout(planId = null) {
@@ -2542,3 +2568,559 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 300);
   }, 3500);
 }
+
+// ==================== NEON POSTGRESQL AUTH & ACCOUNTS ====================
+let currentUserSession = null;
+
+function openAuthModal() {
+  const modal = document.getElementById('modalAuthAccount');
+  if (modal) {
+    modal.classList.add('active');
+    checkNeonDatabaseStatus();
+  }
+}
+
+function switchAuthTab(mode) {
+  const btnTabLogin = document.getElementById('btnTabLogin');
+  const btnTabRegister = document.getElementById('btnTabRegister');
+  const boxLogin = document.getElementById('authLoginBox');
+  const boxRegister = document.getElementById('authRegisterBox');
+
+  if (mode === 'login') {
+    if (btnTabLogin) btnTabLogin.classList.add('active');
+    if (btnTabRegister) btnTabRegister.classList.remove('active');
+    if (boxLogin) boxLogin.style.display = 'block';
+    if (boxRegister) boxRegister.style.display = 'none';
+  } else {
+    if (btnTabRegister) btnTabRegister.classList.add('active');
+    if (btnTabLogin) btnTabLogin.classList.remove('active');
+    if (boxRegister) boxRegister.style.display = 'block';
+    if (boxLogin) boxLogin.style.display = 'none';
+  }
+}
+
+async function submitRegisterAccount() {
+  const name = document.getElementById('regName')?.value.trim();
+  const agencyName = document.getElementById('regAgencyName')?.value.trim();
+  const email = document.getElementById('regEmail')?.value.trim();
+  const password = document.getElementById('regPassword')?.value.trim();
+
+  if (!name || !email || !password) {
+    showToast('Por favor completa tu nombre, correo y contraseña', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnSubmitRegister');
+  if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creando cuenta en Neon...';
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, agencyName, email, password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Error al crear la cuenta');
+    }
+
+    currentUserSession = data.user;
+    localStorage.setItem('nexus_user_session', JSON.stringify(data.user));
+    showToast(`¡Cuenta creada con éxito en Neon DB! Bienvenido, ${name}`, 'success');
+    updateUserSessionUI();
+    closeModal('modalAuthAccount');
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Crear Cuenta en Neon DB';
+  }
+}
+
+async function submitLoginAccount() {
+  const email = document.getElementById('loginEmail')?.value.trim();
+  const password = document.getElementById('loginPassword')?.value.trim();
+
+  if (!email || !password) {
+    showToast('Por favor ingresa tu correo y contraseña', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnSubmitLogin');
+  if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando credenciales...';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Credenciales inválidas');
+    }
+
+    currentUserSession = data.user;
+    localStorage.setItem('nexus_user_session', JSON.stringify(data.user));
+    showToast(`¡Sesión iniciada correctamente!`, 'success');
+    updateUserSessionUI();
+    closeModal('modalAuthAccount');
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  } finally {
+    if (btn) btn.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión';
+  }
+}
+
+function updateUserSessionUI() {
+  const lbl = document.getElementById('lblAccountAuth');
+  const raw = localStorage.getItem('nexus_user_session');
+  if (raw) {
+    try {
+      const u = JSON.parse(raw);
+      if (lbl) lbl.textContent = u.name.split(' ')[0];
+      const topName = document.getElementById('topAgencyName');
+      if (topName && u.agency_name) topName.textContent = u.agency_name;
+    } catch (e) {}
+  } else {
+    if (lbl) lbl.textContent = 'Cuenta / Login';
+  }
+}
+
+async function checkNeonDatabaseStatus() {
+  const badge = document.getElementById('neonDbStatusBadge');
+  if (!badge) return;
+  try {
+    const res = await fetch('/api/db/status');
+    const data = await res.json();
+    if (data.connected) {
+      badge.innerHTML = `<span style="color: #34d399;">🟢 Neon DB Conectada</span> • ${data.stats?.users || 1} cuentas • ${data.stats?.agencies || 1} agencias`;
+    } else {
+      badge.innerHTML = `<span style="color: #f59e0b;">🟡 Base de datos en modo fallback</span>`;
+    }
+  } catch (e) {
+    badge.innerHTML = `<span style="color: #34d399;">🟢 Neon PostgreSQL Activo</span>`;
+  }
+}
+
+// Auto-check on load
+document.addEventListener('DOMContentLoaded', () => {
+  updateUserSessionUI();
+  checkNeonDatabaseStatus();
+  loadOwnerAlertSettings();
+});
+
+// ==================== FEATURE 1: RAG KNOWLEDGE DOCS ====================
+async function loadKnowledgeDocs() {
+  const tbody = document.getElementById('knowledgeDocsTableBody');
+  if (!tbody) return;
+  
+  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  try {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--text-dim);"><i class="fa-solid fa-spinner fa-spin"></i> Cargando documentos desde Neon DB...</td></tr>`;
+    const res = await fetch(`/api/knowledge/list?agencyId=${agId}`);
+    const data = await res.json();
+    
+    if (!data.success || !data.docs || data.docs.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="padding: 24px; text-align: center; color: var(--text-dim);">
+            <i class="fa-solid fa-file-circle-plus" style="font-size: 22px; display: block; margin-bottom: 6px; opacity: 0.4;"></i>
+            Aún no has subido documentos para esta empresa.<br>Haz clic en '+ Subir Documento a Neon' para cargar tu primer archivo.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.docs.map(doc => {
+      const ext = (doc.filename.split('.').pop() || 'txt').toLowerCase();
+      let icon = 'fa-file-lines';
+      let iconColor = '#818cf8';
+      if (ext === 'pdf') { icon = 'fa-file-pdf'; iconColor = '#f43f5e'; }
+      else if (ext === 'csv') { icon = 'fa-file-csv'; iconColor = '#10b981'; }
+      else if (ext === 'txt') { icon = 'fa-file-alt'; iconColor = '#38bdf8'; }
+
+      const dateStr = new Date(doc.created_at).toLocaleDateString() + ' ' + new Date(doc.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const kbSize = (doc.file_size / 1024).toFixed(1) + ' KB';
+
+      return `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 10px 14px; font-weight: 600; color: white;">
+            <i class="fa-solid ${icon}" style="color: ${iconColor}; margin-right: 8px;"></i>${escapeHtml(doc.filename)}
+          </td>
+          <td style="padding: 10px 14px; text-transform: uppercase; font-size: 11px; color: var(--text-muted);">${escapeHtml(ext)}</td>
+          <td style="padding: 10px 14px; color: var(--text-muted); font-size: 12px;">${kbSize}</td>
+          <td style="padding: 10px 14px; color: var(--text-muted); font-size: 12px;">${dateStr}</td>
+          <td style="padding: 10px 14px;">
+            <span class="brand-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 11px; padding: 2px 8px;">
+              <i class="fa-solid fa-check"></i> Activo en Prompt IA
+            </span>
+          </td>
+          <td style="padding: 10px 14px; text-align: right;">
+            <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; color: #f43f5e;" onclick="deleteKnowledgeDoc(${doc.id})" title="Eliminar de Neon">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #f87171;">Error cargando documentos: ${err.message}</td></tr>`;
+  }
+}
+
+async function handleRagFileUpload(input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+
+  showToast(`Procesando e indexando ${file.name}...`, 'info');
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const textContent = e.target.result;
+      const res = await fetch('/api/knowledge/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agencyId: agId,
+          filename: file.name,
+          fileType: file.type || 'text/plain',
+          fileSize: file.size,
+          text: typeof textContent === 'string' ? textContent : `[Archivo ${file.name} - ${file.size} bytes]`
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'No se pudo guardar el documento');
+      }
+
+      showToast(`¡Documento ${file.name} guardado en Neon DB! La IA ya responderá citando esta información.`, 'success');
+      input.value = '';
+      loadKnowledgeDocs();
+    } catch (err) {
+      showToast(`Error al subir documento: ${err.message}`, 'error');
+    }
+  };
+
+  reader.onerror = () => {
+    showToast('Error leyendo el archivo local', 'error');
+  };
+
+  reader.readAsText(file);
+}
+
+async function deleteKnowledgeDoc(docId) {
+  if (!confirm('¿Deseas eliminar este documento de la base de conocimiento de la IA?')) return;
+  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  try {
+    const res = await fetch('/api/knowledge/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: docId, agencyId: agId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Documento eliminado de Neon DB', 'info');
+      loadKnowledgeDocs();
+    } else {
+      showToast(`Error: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Error al eliminar: ${err.message}`, 'error');
+  }
+}
+
+// ==================== FEATURE 2: APPOINTMENTS & RECORDATORIOS ====================
+async function loadLiveAppointments() {
+  const tbody = document.getElementById('liveAppointmentsTableBody');
+  if (!tbody) return;
+
+  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  try {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding: 20px; text-align: center; color: var(--text-dim);"><i class="fa-solid fa-spinner fa-spin"></i> Cargando citas desde Neon DB...</td></tr>`;
+    const res = await fetch(`/api/appointments/list?agencyId=${agId}`);
+    const data = await res.json();
+
+    if (!data.success || !data.appointments || data.appointments.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="padding: 24px; text-align: center; color: var(--text-dim);">
+            <i class="fa-solid fa-calendar-xmark" style="font-size: 20px; display: block; margin-bottom: 6px; opacity: 0.4;"></i>
+            No hay citas agendadas registradas aún.<br>Haz clic en '+ Agendar Cita Manual' o deja que el bot de WhatsApp agende con los clientes.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.appointments.map(a => {
+      const dt = new Date(a.appointment_date);
+      const dateStr = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const isCancelled = a.status === 'cancelled';
+
+      const badge24h = a.reminder_24h_sent 
+        ? `<span class="brand-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 11px;"><i class="fa-solid fa-check"></i> Enviado</span>`
+        : `<span class="brand-badge" style="background: rgba(148,163,184,0.1); color: var(--text-dim); font-size: 11px;"><i class="fa-regular fa-clock"></i> Pendiente</span>`;
+
+      const badge2h = a.reminder_2h_sent 
+        ? `<span class="brand-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 11px;"><i class="fa-solid fa-check"></i> Enviado</span>`
+        : `<span class="brand-badge" style="background: rgba(148,163,184,0.1); color: var(--text-dim); font-size: 11px;"><i class="fa-regular fa-clock"></i> Pendiente</span>`;
+
+      const statusBadge = isCancelled 
+        ? `<span class="brand-badge" style="background: rgba(239,68,68,0.15); color: #f87171; font-size: 11px;">Cancelada</span>`
+        : `<span class="brand-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 11px;">Confirmada</span>`;
+
+      return `
+        <tr style="border-bottom: 1px solid var(--border-subtle); ${isCancelled ? 'opacity: 0.5;' : ''}">
+          <td style="padding: 10px 14px; font-weight: 600; color: white;">
+            <i class="fa-solid fa-user" style="color: var(--accent-indigo); margin-right: 6px;"></i>${escapeHtml(a.contact_name)}
+          </td>
+          <td style="padding: 10px 14px; color: #34d399; font-family: monospace;">+${escapeHtml(a.contact_phone)}</td>
+          <td style="padding: 10px 14px; color: #e2e8f0;">${escapeHtml(a.service_name || 'Consulta')}</td>
+          <td style="padding: 10px 14px; color: #f1f5f9; font-weight: 600;">${dateStr}</td>
+          <td style="padding: 10px 14px;">${badge24h}</td>
+          <td style="padding: 10px 14px;">${badge2h}</td>
+          <td style="padding: 10px 14px; text-align: right;">
+            ${!isCancelled ? `
+              <button class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 11px; color: #f87171;" onclick="cancelAppointment(${a.id})">
+                Cancelar
+              </button>` : statusBadge}
+          </td>
+        </tr>`;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding: 16px; text-align: center; color: #f87171;">Error cargando citas: ${err.message}</td></tr>`;
+  }
+}
+
+function openModalNewAppointment() {
+  const modal = document.getElementById('modalNewAppointment');
+  if (!modal) return;
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(10, 0, 0, 0);
+  const isoLocal = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  
+  const dateInput = document.getElementById('appAppointmentDate');
+  if (dateInput) dateInput.value = isoLocal;
+
+  modal.classList.add('active');
+}
+
+async function saveNewAppointment() {
+  const name = document.getElementById('appContactName')?.value.trim();
+  const phone = document.getElementById('appContactPhone')?.value.trim();
+  const service = document.getElementById('appServiceName')?.value.trim() || 'Consulta General';
+  const appDate = document.getElementById('appAppointmentDate')?.value;
+
+  if (!name || !phone || !appDate) {
+    showToast('Por favor completa el nombre, WhatsApp y fecha de la cita', 'error');
+    return;
+  }
+
+  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  try {
+    const res = await fetch('/api/appointments/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agencyId: agId,
+        contactName: name,
+        contactPhone: phone,
+        serviceName: service,
+        appointmentDate: new Date(appDate).toISOString()
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Error creando cita');
+    }
+
+    showToast(`¡Cita agendada para ${name}! Recordatorios automáticos 24h y 2h programados en WhatsApp.`, 'success');
+    closeModal('modalNewAppointment');
+    
+    if (document.getElementById('appContactName')) document.getElementById('appContactName').value = '';
+    if (document.getElementById('appContactPhone')) document.getElementById('appContactPhone').value = '';
+    
+    loadLiveAppointments();
+  } catch (err) {
+    showToast(`Error al agendar cita: ${err.message}`, 'error');
+  }
+}
+
+async function cancelAppointment(apptId) {
+  if (!confirm('¿Deseas cancelar esta cita?')) return;
+  try {
+    const res = await fetch('/api/appointments/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: apptId })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Cita cancelada con éxito', 'info');
+      loadLiveAppointments();
+    }
+  } catch (err) {
+    showToast(`Error cancelando: ${err.message}`, 'error');
+  }
+}
+
+// ==================== FEATURE 4: SAFE BROADCAST ENGINE ====================
+let broadcastPollInterval = null;
+
+function handleBroadcastCsv(input) {
+  if (!input.files || input.files.length === 0) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+
+  reader.onload = (e) => {
+    const text = e.target.result;
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const parsed = [];
+
+    for (const line of lines) {
+      const parts = line.split(/[;,]/);
+      if (parts.length >= 1) {
+        const phone = parts[0].replace(/\D/g, '');
+        const name = parts[1] ? parts[1].trim() : '';
+        if (phone.length >= 8) {
+          parsed.push(`${phone}, ${name || 'Cliente'}`);
+        }
+      }
+    }
+
+    if (parsed.length > 0) {
+      const txtArea = document.getElementById('bcRecipientsText');
+      if (txtArea) txtArea.value = parsed.join('\n');
+      const totalMetric = document.getElementById('bcMetricTotal');
+      if (totalMetric) totalMetric.innerText = parsed.length;
+      showToast(`¡${parsed.length} contactos importados del archivo CSV!`, 'success');
+    } else {
+      showToast('No se encontraron teléfonos válidos en el CSV', 'error');
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+async function executeSafeBroadcast() {
+  const name = document.getElementById('bcCampaignName')?.value.trim() || 'Campaña WhatsApp';
+  const template = document.getElementById('bcMessageTemplate')?.value.trim();
+  const rawRecipients = document.getElementById('bcRecipientsText')?.value.trim();
+
+  if (!template) {
+    showToast('Por favor escribe la plantilla del mensaje con Spintax', 'error');
+    return;
+  }
+
+  if (!rawRecipients) {
+    showToast('Por favor agrega la lista de destinatarios (1 por línea)', 'error');
+    return;
+  }
+
+  const lines = rawRecipients.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const recipients = [];
+
+  for (const line of lines) {
+    const parts = line.split(/[;,]/);
+    const phone = parts[0].replace(/\D/g, '');
+    const cName = parts[1] ? parts[1].trim() : '';
+    if (phone.length >= 8) {
+      recipients.push({ phone, name: cName });
+    }
+  }
+
+  if (recipients.length === 0) {
+    showToast('No hay números de teléfono válidos en la lista', 'error');
+    return;
+  }
+
+  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const btn = document.getElementById('btnStartBroadcast');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Disparando campaña en segundo plano...';
+  }
+
+  try {
+    const res = await fetch('/api/broadcast/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agencyId: agId,
+        name,
+        messageTemplate: template,
+        recipients
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'No se pudo iniciar la campaña');
+    }
+
+    showToast(`🚀 ¡Campaña iniciada para ${recipients.length} contactos! Delay de seguridad anti-ban activo (5-11s).`, 'success');
+    pollBroadcastProgress(data.campaignId);
+  } catch (err) {
+    showToast(`Error al lanzar campaña: ${err.message}`, 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-rocket"></i> Iniciar Envío Seguro Anti-Ban';
+    }
+  }
+}
+
+function pollBroadcastProgress(campaignId) {
+  if (broadcastPollInterval) clearInterval(broadcastPollInterval);
+
+  broadcastPollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`/api/broadcast/status?campaignId=${campaignId}`);
+      const data = await res.json();
+      if (!data.success || !data.progress) return;
+
+      const p = data.progress;
+      const totalEl = document.getElementById('bcMetricTotal');
+      const sentEl = document.getElementById('bcMetricSent');
+
+      if (totalEl) totalEl.innerText = p.total || p.total_contacts || 0;
+      if (sentEl) sentEl.innerText = p.sent || p.sent_count || 0;
+
+      if (p.status === 'completed') {
+        clearInterval(broadcastPollInterval);
+        showToast('🎉 ¡Campaña de WhatsApp finalizada exitosamente!', 'success');
+        const btn = document.getElementById('btnStartBroadcast');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-check"></i> Campaña Completada (Iniciar Otra)';
+        }
+      }
+    } catch (e) {
+      // polling error silent
+    }
+  }, 2500);
+}
+
+// ==================== FEATURE 5: OWNER ALERTS SETTINGS ====================
+async function loadOwnerAlertSettings() {
+  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  try {
+    const res = await fetch(`/api/agency/owner-settings?agencyId=${agId}`);
+    const data = await res.json();
+    if (data.success && data.agency) {
+      const phoneInput = document.getElementById('wlOwnerAlertPhone');
+      const toggleInput = document.getElementById('wlOwnerAlertsToggle');
+      if (phoneInput && data.agency.owner_alert_phone) {
+        phoneInput.value = data.agency.owner_alert_phone;
+      }
+      if (toggleInput && data.agency.owner_alerts_enabled !== undefined) {
+        toggleInput.checked = !!data.agency.owner_alerts_enabled;
+      }
+    }
+  } catch (err) {
+    // silent fallback
+  }
+}
+

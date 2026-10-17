@@ -5,6 +5,16 @@ const https = require('https');
 const QRCode = require('qrcode');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const pino = require('pino');
+const db = require('./db');
+const { initDatabase } = require('./init-db');
+const {
+  parseSpintax,
+  getAgencyKnowledgeContext,
+  checkAndAlertOwner,
+  startAppointmentReminderCron,
+  startBroadcastExecution,
+  activeCampaigns
+} = require('./agency-features');
 
 const PORT = process.env.PORT || 5180;
 const MIME_TYPES = {
@@ -160,15 +170,36 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
     }
   });
 
-  // Listen to Real Incoming Messages
+  // Listen to Real Incoming Messages & Auto-Respond with AI
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type === 'notify') {
       for (const msg of messages) {
         if (!msg.key.fromMe && msg.message) {
           const senderJid = msg.key.remoteJid;
-          const senderNumber = senderJid ? senderJid.split('@')[0] : 'Desconocido';
-          const textBody = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-          console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber}: "${textBody}"`);
+          // Avoid replying to status broadcast or groups
+          if (senderJid && !senderJid.includes('@g.us') && !senderJid.includes('status@broadcast')) {
+            const senderNumber = senderJid.split('@')[0];
+            const textBody = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+            console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber}: "${textBody}"`);
+
+            if (textBody && textBody.trim()) {
+              try {
+                // Feature 5: Check and Alert Owner for High-Intent Lead
+                const agId = sessionId.replace('agency_', '') || 'agency_master_1';
+                checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
+
+                // Simulate human delay (1.2s)
+                await new Promise(r => setTimeout(r, 1200));
+                const aiReply = await generateAiAgentResponse(textBody, senderNumber, agId);
+                if (aiReply && sock) {
+                  await sock.sendMessage(senderJid, { text: aiReply });
+                  console.log(`[Baileys - ${sessionId}] 🤖 IA respondió a +${senderNumber}: "${aiReply.slice(0, 40)}..."`);
+                }
+              } catch (replyErr) {
+                console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
+              }
+            }
+          }
         }
       }
     }
@@ -188,6 +219,68 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
   }
 
   return sessionData;
+}
+
+// AI Auto-Responder Engine
+let customAiKey = process.env.GEMINI_API_KEY || '';
+
+async function generateAiAgentResponse(userText, senderPhone, agencyId = 'agency_master_1') {
+  const text = (userText || '').toLowerCase().trim();
+  if (!text) return null;
+
+  // Feature 1: Load RAG Knowledge Documents for this agency
+  const docContext = await getAgencyKnowledgeContext(agencyId);
+  const ragInstruction = docContext 
+    ? `\n\nCATÁLOGO Y DOCUMENTACIÓN OFICIAL DE LA EMPRESA (usa esta información como verdad absoluta):\n${docContext}\n` 
+    : '';
+
+  // 1. If Gemini API key is configured, call Gemini 2.5 Flash
+  if (customAiKey) {
+    try {
+      const prompt = `Eres un asistente de inteligencia artificial profesional para una agencia de automatización y servicios. Responde de forma amable, vendedora, concisa (máximo 2 a 3 párrafos cortos) y en español neutro al siguiente mensaje de WhatsApp de un cliente (+${senderPhone}):\n${ragInstruction}\nMensaje del cliente: "${userText}"\n\nRespuesta:`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customAiKey}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      if (response.ok) {
+        const json = await response.json();
+        const candidate = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidate) return candidate.trim();
+      }
+    } catch (err) {
+      console.log('Gemini API call fallback to smart heuristics:', err.message);
+    }
+  }
+
+  // 2. High-converting smart contextual heuristics fallback (enhanced with RAG if present)
+  if (docContext && (text.includes('precio') || text.includes('catalogo') || text.includes('servicio') || text.includes('costo'))) {
+    return `¡Hola! Aquí tienes la información oficial de nuestros servicios:\n\n${docContext.slice(0, 450)}...\n\n¿Te gustaría coordinar una cotización personalizada o agendar una llamada con nuestro equipo?`;
+  }
+
+  // 2. High-converting smart contextual heuristics fallback
+  if (text.includes('hola') || text.includes('buenos') || text.includes('buenas') || text.includes('info') || text.includes('saludos')) {
+    return `¡Hola! 👋 Gracias por comunicarte con nuestro equipo. Soy el Asistente Virtual con IA 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar planes y servicios de automatización con IA\n2️⃣ Agendar una llamada o demo estratégica\n3️⃣ Solicitar una cotización a medida\n4️⃣ Hablar con un especialista humano`;
+  }
+
+  if (text.includes('precio') || text.includes('costo') || text.includes('cuanto') || text.includes('plan') || text.includes('tarifa') || text.includes('1')) {
+    return `💵 ¡Excelente! Contamos con planes llave en mano para impulsar tu negocio:\n\n⭐ *Plan Starter:* Agente de WhatsApp 24/7 entrenado a medida.\n🚀 *Plan Growth Pro:* Agente + Agendamiento automático en Google Calendar + Generador de Cotizaciones + CRM.\n\n¿Te gustaría que te preparemos una propuesta personalizada para tu rubro?`;
+  }
+
+  if (text.includes('turno') || text.includes('cita') || text.includes('reunion') || text.includes('demo') || text.includes('agendar') || text.includes('2')) {
+    return `📅 ¡Con gusto! Para coordinar una demo o sesión estratégica de 15 minutos, indícanos qué día y horario te queda más cómodo (o déjanos tu correo) y nuestro sistema lo reservará en tu calendario.`;
+  }
+
+  if (text.includes('cotiza') || text.includes('presupuesto') || text.includes('propuesta') || text.includes('3')) {
+    return `📄 ¡Por supuesto! Podemos generarte una cotización oficial con desglose de ítems y link de pago online. ¿Cuál es el nombre de tu empresa y qué solución necesitas implementar?`;
+  }
+
+  if (text.includes('humano') || text.includes('asesor') || text.includes('persona') || text.includes('4')) {
+    return `👤 Entendido. He notificado a uno de nuestros especialistas del equipo para que revise tu consulta y te responda a la brevedad por este mismo chat. ¡Muchas gracias por tu paciencia!`;
+  }
+
+  return `¡Muchas gracias por tu mensaje! 🤖 He recibido tu consulta:\n\n"${userText}"\n\nUn asesor de nuestro equipo se pondrá en contacto contigo a la brevedad. Si deseas conocer nuestros servicios o precios, solo escribe *PRECIOS*.`;
 }
 
 // Meta Cloud API Fallback
@@ -237,7 +330,7 @@ function sendMetaWhatsAppMessage(toPhone, messageText) {
 }
 
 // HTTP Server
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const urlObj = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = urlObj.pathname;
 
@@ -450,6 +543,350 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // ==================== NEON POSTGRESQL & AUTH ENDPOINTS ====================
+
+  // DB Init / Reset Database
+  if (pathname === '/api/db/init' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { connectionString } = JSON.parse(body || '{}');
+        const conn = connectionString || process.env.DATABASE_URL;
+        if (!conn) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Falta la cadena de conexión de Neon (DATABASE_URL).' }));
+          return;
+        }
+        await initDatabase(conn);
+        process.env.DATABASE_URL = conn;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, message: 'Base de datos de Neon reseteada e inicializada correctamente para tu agencia.' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Register New Account
+  if (pathname === '/api/auth/register' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { name, email, password, agencyName } = JSON.parse(body || '{}');
+        if (!name || !email || !password) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Nombre, email y contraseña son obligatorios.' }));
+          return;
+        }
+        const agencyId = 'ag_' + Date.now();
+        const aName = agencyName || `${name} Agency`;
+        const slug = aName.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+        await db.query(
+          `INSERT INTO agencies (id, name, slug) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+          [agencyId, aName, slug]
+        );
+
+        const userRes = await db.query(
+          `INSERT INTO users (agency_id, name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, agency_id, name, email, role, created_at`,
+          [agencyId, name, email, password, 'agency_admin']
+        );
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, user: userRes?.rows?.[0] || { name, email, agency_id: agencyId } }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Login Account
+  if (pathname === '/api/auth/login' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { email, password } = JSON.parse(body || '{}');
+        const userRes = await db.query(
+          `SELECT u.id, u.agency_id, u.name, u.email, u.role, a.name as agency_name, a.brand_color 
+           FROM users u 
+           LEFT JOIN agencies a ON u.agency_id = a.id 
+           WHERE u.email = $1 AND u.password_hash = $2`,
+          [email, password]
+        );
+        if (!userRes || userRes.rows.length === 0) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Credenciales inválidas. Verifica tu correo y contraseña.' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, user: userRes.rows[0] }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Database Status
+  if (pathname === '/api/db/status' && req.method === 'GET') {
+    try {
+      const isConnected = !!db.getDbPool();
+      let stats = null;
+      if (isConnected) {
+        const u = await db.query('SELECT COUNT(*) FROM users');
+        const a = await db.query('SELECT COUNT(*) FROM agencies');
+        const c = await db.query('SELECT COUNT(*) FROM clients');
+        const p = await db.query('SELECT COUNT(*) FROM plans');
+        stats = {
+          users: parseInt(u?.rows?.[0]?.count || 0),
+          agencies: parseInt(a?.rows?.[0]?.count || 0),
+          clients: parseInt(c?.rows?.[0]?.count || 0),
+          plans: parseInt(p?.rows?.[0]?.count || 0)
+        };
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ connected: isConnected, stats }));
+    } catch (err) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ connected: false, error: err.message }));
+    }
+    return;
+  }
+
+  // ==================== FEATURE 1: RAG KNOWLEDGE DOCS ====================
+  if (pathname === '/api/knowledge/upload' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { agencyId, filename, fileType, text, fileSize } = JSON.parse(body || '{}');
+        if (!text || !filename) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Falta el nombre o contenido del documento.' }));
+          return;
+        }
+        const agId = agencyId || 'agency_master_1';
+        const result = await db.query(
+          `INSERT INTO knowledge_docs (agency_id, filename, file_type, file_size, extracted_text)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id, filename, file_type, file_size, created_at`,
+          [agId, filename, fileType || 'text/plain', fileSize || text.length, text]
+        );
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, doc: result.rows[0] }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/knowledge/list' && req.method === 'GET') {
+    try {
+      const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
+      const result = await db.query(
+        `SELECT id, filename, file_type, file_size, created_at 
+         FROM knowledge_docs WHERE agency_id = $1 ORDER BY id DESC`,
+        [agId]
+      );
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, docs: result?.rows || [] }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/knowledge/delete' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { id, agencyId } = JSON.parse(body || '{}');
+        await db.query(`DELETE FROM knowledge_docs WHERE id = $1 AND agency_id = $2`, [id, agencyId || 'agency_master_1']);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // ==================== FEATURE 2: APPOINTMENTS & CALENDAR ====================
+  if (pathname === '/api/appointments/create' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { agencyId, contactName, contactPhone, serviceName, appointmentDate } = JSON.parse(body || '{}');
+        if (!contactName || !contactPhone || !appointmentDate) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Faltan campos obligatorios para agendar la cita.' }));
+          return;
+        }
+        const agId = agencyId || 'agency_master_1';
+        const result = await db.query(
+          `INSERT INTO appointments (agency_id, contact_name, contact_phone, service_name, appointment_date, status)
+           VALUES ($1, $2, $3, $4, $5, 'confirmed') RETURNING *`,
+          [agId, contactName, contactPhone, serviceName || 'Atención General', appointmentDate]
+        );
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, appointment: result.rows[0] }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/appointments/list' && req.method === 'GET') {
+    try {
+      const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
+      const result = await db.query(
+        `SELECT * FROM appointments WHERE agency_id = $1 ORDER BY appointment_date ASC`,
+        [agId]
+      );
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, appointments: result?.rows || [] }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/appointments/cancel' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { id } = JSON.parse(body || '{}');
+        await db.query(`UPDATE appointments SET status = 'cancelled' WHERE id = $1`, [id]);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // ==================== FEATURE 4: BROADCAST ANTI-BAN ====================
+  if (pathname === '/api/broadcast/start' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { agencyId, name, messageTemplate, recipients } = JSON.parse(body || '{}');
+        if (!messageTemplate || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Plantilla de mensaje o lista de destinatarios vacía.' }));
+          return;
+        }
+        const agId = agencyId || 'agency_master_1';
+
+        // 1. Create campaign in DB
+        const campRes = await db.query(
+          `INSERT INTO broadcast_campaigns (agency_id, name, message_template, total_contacts, status)
+           VALUES ($1, $2, $3, $4, 'running') RETURNING id`,
+          [agId, name || 'Campaña WhatsApp', messageTemplate, recipients.length]
+        );
+        const campId = campRes.rows[0].id;
+
+        // 2. Insert recipients
+        for (const r of recipients) {
+          await db.query(
+            `INSERT INTO broadcast_recipients (campaign_id, phone, name) VALUES ($1, $2, $3)`,
+            [campId, r.phone, r.name || '']
+          );
+        }
+
+        // 3. Start background runner
+        const runnerStatus = startBroadcastExecution(campId, agId, messageTemplate, recipients, (targetAgId) => {
+          const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
+          return sess?.sock;
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, campaignId: campId, progress: runnerStatus }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/broadcast/status' && req.method === 'GET') {
+    try {
+      const campId = parseInt(urlObj.searchParams.get('campaignId') || 0);
+      const inMemory = activeCampaigns[campId];
+      if (inMemory) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, progress: inMemory }));
+        return;
+      }
+      const dbRes = await db.query(`SELECT * FROM broadcast_campaigns WHERE id = $1`, [campId]);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, progress: dbRes?.rows?.[0] || null }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  // ==================== FEATURE 5: OWNER NOTIFICATION SETTINGS ====================
+  if (pathname === '/api/agency/owner-settings' && req.method === 'GET') {
+    try {
+      const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
+      const resDb = await db.query(
+        `SELECT id, name, owner_alert_phone, owner_alerts_enabled FROM agencies WHERE id = $1`,
+        [agId]
+      );
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, agency: resDb?.rows?.[0] || {} }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/agency/owner-settings' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { agencyId, ownerAlertPhone, ownerAlertsEnabled } = JSON.parse(body || '{}');
+        const agId = agencyId || 'agency_master_1';
+        await db.query(
+          `UPDATE agencies SET owner_alert_phone = $1, owner_alerts_enabled = $2 WHERE id = $3`,
+          [ownerAlertPhone || '', ownerAlertsEnabled !== false, agId]
+        );
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, message: 'Configuración de alertas actualizada.' }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
   // Static File Serving
   let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
   const ext = path.extname(filePath);
@@ -481,7 +918,12 @@ getOrInitBaileysSession('agency_master_1')
 
 getOrInitBaileysSession('agency_hq')
   .then(() => console.log('🟢 Motor Baileys WhatsApp Multi-Device (agency_hq) listo.'))
-  .catch(err => console.error('Error iniciando Baileys agency_hq:', err));
+// Start Background Appointment Reminder Cron (24h and 2h alerts)
+startAppointmentReminderCron((targetAgId) => {
+  const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
+  return sess?.sock;
+// Auto-initialize DB schema and default agency if needed
+initDatabase().catch(e => console.log('DB init on boot note:', e.message));
 
 server.listen(PORT, () => {
   console.log(`NEXUS AI Agency Server running at http://localhost:${PORT}/`);
