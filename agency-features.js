@@ -13,15 +13,33 @@ function parseSpintax(text) {
   });
 }
 
-// 1. RAG Knowledge Documents Loader
-async function getAgencyKnowledgeContext(agencyId) {
+// 1. RAG Knowledge Documents Loader with Multi-Tenant Client Support
+async function getAgencyKnowledgeContext(identifier) {
   try {
+    const id = identifier || 'agency_master_1';
+    let contextHeader = '';
+
+    // Check if identifier corresponds to a specific client/sub-account
+    try {
+      const clientRes = await db.query(
+        `SELECT name, industry, notes FROM clients WHERE id = $1 LIMIT 1`,
+        [id]
+      );
+      if (clientRes && clientRes.rows.length > 0) {
+        const client = clientRes.rows[0];
+        contextHeader = `--- INFORMACIÓN DE LA EMPRESA ---\nNombre: ${client.name}\nRubro: ${client.industry || 'Servicios'}\nDetalles: ${client.notes || 'Atención personalizada'}\n\n`;
+      }
+    } catch (cErr) {
+      // Table clients may be empty or error handled gracefully
+    }
+
     const res = await db.query(
-      `SELECT filename, extracted_text FROM knowledge_docs WHERE agency_id = $1 ORDER BY id DESC LIMIT 5`,
-      [agencyId || 'agency_master_1']
+      `SELECT filename, extracted_text FROM knowledge_docs WHERE agency_id = $1 OR client_id = $1 ORDER BY id DESC LIMIT 5`,
+      [id]
     );
-    if (!res || res.rows.length === 0) return '';
-    return res.rows.map(r => `--- DOCUMENTO: ${r.filename} ---\n${r.extracted_text.slice(0, 3000)}`).join('\n\n');
+    if (!res || res.rows.length === 0) return contextHeader.trim();
+    const docs = res.rows.map(r => `--- DOCUMENTO OFICIAL: ${r.filename} ---\n${r.extracted_text.slice(0, 3000)}`).join('\n\n');
+    return `${contextHeader}${docs}`.trim();
   } catch (e) {
     console.error('Error cargando knowledge docs:', e.message);
     return '';

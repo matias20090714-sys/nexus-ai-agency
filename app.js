@@ -2540,8 +2540,35 @@ function sendCheckoutWhatsApp() {
   window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
 }
 
-function saveAndTestAiApi() {
-  showToast('✅ Conexión con Google Gemini verificada', 'success');
+async function saveAndTestAiApi() {
+  const keyInput = document.getElementById('apiAiKey');
+  const modelSelect = document.getElementById('apiAiModel');
+  const apiKey = keyInput ? keyInput.value.trim() : '';
+  const model = modelSelect ? modelSelect.value : 'gemini-2.5-flash';
+
+  showToast('🔄 Verificando y activando clave de IA con el servidor...', 'info');
+
+  try {
+    const res = await fetch('/api/config/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey, model })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (data.isLiveAi) {
+        showToast(`⚡ ¡IA Generativa Activa (${data.activeModel})! Probada con éxito: "${data.sampleReply.slice(0, 45)}..."`, 'success');
+      } else if (data.hasKey) {
+        showToast(`Clave guardada para modelo ${data.activeModel}.`, 'success');
+      } else {
+        showToast('Clave removida. Usando motor contextual de alta conversión.', 'info');
+      }
+    } else {
+      showToast(data.error || 'Error al guardar la clave de IA', 'error');
+    }
+  } catch (e) {
+    showToast('Error de conexión con el servidor', 'error');
+  }
 }
 
 // ==================== UTILS & TOAST ====================

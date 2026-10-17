@@ -222,47 +222,76 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
   return sessionData;
 }
 
-// AI Auto-Responder Engine
-let customAiKey = process.env.GEMINI_API_KEY || '';
+// AI Auto-Responder Engine (Supports Google Gemini & OpenAI)
+let customAiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
+let activeAiModel = process.env.AI_MODEL || 'gemini-2.5-flash';
 
 async function generateAiAgentResponse(userText, senderPhone, agencyId = 'agency_master_1') {
   const text = (userText || '').toLowerCase().trim();
   if (!text) return null;
 
-  // Feature 1: Load RAG Knowledge Documents for this agency
+  // Feature 1: Load RAG Knowledge Documents & Client details for this agency/company
   const docContext = await getAgencyKnowledgeContext(agencyId);
   const ragInstruction = docContext 
     ? `\n\nCATÁLOGO Y DOCUMENTACIÓN OFICIAL DE LA EMPRESA (usa esta información como verdad absoluta):\n${docContext}\n` 
     : '';
 
-  // 1. If Gemini API key is configured, call Gemini 2.5 Flash
+  // 1. Call Real Generative LLM if API Key is configured
   if (customAiKey) {
     try {
-      const prompt = `Eres un asistente de inteligencia artificial profesional para una agencia de automatización y servicios. Responde de forma amable, vendedora, concisa (máximo 2 a 3 párrafos cortos) y en español neutro al siguiente mensaje de WhatsApp de un cliente (+${senderPhone}):\n${ragInstruction}\nMensaje del cliente: "${userText}"\n\nRespuesta:`;
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${customAiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-      });
-      if (response.ok) {
-        const json = await response.json();
-        const candidate = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (candidate) return candidate.trim();
+      const prompt = `Eres un asistente de inteligencia artificial profesional para una empresa. Responde de forma amable, vendedora, concisa (máximo 2 a 3 párrafos cortos) y en español neutro al siguiente mensaje de WhatsApp de un cliente (+${senderPhone}):\n${ragInstruction}\nMensaje del cliente: "${userText}"\n\nRespuesta:`;
+      
+      // OpenAI API Support
+      if (customAiKey.startsWith('sk-')) {
+        const oaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${customAiKey}`
+          },
+          body: JSON.stringify({
+            model: activeAiModel.includes('gpt') ? activeAiModel : 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: `Eres un asistente de ventas y atención al cliente con IA por WhatsApp. Responde siempre en español, con emojis amables y de manera concisa y vendedora.${ragInstruction}` },
+              { role: 'user', content: userText }
+            ],
+            temperature: 0.7,
+            max_tokens: 350
+          })
+        });
+        if (oaiRes.ok) {
+          const oaiData = await oaiRes.json();
+          const reply = oaiData.choices?.[0]?.message?.content;
+          if (reply) return reply.trim();
+        }
+      } else {
+        // Google Gemini API Support
+        const geminiModel = activeAiModel.includes('gemini') ? activeAiModel : 'gemini-2.5-flash';
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${customAiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        });
+        if (response.ok) {
+          const json = await response.json();
+          const candidate = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (candidate) return candidate.trim();
+        }
       }
     } catch (err) {
-      console.log('Gemini API call fallback to smart heuristics:', err.message);
+      console.log('LLM API call fallback to contextual heuristics:', err.message);
     }
   }
 
   // 2. High-converting smart contextual heuristics fallback (enhanced with RAG if present)
-  if (docContext && (text.includes('precio') || text.includes('catalogo') || text.includes('servicio') || text.includes('costo'))) {
-    return `¡Hola! Aquí tienes la información oficial de nuestros servicios:\n\n${docContext.slice(0, 450)}...\n\n¿Te gustaría coordinar una cotización personalizada o agendar una llamada con nuestro equipo?`;
+  if (docContext && (text.includes('precio') || text.includes('catalogo') || text.includes('servicio') || text.includes('costo') || text.includes('cuanto'))) {
+    return `¡Hola! Aquí tienes la información oficial de nuestros servicios:\n\n${docContext.slice(0, 450)}...\n\n¿Te gustaría coordinar una cotización personalizada o agendar una cita con nuestro equipo?`;
   }
 
-  // 2. High-converting smart contextual heuristics fallback
+  // High-converting smart contextual heuristics fallback
   if (text.includes('hola') || text.includes('buenos') || text.includes('buenas') || text.includes('info') || text.includes('saludos')) {
-    return `¡Hola! 👋 Gracias por comunicarte con nuestro equipo. Soy el Asistente Virtual con IA 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar planes y servicios de automatización con IA\n2️⃣ Agendar una llamada o demo estratégica\n3️⃣ Solicitar una cotización a medida\n4️⃣ Hablar con un especialista humano`;
+    return `¡Hola! 👋 Gracias por comunicarte con nuestro equipo. Soy el Asistente Virtual con IA 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar catálogo, servicios y precios\n2️⃣ Agendar una cita o demo estratégica\n3️⃣ Solicitar una cotización personalizada\n4️⃣ Hablar con un especialista humano`;
   }
 
   if (text.includes('precio') || text.includes('costo') || text.includes('cuanto') || text.includes('plan') || text.includes('tarifa') || text.includes('1')) {
@@ -536,11 +565,92 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/webhook' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      console.log('📩 Evento de WhatsApp recibido:', body);
+    req.on('end', async () => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ status: 'EVENT_RECEIVED' }));
+
+      try {
+        const payload = JSON.parse(body || '{}');
+        if (payload.object === 'whatsapp_business_account') {
+          for (const entry of payload.entry || []) {
+            for (const change of entry.changes || []) {
+              const val = change.value;
+              if (val && val.messages) {
+                for (const msg of val.messages) {
+                  if (msg.type === 'text') {
+                    const fromNumber = msg.from;
+                    const textBody = msg.text.body;
+                    console.log(`[Meta Cloud Webhook] 📩 Mensaje entrante de +${fromNumber}: "${textBody}"`);
+                    
+                    // High intent check
+                    checkAndAlertOwner('agency_master_1', fromNumber, textBody, null).catch(e => console.error(e));
+
+                    const aiReply = await generateAiAgentResponse(textBody, fromNumber, 'agency_master_1');
+                    if (aiReply) {
+                      await sendMetaWhatsAppMessage(fromNumber, aiReply);
+                      console.log(`[Meta Cloud Webhook] 🤖 IA respondió a +${fromNumber}: "${aiReply.slice(0, 40)}..."`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[Meta Webhook Error]', err.message);
+      }
     });
+    return;
+  }
+
+  // 7. Save and Test AI Configuration (Gemini / OpenAI)
+  if (pathname === '/api/config/ai' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { apiKey, model } = JSON.parse(body || '{}');
+        if (apiKey) customAiKey = apiKey.trim();
+        if (model) activeAiModel = model.trim();
+
+        // Test the AI key with a quick prompt
+        let testSuccess = false;
+        let testResponse = '';
+        if (customAiKey) {
+          try {
+            const reply = await generateAiAgentResponse('Hola, ¿qué servicios ofrecen?', '5491112345678', 'agency_master_1');
+            if (reply) {
+              testSuccess = true;
+              testResponse = reply;
+            }
+          } catch (tErr) {
+            testResponse = tErr.message;
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          activeModel: activeAiModel,
+          hasKey: !!customAiKey,
+          isLiveAi: !!customAiKey && testSuccess,
+          sampleReply: testResponse.slice(0, 150)
+        }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/config/ai' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      hasKey: !!customAiKey,
+      activeModel: activeAiModel,
+      provider: customAiKey.startsWith('sk-') ? 'OpenAI' : 'Google Gemini'
+    }));
     return;
   }
 
@@ -922,13 +1032,37 @@ const server = http.createServer(async (req, res) => {
   });
 });
 
-// Auto-initialize Default Agency Baileys Sessions on Start
-getOrInitBaileysSession('agency_master_1')
-  .then(() => console.log('🟢 Motor Baileys WhatsApp Multi-Device (agency_master_1) listo para generar códigos QR reales.'))
-  .catch(err => console.error('Error iniciando Baileys agency_master_1:', err));
+// Auto-restore and re-initialize ALL saved WhatsApp sessions (agencies & client companies) on start
+async function restoreAllBaileysSessions() {
+  const initialSessions = new Set(['agency_master_1', 'agency_hq']);
+  if (fs.existsSync(SESSIONS_DIR)) {
+    try {
+      const folders = fs.readdirSync(SESSIONS_DIR);
+      for (const folder of folders) {
+        const fullPath = path.join(SESSIONS_DIR, folder);
+        if (fs.statSync(fullPath).isDirectory()) {
+          const files = fs.readdirSync(fullPath);
+          if (files.some(f => f.includes('creds') || f.endsWith('.json'))) {
+            initialSessions.add(folder);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error escaneando sesiones de WhatsApp:', e.message);
+    }
+  }
 
-getOrInitBaileysSession('agency_hq')
-  .then(() => console.log('🟢 Motor Baileys WhatsApp Multi-Device (agency_hq) listo.'))
+  for (const sessId of initialSessions) {
+    try {
+      await getOrInitBaileysSession(sessId);
+      console.log(`🟢 Sesión WhatsApp Multi-Device cargada: [${sessId}]`);
+    } catch (err) {
+      console.error(`Error iniciando sesión Baileys [${sessId}]:`, err.message);
+    }
+  }
+}
+
+restoreAllBaileysSessions();
 // Start Background Appointment Reminder Cron (24h and 2h alerts)
 startAppointmentReminderCron((targetAgId) => {
   const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
