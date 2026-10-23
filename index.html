@@ -2339,15 +2339,26 @@
                 </div>
               </div>
 
-              <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; align-items: center;">
+              <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; align-items: flex-start;">
                 <div>
                   <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">
-                    🔗 Enlace Web Directo (Pruébalo o mándalo a empresas y clientes):
+                    🔗 Enlace Web Directo (Limpio):
                   </label>
-                  <div class="wl-link-url-display">
+                  <div class="wl-link-url-display" style="margin-bottom: 8px;">
                     <i class="fa-solid fa-globe" style="color: #38bdf8;"></i>
                     <input type="text" id="myAgencyUniqueLinkInput" readonly value="">
                     <button class="btn btn-primary btn-sm" onclick="copyMyAgencyPublicUrl()" style="padding: 6px 12px; font-size: 12px;">
+                      Copiar
+                    </button>
+                  </div>
+
+                  <label style="font-size: 11px; color: #34d399; margin-bottom: 4px; display: flex; align-items: center; gap: 5px;">
+                    <i class="fa-solid fa-shield-halved"></i> Enlace Universal Anti-404 (Abre 100% en cualquier servidor Render/CDN):
+                  </label>
+                  <div class="wl-link-url-display" style="border-color: rgba(52, 211, 153, 0.4); background: rgba(6, 78, 59, 0.2);">
+                    <i class="fa-solid fa-link" style="color: #34d399;"></i>
+                    <input type="text" id="myAgencyUniversalLinkInput" readonly value="" style="color: #34d399;">
+                    <button class="btn btn-emerald btn-sm" onclick="copyMyAgencyUniversalUrl()" style="padding: 6px 12px; font-size: 12px;">
                       Copiar
                     </button>
                   </div>
@@ -2366,6 +2377,9 @@
                       <i class="fa-solid fa-check"></i> Aplicar
                     </button>
                   </div>
+                  <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 6px;">
+                    Al cambiar tu slug, ambos enlaces se actualizan automáticamente en tiempo real.
+                  </span>
                 </div>
               </div>
             </div>
@@ -3058,10 +3072,20 @@
         </p>
         
         <div class="form-group">
-          <label class="form-label" style="font-weight: 700; color: white;">Enlace Público de tu Landing Page:</label>
-          <div style="display: flex; gap: 8px;">
+          <label class="form-label" style="font-weight: 700; color: white;">Enlace Directo (/p/slug):</label>
+          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
             <input type="text" id="publicShareUrlInput" class="form-control" readonly style="font-weight: 600; color: #38bdf8; background: rgba(15,23,42,0.9); font-size: 13px;" value="">
             <button class="btn btn-primary btn-sm" onclick="copyPublicShareUrl()" style="white-space: nowrap;">
+              <i class="fa-solid fa-copy"></i> Copiar
+            </button>
+          </div>
+
+          <label class="form-label" style="font-weight: 700; color: #34d399; font-size: 12px; display: flex; align-items: center; gap: 5px;">
+            <i class="fa-solid fa-shield-halved"></i> Enlace Universal Anti-404 (Abre 100% seguro en cualquier servidor):
+          </label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="publicShareUniversalUrlInput" class="form-control" readonly style="font-weight: 600; color: #34d399; background: rgba(6,78,59,0.3); border: 1px solid rgba(52,211,153,0.4); font-size: 13px;" value="">
+            <button class="btn btn-emerald btn-sm" onclick="copyMyAgencyUniversalUrl()" style="white-space: nowrap;">
               <i class="fa-solid fa-copy"></i> Copiar
             </button>
           </div>

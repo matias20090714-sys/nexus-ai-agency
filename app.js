@@ -89,18 +89,23 @@ const DEFAULT_PHONE_ID = localStorage.getItem('nexus_meta_phone_id') || '1342311
 function checkPublicPortalRoute() {
   const path = window.location.pathname.toLowerCase();
   const search = window.location.search.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
   const params = new URLSearchParams(window.location.search);
 
   const isSlugPath = path.startsWith('/p/');
-  const isPortal = isSlugPath || path.includes('/portal') || path.includes('/servicios') || path.includes('/landing') || search.includes('portal') || search.includes('view=portal') || search.includes('view=public');
+  const isHashSlug = hash.startsWith('#/p/') || hash.startsWith('#portal');
+  const isQuerySlug = params.has('p') || params.has('slug') || params.has('agency') || params.has('portal') || params.has('landing');
+  const isPortal = isSlugPath || isHashSlug || isQuerySlug || path.includes('/portal') || path.includes('/servicios') || path.includes('/landing') || search.includes('portal') || search.includes('view=portal') || search.includes('view=public');
 
   if (isPortal) {
     let identifier = null;
     if (isSlugPath) {
       identifier = window.location.pathname.replace(/^\/p\//i, '').split('/')[0].trim();
+    } else if (isHashSlug && hash.startsWith('#/p/')) {
+      identifier = window.location.hash.replace(/^#\/p\//i, '').split('/')[0].split('?')[0].trim();
     }
     if (!identifier) {
-      identifier = params.get('slug') || params.get('agency') || params.get('id');
+      identifier = params.get('p') || params.get('slug') || params.get('agency') || params.get('id');
     }
 
     // Apply Public Portal Mode
@@ -2017,25 +2022,51 @@ function getPublicShareUrl(useSlug = true) {
   return `${origin}/portal?agency=${encodeURIComponent(id)}`;
 }
 
+function getUniversalShareUrl() {
+  const profile = getAgencyProfile();
+  const origin = window.location.origin;
+  const slugOrId = (profile && profile.slug) ? profile.slug : ((profile && profile.id) ? profile.id : currentAgencyId);
+  return `${origin}/?p=${encodeURIComponent(slugOrId)}`;
+}
+
 function updateUniqueLinkDisplays() {
   const linkInput = document.getElementById('myAgencyUniqueLinkInput');
   if (linkInput) {
     linkInput.value = getPublicShareUrl(true);
   }
+  const univInput = document.getElementById('myAgencyUniversalLinkInput');
+  if (univInput) {
+    univInput.value = getUniversalShareUrl();
+  }
   const shareInput = document.getElementById('publicShareUrlInput');
   if (shareInput) {
     shareInput.value = getPublicShareUrl(true);
+  }
+  const shareUnivInput = document.getElementById('publicShareUniversalUrlInput');
+  if (shareUnivInput) {
+    shareUnivInput.value = getUniversalShareUrl();
   }
 }
 
 function copyMyAgencyPublicUrl() {
   const url = getPublicShareUrl(true);
   navigator.clipboard.writeText(url);
-  showToast('¡Enlace único de tu landing copiado al portapapeles!', 'success');
+  showToast('¡Enlace directo /p/ copiado al portapapeles!', 'success');
+}
+
+function copyMyAgencyUniversalUrl() {
+  const url = getUniversalShareUrl();
+  navigator.clipboard.writeText(url);
+  showToast('¡Enlace universal anti-404 copiado al portapapeles!', 'success');
 }
 
 function openMyAgencyPublicUrl() {
   const url = getPublicShareUrl(true);
+  window.open(url, '_blank');
+}
+
+function openMyAgencyUniversalUrl() {
+  const url = getUniversalShareUrl();
   window.open(url, '_blank');
 }
 
