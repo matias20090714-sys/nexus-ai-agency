@@ -2264,6 +2264,33 @@ textarea.form-control {
   .sidebar, .top-header, .btn, .subtabs-nav-bar, .panel-header {
     display: none !important;
   }
+/* ==================== PUBLIC PORTAL / LANDING PAGE MODE ==================== */
+body.public-portal-mode .sidebar,
+body.public-portal-mode .sidebar-overlay,
+body.public-portal-mode .top-header,
+body.public-portal-mode .mobile-menu-toggle {
+  display: none !important;
+}
+
+body.public-portal-mode .app-container {
+  display: block !important;
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow: visible !important;
+}
+
+body.public-portal-mode .main-wrapper {
+  margin-left: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow: visible !important;
+}
+
+body.public-portal-mode .content-body {
+  max-width: 1180px !important;
+  margin: 0 auto !important;
+  padding: 16px 16px 80px 16px !important;
 }
 
 /* ==================== HIGH-CONVERTING LANDING PAGE STYLES ==================== */

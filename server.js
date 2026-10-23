@@ -1008,14 +1008,35 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Static File Serving
-  let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
-  const ext = path.extname(filePath);
-  const contentType = MIME_TYPES[ext] || 'text/plain';
+  // Static File Serving & Clean URL / SPA Fallback (for /portal, /servicios, etc.)
+  let cleanPath = pathname === '/' ? '/index.html' : pathname;
+  let filePath = path.join(__dirname, cleanPath);
+  let ext = path.extname(filePath);
+
+  // If path has no extension and is not an API route, serve index.html (SPA routing)
+  if (!ext && !pathname.startsWith('/api')) {
+    filePath = path.join(__dirname, 'index.html');
+    ext = '.html';
+  }
+
+  const contentType = MIME_TYPES[ext] || 'text/html; charset=utf-8';
 
   fs.readFile(filePath, (err, content) => {
     if (err) {
       if (err.code === 'ENOENT') {
+        // Fallback to index.html for any sub-routes so landing pages never return 404
+        if (!pathname.startsWith('/api')) {
+          fs.readFile(path.join(__dirname, 'index.html'), (idxErr, idxContent) => {
+            if (!idxErr) {
+              res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+              res.end(idxContent, 'utf-8');
+              return;
+            }
+            res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('404 Not Found');
+          });
+          return;
+        }
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('404 Not Found');
       } else {

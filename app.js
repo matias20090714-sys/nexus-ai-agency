@@ -85,9 +85,92 @@ const DEFAULT_GEMINI_KEY = localStorage.getItem('nexus_ai_key') || '';
 const DEFAULT_META_TOKEN = localStorage.getItem('nexus_meta_token') || 'META_ACCESS_TOKEN_PLACEHOLDER';
 const DEFAULT_PHONE_ID = localStorage.getItem('nexus_meta_phone_id') || '1342311562300304';
 
+// Detect if visitor is an external prospect visiting the public sales landing page
+function checkPublicPortalRoute() {
+  const path = window.location.pathname.toLowerCase();
+  const search = window.location.search.toLowerCase();
+  const params = new URLSearchParams(window.location.search);
+
+  const isPortal = path.includes('/portal') || path.includes('/servicios') || path.includes('/landing') || search.includes('portal') || search.includes('view=portal') || search.includes('view=public');
+
+  if (isPortal) {
+    // If an agency ID is provided in query params: ?agency=agency_xxx
+    const agencyParam = params.get('agency');
+    if (agencyParam) {
+      const reg = getAgenciesRegistry();
+      const matched = reg.find(a => a.id === agencyParam || a.name.toLowerCase().replace(/[^a-z0-9]/g, '') === agencyParam.toLowerCase());
+      if (matched) {
+        currentAgencyId = matched.id;
+      }
+    }
+
+    loadAgencyWorkspace(currentAgencyId);
+
+    // Apply Public Portal Mode
+    document.body.classList.add('public-portal-mode');
+    
+    // Hide Admin Navigation & Internal Bars
+    const sidebar = document.getElementById('appSidebar');
+    if (sidebar) sidebar.style.display = 'none';
+
+    const topHeader = document.querySelector('.top-header');
+    if (topHeader) topHeader.style.display = 'none';
+
+    const adminBar = document.getElementById('agencyPortalAdminBar');
+    if (adminBar) adminBar.style.display = 'none';
+
+    const overlay = document.getElementById('sidebarOverlay');
+    if (overlay) overlay.style.display = 'none';
+
+    // Show Public Header
+    const pubHeader = document.getElementById('publicPortalHeader');
+    if (pubHeader) pubHeader.style.display = 'flex';
+
+    // Layout adjustment: Full-width responsive container
+    const appContainer = document.querySelector('.app-container');
+    if (appContainer) {
+      appContainer.style.display = 'block';
+    }
+
+    const mainWrapper = document.querySelector('.main-wrapper');
+    if (mainWrapper) {
+      mainWrapper.style.marginLeft = '0';
+      mainWrapper.style.width = '100%';
+      mainWrapper.style.minHeight = '100vh';
+      mainWrapper.style.overflowY = 'auto';
+    }
+
+    const contentBody = document.querySelector('.content-body');
+    if (contentBody) {
+      contentBody.style.maxWidth = '1180px';
+      contentBody.style.margin = '0 auto';
+      contentBody.style.padding = '14px 16px 80px 16px';
+    }
+
+    // Switch to agency portal tab and render pricing
+    switchTab('agency-portal');
+    renderPortalPricing();
+
+    // Update public brand elements
+    const profile = getAgencyProfile();
+    if (profile) {
+      const pubName = document.getElementById('publicBrandName');
+      if (pubName) pubName.innerText = profile.name;
+      const portalAgency = document.getElementById('portalAgencyName');
+      if (portalAgency) portalAgency.innerText = profile.name;
+      document.title = `${profile.name} - Soluciones de Automatización con IA 24/7`;
+    }
+    return true;
+  }
+  return false;
+}
+
 // Initialize context on load
 document.addEventListener('DOMContentLoaded', () => {
-  loadAgencyWorkspace(currentAgencyId);
+  const isPortal = checkPublicPortalRoute();
+  if (!isPortal) {
+    loadAgencyWorkspace(currentAgencyId);
+  }
 
   // Setup robust click listeners on all nav-items
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -1822,13 +1905,45 @@ function openContactDemoModal(plan = 'Sesión Estratégica') {
   openAgencyRealCheckout('pro');
 }
 
+function getPublicShareUrl() {
+  const origin = window.location.origin;
+  return `${origin}/portal?agency=${encodeURIComponent(currentAgencyId)}`;
+}
+
 function openPublicShareModal() {
+  const shareUrl = getPublicShareUrl();
+  const input = document.getElementById('publicShareUrlInput');
+  if (input) input.value = shareUrl;
+
+  const modal = document.getElementById('shareAgencyPublicLinkModal');
+  if (modal) {
+    modal.classList.add('active');
+  } else {
+    navigator.clipboard.writeText(shareUrl);
+    showToast('¡Enlace de tu landing copiado al portapapeles!', 'success');
+  }
+}
+
+function copyPublicShareUrl() {
+  const input = document.getElementById('publicShareUrlInput');
+  const url = input ? input.value : getPublicShareUrl();
+  navigator.clipboard.writeText(url);
+  showToast('¡Enlace copiado al portapapeles con éxito!', 'success');
+}
+
+function testOpenPublicPortal() {
+  const input = document.getElementById('publicShareUrlInput');
+  const url = input ? input.value : getPublicShareUrl();
+  window.open(url, '_blank');
+}
+
+function sharePublicPortalWhatsApp() {
+  const input = document.getElementById('publicShareUrlInput');
+  const url = input ? input.value : getPublicShareUrl();
   const profile = getAgencyProfile();
   const agencyName = profile ? profile.name : 'NEXUS AI';
-  const shareUrl = `https://${agencyName.toLowerCase().replace(/[^a-z0-9]/g, '')}.nexus-ai.agency/servicios`;
-  
-  navigator.clipboard.writeText(shareUrl);
-  alert(`🌐 ENLACE PÚBLICO DE TU AGENCIA:\n\n${shareUrl}\n\n¡Enlace copiado al portapapeles! Tus compradores pueden enviar este enlace a cualquier empresa para mostrar sus 4 servicios de IA y paquetes mensuales.`);
+  const msg = encodeURIComponent(`¡Hola! Te comparto la página web oficial de ${agencyName} donde puedes probar nuestra demo interactiva de Asistente de WhatsApp con IA y calcular cuánto dinero puedes recuperar:\n\n${url}`);
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
 }
 
 // ==================== REAL BAILEYS WHATSAPP QR ENGINE ====================

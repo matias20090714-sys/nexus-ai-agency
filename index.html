@@ -254,8 +254,8 @@
         <!-- ==================== TAB: WEB COMERCIAL & PORTAL DE SERVICIOS DE LA AGENCIA ==================== -->
         <div id="tab-agency-portal" class="tab-view">
           
-          <!-- Public Agency Preview Bar -->
-          <div style="background: rgba(13, 16, 33, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 14px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <!-- Public Agency Preview Bar (Only visible in Admin Mode) -->
+          <div id="agencyPortalAdminBar" style="background: rgba(13, 16, 33, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 14px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span class="brand-badge" style="background: rgba(16,185,129,0.2); color:#34d399;"><i class="fa-solid fa-signal"></i> Portal Comercial Activo</span>
               <span style="font-size: 13px; color: var(--text-muted);">Esta es la página de alta conversión que tus clientes potenciales visitan para contratar tus servicios de IA:</span>
@@ -269,6 +269,27 @@
               </button>
             </div>
           </div>
+
+          <!-- Public Brand Header (Visible to external visitors on /portal) -->
+          <header id="publicPortalHeader" style="display: none; align-items: center; justify-content: space-between; padding: 14px 22px; background: rgba(13, 16, 33, 0.95); backdrop-filter: blur(15px); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); margin-bottom: 24px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 38px; height: 38px; border-radius: 10px; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;">
+                <i class="fa-solid fa-brain"></i>
+              </div>
+              <div>
+                <div style="font-size: 16px; font-weight: 800; color: white;" id="publicBrandName">NEXUS AI</div>
+                <div style="font-size: 11px; color: #34d399; font-weight: 700;">Agencia Oficial de Automatización con IA</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('portalPricingContainer').scrollIntoView({behavior:'smooth'})">
+                <i class="fa-solid fa-tags"></i> Ver Planes & Precios
+              </button>
+              <button class="btn btn-emerald btn-sm" onclick="openAgencyRealCheckout('pro')">
+                <i class="fa-brands fa-whatsapp"></i> Hablar con un Asesor
+              </button>
+            </div>
+          </header>
 
           <!-- The High-Converting Agency Sales Engine -->
           <div class="landing-page-container">
@@ -2887,6 +2908,51 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modalAuthAccount')">Cerrar</button>
+      </div>
+  <!-- Modal: Compartir Enlace Público de la Agencia -->
+  <div class="modal-backdrop" id="shareAgencyPublicLinkModal">
+    <div class="modal-content" style="max-width: 560px;">
+      <div class="modal-header">
+        <div>
+          <strong style="font-size: 17px; color: white; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-share-nodes" style="color: var(--accent-indigo);"></i> Enlace Comercial de tu Agencia
+          </strong>
+          <div style="font-size: 12px; color: #34d399; margin-top: 3px;">
+            Página web comercial activa en tu servidor
+          </div>
+        </div>
+        <button class="close-btn" onclick="closeModal('shareAgencyPublicLinkModal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+          Este es el enlace público a tu <strong>Landing Page Comercial</strong>. Tus prospectos verán tu marca, la calculadora de pérdidas, el simulador interactivo de WhatsApp y tus planes sin tener acceso a tu panel administrativo.
+        </p>
+        
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 700; color: white;">Enlace Público de tu Landing Page:</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="publicShareUrlInput" class="form-control" readonly style="font-weight: 600; color: #38bdf8; background: rgba(15,23,42,0.9); font-size: 13px;" value="">
+            <button class="btn btn-primary btn-sm" onclick="copyPublicShareUrl()" style="white-space: nowrap;">
+              <i class="fa-solid fa-copy"></i> Copiar
+            </button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px;">
+          <button class="btn btn-secondary btn-sm" onclick="testOpenPublicPortal()" style="justify-content: center;">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Probar / Abrir Enlace
+          </button>
+          <button class="btn btn-emerald btn-sm" onclick="sharePublicPortalWhatsApp()" style="justify-content: center;">
+            <i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp
+          </button>
+        </div>
+
+        <div style="margin-top: 16px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 12px; font-size: 11.5px; color: #cbd5e1; line-height: 1.45;">
+          💡 <strong>Conexión Directa:</strong> El enlace utiliza automáticamente el dominio real donde está alojada tu plataforma (en Render o en tu dominio propio), por lo que siempre abrirá en cualquier celular o computadora sin dar error de página inexistente.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('shareAgencyPublicLinkModal')">Cerrar</button>
       </div>
     </div>
   </div>
