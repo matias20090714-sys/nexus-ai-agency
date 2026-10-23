@@ -1008,7 +1008,222 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // Static File Serving & Clean URL / SPA Fallback (for /portal, /servicios, etc.)
+  // ==================== PUBLIC PORTAL & IN-VIVO LANDING CONFIGURATION ====================
+  if (pathname === '/api/agency/public-portal' && req.method === 'GET') {
+    try {
+      const identifier = urlObj.searchParams.get('id') || urlObj.searchParams.get('slug') || urlObj.searchParams.get('agency') || 'agency_master_1';
+      
+      const agencyRes = await db.query(
+        `SELECT id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config FROM agencies WHERE id = $1 OR slug = $1 LIMIT 1`,
+        [identifier]
+      );
+
+      let agencyData = agencyRes?.rows?.[0];
+      if (!agencyData) {
+        // Fallback to first agency in DB
+        const fallbackRes = await db.query(`SELECT id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config FROM agencies ORDER BY created_at ASC LIMIT 1`);
+        agencyData = fallbackRes?.rows?.[0];
+      }
+
+      if (!agencyData) {
+        agencyData = {
+          id: 'agency_master_1',
+          name: 'NEXUS AI Agency',
+          slug: 'nexus-ai',
+          brand_color: '#6366f1',
+          billing_phone: '5491148923310',
+          portal_title: null,
+          portal_subtitle: null,
+          portal_config: {}
+        };
+      }
+
+      // Fetch plans for this specific agency
+      const plansRes = await db.query(
+        `SELECT id, name, price, currency, period, category, features, payment_link, is_featured FROM plans WHERE agency_id = $1 ORDER BY price ASC`,
+        [agencyData.id]
+      );
+
+      let returnPlans = plansRes?.rows || [];
+      if (returnPlans.length === 0) {
+        // Fallback default plans so landing page always has high-converting plans ready
+        const defaultPlansRes = await db.query(
+          `SELECT id, name, price, currency, period, category, features, payment_link, is_featured FROM plans WHERE agency_id = 'agency_master_1' ORDER BY price ASC`
+        );
+        returnPlans = defaultPlansRes?.rows && defaultPlansRes.rows.length > 0 ? defaultPlansRes.rows : [
+          {
+            id: 'plan_starter',
+            name: 'Plan Starter IA',
+            price: '290.00',
+            currency: 'USD',
+            period: 'mes',
+            category: 'Negocios & Comercios Locales',
+            features: [
+              '1 Agente de WhatsApp 24/7 entrenado a medida',
+              'Respuestas instantáneas en menos de 2 seg',
+              'Catálogo interactivo de servicios/productos',
+              'Derivación a WhatsApp personal ante emergencias',
+              'Mantenimiento mensual e IA incluida'
+            ],
+            payment_link: '',
+            is_featured: false
+          },
+          {
+            id: 'plan_pro',
+            name: 'Plan Growth Pro Multi-Flujo',
+            price: '690.00',
+            currency: 'USD',
+            period: 'mes',
+            category: '★ DESTACADO | Clínicas, Inmobiliarias & Empresas',
+            features: [
+              'Todo lo incluido en Starter',
+              'Agendamiento Automático en Google Calendar',
+              'Recordatorios WhatsApp anti-ausentismo (24h y 2h)',
+              'Generador de Cotizaciones con links de pago',
+              'Encuestas NPS y Reseñas en Google Maps 5★',
+              'CRM Kanban y Pipeline de Leads en tiempo real'
+            ],
+            payment_link: '',
+            is_featured: true
+          }
+        ];
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        agency: {
+          id: agencyData.id,
+          name: agencyData.name,
+          slug: agencyData.slug,
+          brandColor: agencyData.brand_color || '#6366f1',
+          billingPhone: agencyData.billing_phone || '',
+          bankName: agencyData.bank_name || '',
+          bankHolder: agencyData.bank_holder || '',
+          bankCbu: agencyData.bank_cbu || '',
+          bankTaxId: agencyData.bank_tax_id || '',
+          portalTitle: agencyData.portal_title,
+          portalSubtitle: agencyData.portal_subtitle,
+          portalConfig: agencyData.portal_config || {}
+        },
+        plans: returnPlans
+      }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/agency/portal-config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body || '{}');
+        const {
+          agencyId,
+          name,
+          slug,
+          brandColor,
+          billingPhone,
+          bankName,
+          bankHolder,
+          bankCbu,
+          bankTaxId,
+          portalTitle,
+          portalSubtitle,
+          portalConfig,
+          plans
+        } = payload;
+        const agId = agencyId || 'agency_master_1';
+
+        let sanitizedSlug = slug ? slug.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-') : null;
+        if (sanitizedSlug && sanitizedSlug.startsWith('-')) sanitizedSlug = sanitizedSlug.substring(1);
+        if (sanitizedSlug && sanitizedSlug.endsWith('-')) sanitizedSlug = sanitizedSlug.substring(0, sanitizedSlug.length - 1);
+
+        // Update agency profile in database
+        const updatedAgency = await db.query(
+          `UPDATE agencies SET 
+            name = COALESCE($1, name),
+            brand_color = COALESCE($2, brand_color),
+            billing_phone = COALESCE($3, billing_phone),
+            portal_title = $4,
+            portal_subtitle = $5,
+            portal_config = $6,
+            bank_name = COALESCE($7, bank_name),
+            bank_holder = COALESCE($8, bank_holder),
+            bank_cbu = COALESCE($9, bank_cbu),
+            bank_tax_id = COALESCE($10, bank_tax_id),
+            slug = COALESCE($11, slug),
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = $12 OR slug = $12
+          RETURNING id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config`,
+          [
+            name || null,
+            brandColor || null,
+            billingPhone || null,
+            portalTitle !== undefined ? portalTitle : null,
+            portalSubtitle !== undefined ? portalSubtitle : null,
+            JSON.stringify(portalConfig || {}),
+            bankName || null,
+            bankHolder || null,
+            bankCbu || null,
+            bankTaxId || null,
+            sanitizedSlug || null,
+            agId
+          ]
+        );
+
+        const realAgencyId = updatedAgency?.rows?.[0]?.id || agId;
+
+        // Synchronize plans if provided
+        if (Array.isArray(plans) && plans.length > 0) {
+          // Clean existing plans for this agency
+          await db.query(`DELETE FROM plans WHERE agency_id = $1`, [realAgencyId]);
+
+          for (let i = 0; i < plans.length; i++) {
+            const plan = plans[i];
+            const pId = plan.id && !plan.id.startsWith('temp_') ? plan.id : `plan_${Date.now()}_${i}`;
+            const featuresList = Array.isArray(plan.features)
+              ? plan.features
+              : (typeof plan.features === 'string' ? plan.features.split('\n').map(x => x.trim()).filter(Boolean) : []);
+            const featuresJson = JSON.stringify(featuresList);
+
+            await db.query(
+              `INSERT INTO plans (id, agency_id, name, price, currency, period, category, features, payment_link, is_featured)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                pId,
+                realAgencyId,
+                plan.name || 'Plan Comercial',
+                parseFloat(plan.price) || 0,
+                plan.currency || 'USD',
+                plan.period || plan.billingPeriod || 'mes',
+                plan.category || 'General',
+                featuresJson,
+                plan.paymentLink || plan.payment_link || '',
+                !!(plan.isFeatured || plan.is_featured)
+              ]
+            );
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          message: '¡Landing page y configuración de marca actualizadas en vivo!',
+          agency: updatedAgency?.rows?.[0]
+        }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // Static File Serving & Clean URL / SPA Fallback (for /portal, /servicios, /p/:slug, etc.)
   let cleanPath = pathname === '/' ? '/index.html' : pathname;
   let filePath = path.join(__dirname, cleanPath);
   let ext = path.extname(filePath);

@@ -23,6 +23,11 @@ CREATE TABLE agencies (
     bank_holder VARCHAR(255),
     bank_cbu VARCHAR(128),
     bank_tax_id VARCHAR(64),
+    owner_alert_phone VARCHAR(64),
+    owner_alerts_enabled BOOLEAN DEFAULT TRUE,
+    portal_title TEXT,
+    portal_subtitle TEXT,
+    portal_config JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

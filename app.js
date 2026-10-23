@@ -91,20 +91,17 @@ function checkPublicPortalRoute() {
   const search = window.location.search.toLowerCase();
   const params = new URLSearchParams(window.location.search);
 
-  const isPortal = path.includes('/portal') || path.includes('/servicios') || path.includes('/landing') || search.includes('portal') || search.includes('view=portal') || search.includes('view=public');
+  const isSlugPath = path.startsWith('/p/');
+  const isPortal = isSlugPath || path.includes('/portal') || path.includes('/servicios') || path.includes('/landing') || search.includes('portal') || search.includes('view=portal') || search.includes('view=public');
 
   if (isPortal) {
-    // If an agency ID is provided in query params: ?agency=agency_xxx
-    const agencyParam = params.get('agency');
-    if (agencyParam) {
-      const reg = getAgenciesRegistry();
-      const matched = reg.find(a => a.id === agencyParam || a.name.toLowerCase().replace(/[^a-z0-9]/g, '') === agencyParam.toLowerCase());
-      if (matched) {
-        currentAgencyId = matched.id;
-      }
+    let identifier = null;
+    if (isSlugPath) {
+      identifier = window.location.pathname.replace(/^\/p\//i, '').split('/')[0].trim();
     }
-
-    loadAgencyWorkspace(currentAgencyId);
+    if (!identifier) {
+      identifier = params.get('slug') || params.get('agency') || params.get('id');
+    }
 
     // Apply Public Portal Mode
     document.body.classList.add('public-portal-mode');
@@ -122,44 +119,109 @@ function checkPublicPortalRoute() {
     const overlay = document.getElementById('sidebarOverlay');
     if (overlay) overlay.style.display = 'none';
 
-    // Show Public Header
+    // Show Public Header and Footer
     const pubHeader = document.getElementById('publicPortalHeader');
     if (pubHeader) pubHeader.style.display = 'flex';
 
-    // Layout adjustment: Full-width responsive container
-    const appContainer = document.querySelector('.app-container');
-    if (appContainer) {
-      appContainer.style.display = 'block';
-    }
+    const pubFooter = document.getElementById('publicPortalFooter');
+    if (pubFooter) pubFooter.style.display = 'block';
 
-    const mainWrapper = document.querySelector('.main-wrapper');
-    if (mainWrapper) {
-      mainWrapper.style.marginLeft = '0';
-      mainWrapper.style.width = '100%';
-      mainWrapper.style.minHeight = '100vh';
-      mainWrapper.style.overflowY = 'auto';
-    }
-
-    const contentBody = document.querySelector('.content-body');
-    if (contentBody) {
-      contentBody.style.maxWidth = '1180px';
-      contentBody.style.margin = '0 auto';
-      contentBody.style.padding = '14px 16px 80px 16px';
-    }
-
-    // Switch to agency portal tab and render pricing
+    // Switch to agency portal tab
     switchTab('agency-portal');
-    renderPortalPricing();
 
-    // Update public brand elements
-    const profile = getAgencyProfile();
-    if (profile) {
-      const pubName = document.getElementById('publicBrandName');
-      if (pubName) pubName.innerText = profile.name;
-      const portalAgency = document.getElementById('portalAgencyName');
-      if (portalAgency) portalAgency.innerText = profile.name;
-      document.title = `${profile.name} - Soluciones de Automatización con IA 24/7`;
-    }
+    // Fetch live agency configuration and plans from Neon DB
+    const queryId = identifier || currentAgencyId || 'agency_master_1';
+    fetch(`/api/agency/public-portal?id=${encodeURIComponent(queryId)}&slug=${encodeURIComponent(queryId)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && data.agency) {
+          const ag = data.agency;
+          currentAgencyId = ag.id;
+
+          // Apply brand color
+          if (ag.brandColor) {
+            document.documentElement.style.setProperty('--accent-indigo', ag.brandColor);
+            document.documentElement.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${ag.brandColor} 0%, #a855f7 100%)`);
+          }
+
+          // Brand Name
+          const pubName = document.getElementById('publicBrandName');
+          if (pubName) pubName.innerText = ag.name;
+          const portalAgency = document.getElementById('portalAgencyName');
+          if (portalAgency) portalAgency.innerText = ag.name;
+          const footerAgency = document.getElementById('publicFooterAgencyName');
+          if (footerAgency) footerAgency.innerText = ag.name;
+          document.title = `${ag.name} - Soluciones de Automatización con IA 24/7`;
+
+          // Hero Headline
+          const heroTitle = document.getElementById('portalHeroTitle');
+          if (heroTitle) {
+            if (ag.portalTitle) {
+              heroTitle.innerHTML = escapeHtml(ag.portalTitle).replace(/\n/g, '<br>');
+            } else {
+              heroTitle.innerHTML = `Deja de Perder Ventas por Responder Tarde en WhatsApp.<br><span class="gradient-text-hero">Tu Negocio Atendiendo y Facturando 24/7 en Automático.</span>`;
+            }
+          }
+
+          // Hero Subtitle
+          const heroSubtitle = document.getElementById('portalHeroSubtitle');
+          if (heroSubtitle) {
+            if (ag.portalSubtitle) {
+              heroSubtitle.innerHTML = escapeHtml(ag.portalSubtitle).replace(/\n/g, '<br>');
+            } else {
+              heroSubtitle.innerHTML = `En <strong style="color: #34d399;" id="portalAgencyName">${escapeHtml(ag.name)}</strong> instalamos en tu número oficial de WhatsApp un Asistente Inteligente exclusivo que responde en <strong>2 segundos</strong>, cotiza servicios al instante, agenda citas en Google Calendar y califica compradores mientras duermes.`;
+            }
+          }
+
+          // Urgency Banner
+          const urgencyText = document.getElementById('portalUrgencyText');
+          if (urgencyText && ag.portalConfig?.urgencyText) {
+            urgencyText.innerHTML = escapeHtml(ag.portalConfig.urgencyText);
+          }
+
+          // CTA Buttons
+          if (ag.portalConfig?.ctaText) {
+            const heroCtaText = document.getElementById('portalHeroCtaText');
+            if (heroCtaText) heroCtaText.innerText = ag.portalConfig.ctaText;
+            const finalCtaText = document.getElementById('portalFinalCtaText');
+            if (finalCtaText) finalCtaText.innerText = ag.portalConfig.ctaText;
+          }
+
+          // Simulator Header Name
+          const simHeader = document.getElementById('portalSimHeaderName');
+          if (simHeader) simHeader.innerText = `Asistente Virtual IA • ${ag.name}`;
+
+          // Floating WhatsApp Widget
+          const floatBtn = document.getElementById('publicFloatingWhatsAppBtn');
+          if (floatBtn) {
+            const rawPhone = (ag.billingPhone || '5491148923310').replace(/\D/g, '');
+            const floatMsg = encodeURIComponent(`¡Hola ${ag.name}! Estuve viendo su web y me gustaría recibir asesoramiento para implementar un Asistente con IA en mi empresa.`);
+            floatBtn.href = `https://wa.me/${rawPhone}?text=${floatMsg}`;
+            floatBtn.style.display = 'flex';
+          }
+
+          // Store profile in memory/localStorage for checkout modal
+          let reg = getAgenciesRegistry();
+          let existing = reg.find(a => a.id === ag.id);
+          if (existing) {
+            Object.assign(existing, ag);
+            existing.plans = data.plans;
+          } else {
+            reg.push({ ...ag, plans: data.plans });
+          }
+          saveAgenciesRegistry(reg);
+
+          // Render live pricing plans
+          renderPortalPricing(data.plans);
+        } else {
+          renderPortalPricing();
+        }
+      })
+      .catch(err => {
+        console.warn('Fallback portal rendering:', err);
+        renderPortalPricing();
+      });
+
     return true;
   }
   return false;
@@ -231,6 +293,11 @@ function loadAgencyWorkspace(agencyId) {
   const wlBCbu = document.getElementById('wlBankCbu');
   const wlBTax = document.getElementById('wlBankTaxId');
   const wlBPhone = document.getElementById('wlBillingPhone');
+  const wlSlug = document.getElementById('wlAgencySlug');
+  const wlTitle = document.getElementById('wlPortalHeroTitle');
+  const wlSubtitle = document.getElementById('wlPortalHeroSubtitle');
+  const wlUrgency = document.getElementById('wlPortalUrgencyText');
+  const wlCta = document.getElementById('wlPortalCtaText');
 
   if (wlStarter) wlStarter.value = starterPrice;
   if (wlPro) wlPro.value = proPrice;
@@ -241,6 +308,13 @@ function loadAgencyWorkspace(agencyId) {
   if (wlBCbu) wlBCbu.value = profile.bankCbu || '';
   if (wlBTax) wlBTax.value = profile.bankTaxId || '';
   if (wlBPhone) wlBPhone.value = profile.billingPhone || '';
+  if (wlSlug) wlSlug.value = profile.slug || '';
+  if (wlTitle) wlTitle.value = profile.portalTitle || '';
+  if (wlSubtitle) wlSubtitle.value = profile.portalSubtitle || '';
+  if (wlUrgency) wlUrgency.value = profile.portalConfig?.urgencyText || '';
+  if (wlCta) wlCta.value = profile.portalConfig?.ctaText || '';
+
+  updateUniqueLinkDisplays();
 
   const step1 = document.getElementById('step1ScriptText');
   if (step1) {
@@ -258,7 +332,8 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
 
   if (profile.brandColor) {
     document.documentElement.style.setProperty('--accent-indigo', profile.brandColor);
-    document.getElementById('wlColorPicker').value = profile.brandColor;
+    const cp = document.getElementById('wlColorPicker');
+    if (cp) cp.value = profile.brandColor;
   }
 
   // Render all isolated sections
@@ -273,6 +348,33 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
   checkQrConnectionState();
   renderAgencyPlansAdmin();
   renderPortalPricing();
+
+  // Async sync from Neon DB to ensure fresh live state
+  fetch(`/api/agency/public-portal?id=${encodeURIComponent(agencyId)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.success && data.agency) {
+        const ag = data.agency;
+        let changed = false;
+        if (ag.slug && ag.slug !== profile.slug) { profile.slug = ag.slug; changed = true; }
+        if (ag.brandColor && ag.brandColor !== profile.brandColor) { profile.brandColor = ag.brandColor; changed = true; }
+        if (ag.portalTitle !== undefined) { profile.portalTitle = ag.portalTitle; }
+        if (ag.portalSubtitle !== undefined) { profile.portalSubtitle = ag.portalSubtitle; }
+        if (ag.portalConfig) { profile.portalConfig = ag.portalConfig; }
+        if (data.plans && data.plans.length > 0) { profile.plans = data.plans; }
+        if (changed) saveAgencyProfile(profile);
+
+        if (wlSlug) wlSlug.value = profile.slug || '';
+        if (wlTitle) wlTitle.value = profile.portalTitle || '';
+        if (wlSubtitle) wlSubtitle.value = profile.portalSubtitle || '';
+        if (wlUrgency) wlUrgency.value = profile.portalConfig?.urgencyText || '';
+        if (wlCta) wlCta.value = profile.portalConfig?.ctaText || '';
+        updateUniqueLinkDisplays();
+        renderAgencyPlansAdmin();
+        renderPortalPricing();
+      }
+    })
+    .catch(e => console.warn('Workspace sync warning:', e));
 }
 
 // ==================== TAB NAVIGATION ====================
@@ -1905,45 +2007,97 @@ function openContactDemoModal(plan = 'Sesión Estratégica') {
   openAgencyRealCheckout('pro');
 }
 
-function getPublicShareUrl() {
+function getPublicShareUrl(useSlug = true) {
+  const profile = getAgencyProfile();
   const origin = window.location.origin;
-  return `${origin}/portal?agency=${encodeURIComponent(currentAgencyId)}`;
+  if (useSlug && profile && profile.slug) {
+    return `${origin}/p/${encodeURIComponent(profile.slug)}`;
+  }
+  const id = (profile && profile.id) ? profile.id : currentAgencyId;
+  return `${origin}/portal?agency=${encodeURIComponent(id)}`;
+}
+
+function updateUniqueLinkDisplays() {
+  const linkInput = document.getElementById('myAgencyUniqueLinkInput');
+  if (linkInput) {
+    linkInput.value = getPublicShareUrl(true);
+  }
+  const shareInput = document.getElementById('publicShareUrlInput');
+  if (shareInput) {
+    shareInput.value = getPublicShareUrl(true);
+  }
+}
+
+function copyMyAgencyPublicUrl() {
+  const url = getPublicShareUrl(true);
+  navigator.clipboard.writeText(url);
+  showToast('¡Enlace único de tu landing copiado al portapapeles!', 'success');
+}
+
+function openMyAgencyPublicUrl() {
+  const url = getPublicShareUrl(true);
+  window.open(url, '_blank');
+}
+
+function shareMyAgencyWhatsApp() {
+  const url = getPublicShareUrl(true);
+  const profile = getAgencyProfile();
+  const agencyName = profile ? profile.name : 'NEXUS AI';
+  const msg = encodeURIComponent(`¡Hola! Te comparto la página oficial de ${agencyName} donde puedes probar nuestra demo interactiva de Asistente de WhatsApp con IA y calcular el retorno para tu negocio:\n\n${url}`);
+  window.open(`https://wa.me/?text=${msg}`, '_blank');
+}
+
+function updateAgencySlugQuick() {
+  const input = document.getElementById('wlAgencySlug');
+  if (!input) return;
+  let val = input.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+  if (val.startsWith('-')) val = val.substring(1);
+  if (val.endsWith('-')) val = val.substring(0, val.length - 1);
+
+  if (!val) {
+    showToast('Ingresa un slug válido (ej: mi-agencia-ia)', 'warning');
+    return;
+  }
+
+  input.value = val;
+  const profile = getAgencyProfile();
+  if (profile) {
+    profile.slug = val;
+    saveAgencyProfile(profile);
+  }
+  updateUniqueLinkDisplays();
+  saveWhiteLabelSettings();
+  showToast(`¡Dirección de tu landing actualizada a /p/${val}!`, 'success');
+}
+
+function openPublicContactWhatsApp() {
+  const profile = getAgencyProfile();
+  const agencyName = profile ? profile.name : 'NEXUS AI';
+  const rawPhone = (profile && profile.billingPhone) ? profile.billingPhone.replace(/\D/g, '') : '5491148923310';
+  const msg = encodeURIComponent(`¡Hola ${agencyName}! Estuve revisando su página oficial y quiero consultar sobre el Asistente de WhatsApp con Inteligencia Artificial para mi empresa.`);
+  window.open(`https://wa.me/${rawPhone}?text=${msg}`, '_blank');
 }
 
 function openPublicShareModal() {
-  const shareUrl = getPublicShareUrl();
-  const input = document.getElementById('publicShareUrlInput');
-  if (input) input.value = shareUrl;
-
+  updateUniqueLinkDisplays();
   const modal = document.getElementById('shareAgencyPublicLinkModal');
   if (modal) {
     modal.classList.add('active');
   } else {
-    navigator.clipboard.writeText(shareUrl);
-    showToast('¡Enlace de tu landing copiado al portapapeles!', 'success');
+    copyMyAgencyPublicUrl();
   }
 }
 
 function copyPublicShareUrl() {
-  const input = document.getElementById('publicShareUrlInput');
-  const url = input ? input.value : getPublicShareUrl();
-  navigator.clipboard.writeText(url);
-  showToast('¡Enlace copiado al portapapeles con éxito!', 'success');
+  copyMyAgencyPublicUrl();
 }
 
 function testOpenPublicPortal() {
-  const input = document.getElementById('publicShareUrlInput');
-  const url = input ? input.value : getPublicShareUrl();
-  window.open(url, '_blank');
+  openMyAgencyPublicUrl();
 }
 
 function sharePublicPortalWhatsApp() {
-  const input = document.getElementById('publicShareUrlInput');
-  const url = input ? input.value : getPublicShareUrl();
-  const profile = getAgencyProfile();
-  const agencyName = profile ? profile.name : 'NEXUS AI';
-  const msg = encodeURIComponent(`¡Hola! Te comparto la página web oficial de ${agencyName} donde puedes probar nuestra demo interactiva de Asistente de WhatsApp con IA y calcular cuánto dinero puedes recuperar:\n\n${url}`);
-  window.open(`https://wa.me/?text=${msg}`, '_blank');
+  shareMyAgencyWhatsApp();
 }
 
 // ==================== REAL BAILEYS WHATSAPP QR ENGINE ====================
@@ -2261,6 +2415,7 @@ function saveAgencyPlans(plans) {
   saveAgencyProfile(profile);
   renderAgencyPlansAdmin();
   renderPortalPricing();
+  syncPortalConfigToDatabase();
 }
 
 function renderAgencyPlansAdmin() {
@@ -2439,14 +2594,16 @@ function deletePlan(planId) {
   showToast('Plan eliminado', 'info');
 }
 
-function renderPortalPricing() {
+function renderPortalPricing(customPlans = null) {
   const container = document.getElementById('portalPricingContainer');
   if (!container) return;
 
   const profile = getAgencyProfile();
-  const plans = getAgencyPlans(profile);
+  const plans = (customPlans && Array.isArray(customPlans) && customPlans.length > 0)
+    ? customPlans
+    : getAgencyPlans(profile);
 
-  if (plans.length === 0) {
+  if (!plans || plans.length === 0) {
     container.innerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 40px; background: rgba(15, 20, 42, 0.7); border-radius: var(--radius-xl); border: 1px dashed var(--border-subtle);">
         <h3 style="color: white; margin-bottom: 8px;">No hay planes publicados actualmente</h3>
@@ -2467,17 +2624,24 @@ function renderPortalPricing() {
   }
 
   container.innerHTML = plans.map(p => {
+    const isFeat = !!(p.isFeatured || p.is_featured);
+    const planPrice = p.price || '0';
+    const planCurr = p.currency || 'USD';
+    const planPeriod = p.billingPeriod || p.period || 'mes';
+    const planName = p.name || 'Plan Comercial';
+    const featList = Array.isArray(p.features) ? p.features : (typeof p.features === 'string' ? p.features.split('\n').filter(Boolean) : []);
+
     return `
-      <div class="landing-price-card ${p.isFeatured ? 'featured' : ''}">
-        ${p.isFeatured ? `<div class="popular-ribbon">${escapeHtml(p.badgeText || 'MÁS ELEGIDO')}</div>` : ''}
-        <span class="agent-category" style="${p.isFeatured ? 'color: #a5b4fc;' : ''}">${escapeHtml(p.category || 'Solución IA')}</span>
-        <div style="font-size: 21px; font-weight: 800; color: white; margin: 4px 0 12px 0;">${escapeHtml(p.name)}</div>
-        <div style="font-size: 38px; font-weight: 900; color: ${p.isFeatured ? '#34d399' : 'white'}; margin-bottom: 16px;">
-          $${escapeHtml(p.price)} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">${escapeHtml(p.currency || 'USD')} / ${escapeHtml(p.billingPeriod || 'mes')}</span>
+      <div class="landing-price-card ${isFeat ? 'featured' : ''}">
+        ${isFeat ? `<div class="popular-ribbon">${escapeHtml(p.badgeText || 'MÁS ELEGIDO')}</div>` : ''}
+        <span class="agent-category" style="${isFeat ? 'color: #a5b4fc;' : ''}">${escapeHtml(p.category || 'Solución IA')}</span>
+        <div style="font-size: 21px; font-weight: 800; color: white; margin: 4px 0 12px 0;">${escapeHtml(planName)}</div>
+        <div style="font-size: 38px; font-weight: 900; color: ${isFeat ? '#34d399' : 'white'}; margin-bottom: 16px;">
+          $${escapeHtml(planPrice)} <span style="font-size: 14px; color: var(--text-dim); font-weight: 600;">${escapeHtml(planCurr)} / ${escapeHtml(planPeriod)}</span>
         </div>
         
         <div class="landing-price-features">
-          ${(p.features || []).map(f => `
+          ${featList.map(f => `
             <div>
               <i class="fa-solid fa-check" style="color: #34d399;"></i>
               <span>${escapeHtml(f)}</span>
@@ -2485,8 +2649,8 @@ function renderPortalPricing() {
           `).join('')}
         </div>
 
-        <button class="btn ${p.isFeatured ? 'btn-primary' : 'btn-secondary'}" style="width: 100%; margin-top: auto; padding: 14px; font-weight: 800;" onclick="openAgencyRealCheckout('${p.id}')">
-          <i class="fa-solid ${p.isFeatured ? 'fa-bolt' : 'fa-cart-shopping'}"></i> Contratar ${escapeHtml(p.name)}
+        <button class="btn ${isFeat ? 'btn-primary' : 'btn-secondary'}" style="width: 100%; margin-top: auto; padding: 14px; font-weight: 800;" onclick="openAgencyRealCheckout('${p.id}')">
+          <i class="fa-solid ${isFeat ? 'fa-bolt' : 'fa-cart-shopping'}"></i> Contratar ${escapeHtml(planName)}
         </button>
       </div>
     `;
@@ -2495,28 +2659,88 @@ function renderPortalPricing() {
 
 function updateBrandColor(color) {
   document.documentElement.style.setProperty('--accent-indigo', color);
+  document.documentElement.style.setProperty('--gradient-primary', `linear-gradient(135deg, ${color} 0%, #a855f7 100%)`);
   showToast(`Color actualizado a ${color}`, 'success');
+}
+
+async function syncPortalConfigToDatabase() {
+  const profile = getAgencyProfile();
+  if (!profile) return;
+  const plans = getAgencyPlans(profile);
+
+  try {
+    const res = await fetch('/api/agency/portal-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agencyId: currentAgencyId || profile.id,
+        name: profile.name,
+        slug: profile.slug,
+        brandColor: profile.brandColor,
+        billingPhone: profile.billingPhone,
+        bankName: profile.bankName,
+        bankHolder: profile.bankHolder,
+        bankCbu: profile.bankCbu,
+        bankTaxId: profile.bankTaxId,
+        portalTitle: profile.portalTitle,
+        portalSubtitle: profile.portalSubtitle,
+        portalConfig: profile.portalConfig || {},
+        plans: plans
+      })
+    });
+    const data = await res.json();
+    if (data && data.success && data.agency) {
+      if (data.agency.slug) {
+        profile.slug = data.agency.slug;
+        const slugInp = document.getElementById('wlAgencySlug');
+        if (slugInp) slugInp.value = data.agency.slug;
+      }
+      saveAgencyProfile(profile);
+      updateUniqueLinkDisplays();
+    }
+    return data;
+  } catch (err) {
+    console.warn('Error sincronizando portal con base de datos:', err);
+  }
 }
 
 function saveWhiteLabelSettings() {
   const profile = getAgencyProfile();
   if (!profile) return;
 
-  const name = document.getElementById('wlBrandName').value.trim() || profile.name;
-  const color = document.getElementById('wlColorPicker').value;
-  const bankName = document.getElementById('wlBankName').value.trim();
-  const bankHolder = document.getElementById('wlBankHolder').value.trim();
-  const bankCbu = document.getElementById('wlBankCbu').value.trim();
-  const bankTaxId = document.getElementById('wlBankTaxId').value.trim();
-  const billingPhone = document.getElementById('wlBillingPhone').value.trim();
+  const name = document.getElementById('wlBrandName')?.value.trim() || profile.name;
+  const color = document.getElementById('wlColorPicker')?.value || profile.brandColor;
+  const bankName = document.getElementById('wlBankName')?.value.trim() || '';
+  const bankHolder = document.getElementById('wlBankHolder')?.value.trim() || '';
+  const bankCbu = document.getElementById('wlBankCbu')?.value.trim() || '';
+  const bankTaxId = document.getElementById('wlBankTaxId')?.value.trim() || '';
+  const billingPhone = document.getElementById('wlBillingPhone')?.value.trim() || '';
+
+  const slugInput = document.getElementById('wlAgencySlug');
+  let slug = slugInput ? slugInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-') : (profile.slug || '');
+  if (slug.startsWith('-')) slug = slug.substring(1);
+  if (slug.endsWith('-')) slug = slug.substring(0, slug.length - 1);
+
+  const portalTitle = document.getElementById('wlPortalHeroTitle')?.value.trim() || null;
+  const portalSubtitle = document.getElementById('wlPortalHeroSubtitle')?.value.trim() || null;
+  const urgencyText = document.getElementById('wlPortalUrgencyText')?.value.trim() || null;
+  const ctaText = document.getElementById('wlPortalCtaText')?.value.trim() || null;
 
   profile.name = name;
+  profile.slug = slug;
   profile.brandColor = color;
   profile.bankName = bankName;
   profile.bankHolder = bankHolder;
   profile.bankCbu = bankCbu;
   profile.bankTaxId = bankTaxId;
   profile.billingPhone = billingPhone;
+  profile.portalTitle = portalTitle;
+  profile.portalSubtitle = portalSubtitle;
+  profile.portalConfig = {
+    ...(profile.portalConfig || {}),
+    urgencyText,
+    ctaText
+  };
 
   saveAgencyProfile(profile);
 
@@ -2534,14 +2758,20 @@ function saveWhiteLabelSettings() {
     })
   }).catch(e => console.error('Error guardando alertas de dueño:', e));
 
+  // Sync to Neon DB via /api/agency/portal-config
+  syncPortalConfigToDatabase();
+
   // Update DOM elements
-  document.getElementById('sidebarBrandName').innerText = name;
-  document.getElementById('topAgencyName').innerText = name;
+  const sbBrand = document.getElementById('sidebarBrandName');
+  if (sbBrand) sbBrand.innerText = name;
+  const topAgName = document.getElementById('topAgencyName');
+  if (topAgName) topAgName.innerText = name;
   const portalAgency = document.getElementById('portalAgencyName');
   if (portalAgency) portalAgency.innerText = name;
 
+  updateUniqueLinkDisplays();
   renderPortalPricing();
-  showToast('¡Ajustes de Marca Blanca, Pasarelas y Alertas guardados con éxito!', 'success');
+  showToast('¡Landing page y marca guardadas en vivo en tu enlace único!', 'success');
 }
 
 function openAgencyRealCheckout(planId = null) {

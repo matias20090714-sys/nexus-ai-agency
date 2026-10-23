@@ -282,10 +282,10 @@
               </div>
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('portalPricingContainer').scrollIntoView({behavior:'smooth'})">
+              <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pricingSectionAnchor').scrollIntoView({behavior:'smooth'})">
                 <i class="fa-solid fa-tags"></i> Ver Planes & Precios
               </button>
-              <button class="btn btn-emerald btn-sm" onclick="openAgencyRealCheckout('pro')">
+              <button class="btn btn-emerald btn-sm" id="publicHeaderCta" onclick="openPublicContactWhatsApp()">
                 <i class="fa-brands fa-whatsapp"></i> Hablar con un Asesor
               </button>
             </div>
@@ -295,9 +295,9 @@
           <div class="landing-page-container">
             
             <!-- Floating Live Demand Notification -->
-            <div class="landing-urgency-banner">
+            <div class="landing-urgency-banner" id="portalUrgencyBanner">
               <span class="status-dot-pulse" style="background: #ef4444;"></span>
-              <span>🔥 <strong>ALTA DEMANDA:</strong> 14 empresas activaron su agente esta semana. <strong>Solo quedan 2 cupos</strong> para onboarding prioritario este mes.</span>
+              <span id="portalUrgencyText">🔥 <strong>ALTA DEMANDA:</strong> 14 empresas activaron su agente esta semana. <strong>Solo quedan 2 cupos</strong> para onboarding prioritario este mes.</span>
             </div>
 
             <!-- Hero Section -->
@@ -309,13 +309,13 @@
                 Deja de Perder Ventas por Responder Tarde en WhatsApp.<br>
                 <span class="gradient-text-hero">Tu Negocio Atendiendo y Facturando 24/7 en Automático.</span>
               </h1>
-              <p class="landing-hero-subtitle">
+              <p class="landing-hero-subtitle" id="portalHeroSubtitle">
                 En <strong style="color: #34d399;" id="portalAgencyName">NEXUS AI Agency</strong> instalamos en tu número oficial de WhatsApp un Asistente Inteligente exclusivo que responde en <strong>2 segundos</strong>, cotiza servicios al instante, agenda citas en Google Calendar y califica compradores mientras duermes.
               </p>
               
               <div class="landing-cta-group">
-                <button class="btn btn-emerald landing-cta-btn-main" onclick="openAgencyRealCheckout('pro')">
-                  <i class="fa-solid fa-bolt"></i> Activar Mi Asistente en 48 Horas
+                <button class="btn btn-emerald landing-cta-btn-main" id="portalHeroCtaBtn" onclick="openAgencyRealCheckout()">
+                  <i class="fa-solid fa-bolt"></i> <span id="portalHeroCtaText">Activar Mi Asistente en 48 Horas</span>
                 </button>
                 <button class="btn btn-secondary landing-cta-btn-sec" onclick="document.getElementById('lossCalculatorAnchor').scrollIntoView({behavior:'smooth'})">
                   <i class="fa-solid fa-calculator" style="color: #f59e0b;"></i> Calcular Dinero Perdido
@@ -709,16 +709,32 @@
 
             <!-- Bottom Floating Call-to-Action Card -->
             <div class="landing-final-cta-card">
-              <h3 style="font-size: 26px; font-weight: 900; color: white; margin-bottom: 12px;">¿Listo para Automatizar tu Atención y Multiplicar tus Ventas?</h3>
-              <p style="font-size: 15px; color: #cbd5e1; max-width: 600px; margin: 0 auto 24px auto;">
+              <h3 style="font-size: 26px; font-weight: 900; color: white; margin-bottom: 12px;" id="portalFinalCtaTitle">¿Listo para Automatizar tu Atención y Multiplicar tus Ventas?</h3>
+              <p style="font-size: 15px; color: #cbd5e1; max-width: 600px; margin: 0 auto 24px auto;" id="portalFinalCtaSubtitle">
                 No dejes que más clientes se vayan a tu competencia por no recibir respuesta inmediata. Activa tu Asistente hoy mismo.
               </p>
-              <button class="btn btn-emerald landing-cta-btn-main" onclick="openAgencyRealCheckout('pro')">
-                <i class="fa-solid fa-rocket"></i> Activar Mi Asistente de IA en 48 Horas
+              <button class="btn btn-emerald landing-cta-btn-main" id="portalFinalCtaBtn" onclick="openAgencyRealCheckout()">
+                <i class="fa-solid fa-rocket"></i> <span id="portalFinalCtaText">Activar Mi Asistente de IA en 48 Horas</span>
               </button>
             </div>
 
           </div>
+
+          <!-- Public Brand Footer -->
+          <footer id="publicPortalFooter" class="public-portal-footer" style="display: none;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 32px; height: 32px; border-radius: 8px; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-size: 15px; color: white;">
+                  <i class="fa-solid fa-brain"></i>
+                </div>
+                <strong style="color: white; font-size: 15px;" id="publicFooterAgencyName">NEXUS AI</strong>
+                <span style="color: var(--text-muted); font-size: 12px;">• Sistema de Automatización Empresarial con IA</span>
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted);">
+                Atención 24/7 sin límites • WhatsApp Oficial Conectado
+              </div>
+            </div>
+          </footer>
         </div>
 
         <!-- ==================== TAB: REACTIVADOR DE BASE DE DATOS & SERVICIOS IRRESISTIBLES ==================== -->
@@ -2287,29 +2303,129 @@
           </div>
         </div>
 
-        <!-- ==================== TAB 8: PERSONALIZACIÓN MARCA BLANCA, PLANES & COBROS ==================== -->
+        <!-- ==================== TAB 8: PERSONALIZACIÓN MARCA BLANCA, LANDING & PLANES ==================== -->
         <div id="tab-whitelabel" class="tab-view">
           <div class="glass-panel">
             <div class="panel-header">
               <div>
                 <div class="panel-title">
                   <i class="fa-solid fa-gem" style="color: var(--accent-purple);"></i>
-                  <span>Marca Blanca, Gestor de Planes & Pasarelas de Cobro</span>
+                  <span>Personalización de Landing Page, Marca Blanca & Planes Comerciales</span>
                 </div>
                 <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-                  Define cuántos planes ofrecer (1 único plan o múltiples), sus precios, características y enlaces de cobro para que el dinero vaya directo a tu cuenta.
+                  Tu agencia tiene su propio enlace único público. Personaliza los textos, colores, tu WhatsApp de ventas y tus planes comerciales. Cualquier cambio se guarda de forma permanente y se refleja en vivo en tu enlace.
                 </div>
               </div>
             </div>
 
-            <!-- SECTION: DYNAMIC PLAN MANAGER -->
+            <!-- HERO CARD: TU ENLACE ÚNICO DE LANDING PAGE EN VIVO -->
+            <div class="wl-live-link-hero">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="status-dot-pulse" style="background: #10b981;"></span>
+                  <strong style="color: white; font-size: 16px;">Tu Enlace Único de Ventas en Vivo</strong>
+                  <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399; font-size: 11px;">ACTIVO 24/7</span>
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button class="btn btn-secondary btn-sm" onclick="copyMyAgencyPublicUrl()">
+                    <i class="fa-solid fa-copy"></i> Copiar Enlace
+                  </button>
+                  <button class="btn btn-secondary btn-sm" onclick="openMyAgencyPublicUrl()">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir Mi Landing en Vivo
+                  </button>
+                  <button class="btn btn-emerald btn-sm" onclick="shareMyAgencyWhatsApp()">
+                    <i class="fa-brands fa-whatsapp"></i> Compartir por WhatsApp
+                  </button>
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; align-items: center;">
+                <div>
+                  <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">
+                    🔗 Enlace Web Directo (Pruébalo o mándalo a empresas y clientes):
+                  </label>
+                  <div class="wl-link-url-display">
+                    <i class="fa-solid fa-globe" style="color: #38bdf8;"></i>
+                    <input type="text" id="myAgencyUniqueLinkInput" readonly value="">
+                    <button class="btn btn-primary btn-sm" onclick="copyMyAgencyPublicUrl()" style="padding: 6px 12px; font-size: 12px;">
+                      Copiar
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">
+                    ✏️ Personalizar Dirección / Slug de tu Landing:
+                  </label>
+                  <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; align-items: center; background: rgba(10, 13, 28, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0 10px; width: 100%;">
+                      <span style="font-size: 12px; color: var(--text-muted);">/p/</span>
+                      <input type="text" id="wlAgencySlug" class="form-control" style="border: none; background: transparent; padding: 8px; font-size: 13px; color: #38bdf8; font-weight: 700;" placeholder="mi-agencia-ia">
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="updateAgencySlugQuick()" style="white-space: nowrap;">
+                      <i class="fa-solid fa-check"></i> Aplicar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 1: PERSONALIZACIÓN EN VIVO DE LA LANDING (TEXTOS Y MENSAJES) -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
+              <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+                <i class="fa-solid fa-sliders" style="color: #a855f7;"></i> 1. Textos y Mensajes de Conversión en tu Landing
+              </strong>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: white;">
+                      Título Principal del Hero (Headline)
+                    </label>
+                    <textarea id="wlPortalHeroTitle" class="form-control" rows="3" placeholder="Deja de Perder Ventas por Responder Tarde en WhatsApp.&#10;Tu Negocio Atendiendo y Facturando 24/7 en Automático."></textarea>
+                    <span style="font-size: 11.5px; color: var(--text-muted);">Aparece en letras gigantes en la parte superior de tu landing.</span>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: white;">
+                      Subtítulo Explicativo / Propuesta de Valor
+                    </label>
+                    <textarea id="wlPortalHeroSubtitle" class="form-control" rows="3" placeholder="En nuestra agencia instalamos en tu número oficial de WhatsApp un Asistente Inteligente exclusivo que responde en 2 segundos, cotiza servicios al instante y agenda citas en Google Calendar."></textarea>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: white;">
+                      Texto del Banner de Demanda y Cupos (Urgencia)
+                    </label>
+                    <input type="text" id="wlPortalUrgencyText" class="form-control" placeholder="🔥 ALTA DEMANDA: 14 empresas activaron su agente esta semana. Solo quedan 2 cupos para onboarding prioritario este mes.">
+                    <span style="font-size: 11.5px; color: var(--text-muted);">Genera agudeza psicológica de escasez para acelerar decisiones de compra.</span>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-weight: 700; color: white;">
+                      Texto del Botón de Acción Principal (CTA)
+                    </label>
+                    <input type="text" id="wlPortalCtaText" class="form-control" placeholder="⚡ Activar Mi Asistente en 48 Horas">
+                    <span style="font-size: 11.5px; color: var(--text-muted);">Texto visible en los botones principales que dirigen al checkout / WhatsApp.</span>
+                  </div>
+
+                  <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 12px; font-size: 12px; color: #6ee7b7; margin-top: 14px;">
+                    <i class="fa-solid fa-circle-check"></i> Si dejas algún campo vacío, tu landing usará automáticamente los textos optimizados de alta conversión.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 2: DYNAMIC PLAN MANAGER -->
             <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
                 <div>
                   <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-tags" style="color: #38bdf8;"></i> Planes Comerciales en tu Landing Page
+                    <i class="fa-solid fa-tags" style="color: #38bdf8;"></i> 2. Planes Comerciales en tu Landing Page
                   </strong>
-                  <span style="font-size: 12.5px; color: var(--text-muted);">Puedes tener 1 solo plan principal o crear varios planes según tu modelo de negocio:</span>
+                  <span style="font-size: 12.5px; color: var(--text-muted);">Puedes tener 1 solo plan principal (se centrará como hero) o crear múltiples planes según tu modelo de negocio:</span>
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="openModalPlanEditor()">
                   <i class="fa-solid fa-plus"></i> Crear Nuevo Plan
@@ -2322,12 +2438,13 @@
               </div>
             </div>
 
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <!-- SECTION 3: IDENTIDAD DE MARCA & BANCOS -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
               
               <!-- Column 1: Configuración General de Marca -->
               <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px; display: flex; flex-direction: column;">
                 <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
-                  <i class="fa-solid fa-paintbrush" style="color: #818cf8;"></i> 1. Identidad de Marca de tu Agencia
+                  <i class="fa-solid fa-paintbrush" style="color: #818cf8;"></i> 3. Identidad de Marca & Contacto
                 </strong>
 
                 <div class="form-group">
@@ -2339,13 +2456,14 @@
                   <label class="form-label">Color de Acento Corporativo</label>
                   <div style="display: flex; align-items: center; gap: 12px;">
                     <input type="color" id="wlColorPicker" value="#6366f1" style="height: 40px; width: 60px; background: transparent; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); cursor: pointer;" onchange="updateBrandColor(this.value)">
-                    <span style="font-size: 12px; color: var(--text-muted);">Afecta botones y brillos en tu portal de ventas</span>
+                    <span style="font-size: 12px; color: var(--text-muted);">Afecta botones y brillos en tu landing de ventas</span>
                   </div>
                 </div>
 
                 <div class="form-group">
                   <label class="form-label">WhatsApp de Contacto Directo / Ventas</label>
                   <input type="text" id="wlBillingPhone" class="form-control" placeholder="Ej: 5491148923310 (con código de país sin +)">
+                  <span style="font-size: 11.5px; color: var(--text-muted);">A este número llegarán todos los clientes que toquen 'Hablar con un Asesor' o 'Contratar' en tu landing.</span>
                 </div>
 
                 <!-- Feature 5: Alertas Instantáneas de Leads al Dueño -->
@@ -2360,19 +2478,15 @@
                   </div>
                   <input type="text" id="wlOwnerAlertPhone" class="form-control" placeholder="Ej: 5491148923310 (tu WhatsApp personal)">
                   <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
-                    🔔 Cuando un lead en WhatsApp pregunte por comprar, cotizaciones o pida un asesor humano, recibirás un WhatsApp instantáneo para cerrar la venta.
+                    🔔 Recibirás un WhatsApp instantáneo cada vez que un lead pida cotización o hablar con un asesor.
                   </div>
                 </div>
-
-                <button class="btn btn-primary" style="width: 100%; margin-top: auto;" onclick="saveWhiteLabelSettings()">
-                  <i class="fa-solid fa-floppy-disk"></i> Guardar Ajustes de Marca & Alertas
-                </button>
               </div>
 
               <!-- Column 2: Transferencia Bancaria Directa & Cobros -->
               <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 22px; display: flex; flex-direction: column;">
                 <strong style="font-size: 15px; color: white; display: block; margin-bottom: 14px;">
-                  <i class="fa-solid fa-building-columns" style="color: #34d399;"></i> 2. Cuenta Bancaria para Recibir Transferencias
+                  <i class="fa-solid fa-building-columns" style="color: #34d399;"></i> 4. Cuenta Bancaria para Recibir Transferencias
                 </strong>
 
                 <div class="form-group">
@@ -2397,11 +2511,23 @@
 
                 <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; font-size: 12px; color: #a5b4fc; margin-top: auto;">
                   <i class="fa-solid fa-circle-check" style="color: #34d399;"></i>
-                  <span>Tus clientes verán estos datos bancarios exactos al elegir pago por transferencia.</span>
+                  <span>Tus clientes verán estos datos bancarios exactos al elegir pago por transferencia en el checkout.</span>
                 </div>
               </div>
 
             </div>
+
+            <!-- BIG GLOWING SAVE BUTTON -->
+            <div style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(16, 185, 129, 0.15) 100%); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+              <div>
+                <strong style="color: white; font-size: 15px; display: block;">¿Listo para guardar y publicar?</strong>
+                <span style="font-size: 12.5px; color: var(--text-muted);">Los cambios se guardan en la base de datos y quedan reflejados en vivo inmediatamente en tu enlace único.</span>
+              </div>
+              <button class="btn btn-primary" style="padding: 14px 28px; font-size: 15px; font-weight: 800; box-shadow: 0 4px 20px rgba(99,102,241,0.4);" onclick="saveWhiteLabelSettings()">
+                <i class="fa-solid fa-floppy-disk"></i> Guardar y Publicar en Vivo en Mi Link
+              </button>
+            </div>
+
           </div>
         </div>
 
@@ -2909,6 +3035,9 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('modalAuthAccount')">Cerrar</button>
       </div>
+    </div>
+  </div>
+
   <!-- Modal: Compartir Enlace Público de la Agencia -->
   <div class="modal-backdrop" id="shareAgencyPublicLinkModal">
     <div class="modal-content" style="max-width: 560px;">
@@ -2960,9 +3089,15 @@
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- Floating Live WhatsApp Contact Widget for Public Mode -->
+  <a id="publicFloatingWhatsAppBtn" href="#" target="_blank" class="public-floating-whatsapp" style="display: none;" title="Chatear por WhatsApp">
+    <i class="fa-brands fa-whatsapp"></i>
+    <span class="floating-tooltip">¿Dudas? Chatea con un asesor</span>
+  </a>
+
   <!-- Scripts -->
-  <script src="agents-data.js?v=2.4"></script>
-  <script src="marketing-studio.js?v=2.4"></script>
-  <script src="app.js?v=2.4"></script>
+  <script src="agents-data.js?v=2.5"></script>
+  <script src="marketing-studio.js?v=2.5"></script>
+  <script src="app.js?v=2.5"></script>
 </body>
 </html>
