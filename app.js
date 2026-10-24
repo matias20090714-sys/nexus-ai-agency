@@ -435,6 +435,7 @@ function switchTab(tabName) {
   const titles = {
     'dashboard': '<i class="fa-solid fa-chart-pie" style="color: var(--accent-indigo);"></i> Dashboard de tu Agencia de IA',
     'agency-portal': '<i class="fa-solid fa-globe" style="color: #34d399;"></i> Mi Web Comercial de Agencia',
+    'acquisition': '<i class="fa-solid fa-map-location-dot" style="color: #f59e0b;"></i> Cómo Conseguir Clientes (Google Maps & Cierre B2B)',
     'reactivation': '<i class="fa-solid fa-fire" style="color: #f59e0b;"></i> Reactivador de Clientes (Oferta Irresistible)',
     'clients': '<i class="fa-solid fa-users-gear" style="color: var(--accent-cyan);"></i> Empresas & Sub-Cuentas de Clientes',
     'agents-builder': '<i class="fa-solid fa-robot" style="color: var(--accent-indigo);"></i> Configuración del Agente & Base de Conocimiento',
@@ -2012,66 +2013,49 @@ function openContactDemoModal(plan = 'Sesión Estratégica') {
   openAgencyRealCheckout('pro');
 }
 
-function getPublicShareUrl(useSlug = true) {
-  const profile = getAgencyProfile();
-  const origin = window.location.origin;
-  if (useSlug && profile && profile.slug) {
-    return `${origin}/p/${encodeURIComponent(profile.slug)}`;
-  }
-  const id = (profile && profile.id) ? profile.id : currentAgencyId;
-  return `${origin}/portal?agency=${encodeURIComponent(id)}`;
-}
-
-function getUniversalShareUrl() {
+function getPublicShareUrl() {
   const profile = getAgencyProfile();
   const origin = window.location.origin;
   const slugOrId = (profile && profile.slug) ? profile.slug : ((profile && profile.id) ? profile.id : currentAgencyId);
   return `${origin}/?p=${encodeURIComponent(slugOrId)}`;
 }
 
+function getUniversalShareUrl() {
+  return getPublicShareUrl();
+}
+
 function updateUniqueLinkDisplays() {
   const linkInput = document.getElementById('myAgencyUniqueLinkInput');
   if (linkInput) {
-    linkInput.value = getPublicShareUrl(true);
-  }
-  const univInput = document.getElementById('myAgencyUniversalLinkInput');
-  if (univInput) {
-    univInput.value = getUniversalShareUrl();
+    linkInput.value = getPublicShareUrl();
   }
   const shareInput = document.getElementById('publicShareUrlInput');
   if (shareInput) {
-    shareInput.value = getPublicShareUrl(true);
-  }
-  const shareUnivInput = document.getElementById('publicShareUniversalUrlInput');
-  if (shareUnivInput) {
-    shareUnivInput.value = getUniversalShareUrl();
+    shareInput.value = getPublicShareUrl();
   }
 }
 
 function copyMyAgencyPublicUrl() {
-  const url = getPublicShareUrl(true);
+  const url = getPublicShareUrl();
   navigator.clipboard.writeText(url);
-  showToast('¡Enlace directo /p/ copiado al portapapeles!', 'success');
+  showToast('¡Enlace universal de tu landing copiado al portapapeles!', 'success');
 }
 
 function copyMyAgencyUniversalUrl() {
-  const url = getUniversalShareUrl();
-  navigator.clipboard.writeText(url);
-  showToast('¡Enlace universal anti-404 copiado al portapapeles!', 'success');
+  copyMyAgencyPublicUrl();
 }
 
 function openMyAgencyPublicUrl() {
-  const url = getPublicShareUrl(true);
+  const url = getPublicShareUrl();
   window.open(url, '_blank');
 }
 
 function openMyAgencyUniversalUrl() {
-  const url = getUniversalShareUrl();
-  window.open(url, '_blank');
+  openMyAgencyPublicUrl();
 }
 
 function shareMyAgencyWhatsApp() {
-  const url = getPublicShareUrl(true);
+  const url = getPublicShareUrl();
   const profile = getAgencyProfile();
   const agencyName = profile ? profile.name : 'NEXUS AI';
   const msg = encodeURIComponent(`¡Hola! Te comparto la página oficial de ${agencyName} donde puedes probar nuestra demo interactiva de Asistente de WhatsApp con IA y calcular el retorno para tu negocio:\n\n${url}`);
@@ -3525,5 +3509,119 @@ async function loadOwnerAlertSettings() {
   } catch (err) {
     // silent fallback
   }
+}
+
+// ==================== FEATURE 6: GOOGLE MAPS PROSPECTING & B2B SALES ACADEMY ====================
+
+function launchGoogleMapsSearch() {
+  const nicheSelect = document.getElementById('acqNicheSelect');
+  const cityInput = document.getElementById('acqCityInput');
+
+  const niche = nicheSelect ? nicheSelect.value : 'clinica dental';
+  const city = (cityInput && cityInput.value.trim()) ? cityInput.value.trim() : 'Buenos Aires';
+
+  const query = encodeURIComponent(`${niche} en ${city}`);
+  const mapsUrl = `https://www.google.com/maps/search/${query}`;
+
+  window.open(mapsUrl, '_blank');
+  showToast(`¡Búsqueda de "${niche}" en ${city} abierta en Google Maps!`, 'success');
+}
+
+function updateLossCalculator() {
+  const leadsInput = document.getElementById('calcLeadsInput');
+  const ticketInput = document.getElementById('calcTicketValue');
+  const rateSelect = document.getElementById('calcLossRateSelect');
+
+  const leads = parseInt(leadsInput ? leadsInput.value : 250) || 250;
+  const ticket = parseFloat(ticketInput ? ticketInput.value : 180) || 180;
+  const rate = parseFloat(rateSelect ? rateSelect.value : 0.30) || 0.30;
+
+  const lostCustomers = Math.round(leads * rate);
+  const monthlyLoss = lostCustomers * ticket;
+  const breakEven = Math.max(1, Math.ceil(290 / ticket));
+
+  const lossEl = document.getElementById('calcMonthlyLossDisplay');
+  const lostCustEl = document.getElementById('calcLostCustomersDisplay');
+  const breakEvenEl = document.getElementById('calcBreakEvenDisplay');
+
+  if (lossEl) lossEl.innerText = `-$${monthlyLoss.toLocaleString('en-US')} USD / mes`;
+  if (lostCustEl) lostCustEl.innerText = `${lostCustomers} clientes`;
+  if (breakEvenEl) breakEvenEl.innerText = `Solo ${breakEven} cliente${breakEven > 1 ? 's' : ''}`;
+}
+
+function copyLossPitchMessage() {
+  const bizNameInput = document.getElementById('calcBusinessName');
+  const leadsInput = document.getElementById('calcLeadsInput');
+  const ticketInput = document.getElementById('calcTicketValue');
+  const rateSelect = document.getElementById('calcLossRateSelect');
+
+  const name = (bizNameInput && bizNameInput.value.trim()) ? bizNameInput.value.trim() : 'su empresa';
+  const leads = parseInt(leadsInput ? leadsInput.value : 250) || 250;
+  const ticket = parseFloat(ticketInput ? ticketInput.value : 180) || 180;
+  const rate = parseFloat(rateSelect ? rateSelect.value : 0.30) || 0.30;
+
+  const lostCustomers = Math.round(leads * rate);
+  const monthlyLoss = lostCustomers * ticket;
+  const breakEven = Math.max(1, Math.ceil(290 / ticket));
+  const link = getPublicShareUrl();
+
+  const message = `Hola! Estuvimos haciendo un análisis del flujo comercial de ${name} en WhatsApp.\n\nCon un volumen estimado de ${leads} consultas al mes y un ticket promedio de $${ticket} USD, calculamos que al perder aproximadamente un ${Math.round(rate * 100)}% de prospectos por demoras en responder fuera de horario, están dejando sobre la mesa cerca de $${monthlyLoss.toLocaleString('en-US')} USD cada mes.\n\nCon nuestro Asistente Inteligente de $290 USD/mes, rescatando apenas ${breakEven} cliente${breakEven > 1 ? 's' : ''} en todo el mes la inversión ya tiene un retorno positivo del 100%.\n\nTe preparé una demostración interactiva en vivo para que lo pruebes desde tu celular aquí:\n${link}`;
+
+  navigator.clipboard.writeText(message);
+  showToast('¡Mensaje con análisis financiero copiado para WhatsApp!', 'success');
+}
+
+function copyAcquisitionScript(elementId) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+
+  let text = el.innerText || el.textContent;
+  const universalLink = getPublicShareUrl();
+
+  text = text.replace(/\[PEGA AQUÍ TU ENLACE UNIVERSAL\]/g, universalLink);
+  text = text.replace(/\[ENLACE\]/g, universalLink);
+
+  navigator.clipboard.writeText(text.trim());
+  showToast('¡Guión copiado al portapapeles con tu enlace universal!', 'success');
+}
+
+function toggleAcquisitionChecklist(day) {
+  let checklist = {};
+  try {
+    checklist = JSON.parse(localStorage.getItem('nexus_acq_checklist') || '{}');
+  } catch (e) {
+    checklist = {};
+  }
+
+  const chk = document.getElementById(`acqCheckDay${day}`);
+  if (chk) {
+    checklist[`day_${day}`] = chk.checked;
+  }
+  localStorage.setItem('nexus_acq_checklist', JSON.stringify(checklist));
+}
+
+function loadAcquisitionChecklist() {
+  let checklist = {};
+  try {
+    checklist = JSON.parse(localStorage.getItem('nexus_acq_checklist') || '{}');
+  } catch (e) {
+    checklist = {};
+  }
+
+  for (let i = 1; i <= 7; i++) {
+    const chk = document.getElementById(`acqCheckDay${i}`);
+    if (chk && checklist[`day_${i}`] !== undefined) {
+      chk.checked = !!checklist[`day_${i}`];
+    }
+  }
+
+  updateLossCalculator();
+}
+
+// Auto-load checklist on startup
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(loadAcquisitionChecklist, 300);
+  });
 }
 

@@ -92,6 +92,11 @@
         </a>
 
         <div class="nav-section-title">Herramientas de Cierre & Venta</div>
+        <a class="nav-item" data-tab="acquisition" onclick="switchTab('acquisition')">
+          <span class="nav-icon"><i class="fa-solid fa-map-location-dot" style="color: #f59e0b;"></i></span>
+          <span>Cómo Conseguir Clientes (Google Maps)</span>
+          <span class="nav-badge" style="background: rgba(245,158,11,0.25); color: #fbbf24; font-weight: 800;">Método 0 a 100</span>
+        </a>
         <a class="nav-item" data-tab="playbook" onclick="switchTab('playbook')">
           <span class="nav-icon"><i class="fa-solid fa-graduation-cap"></i></span>
           <span>Manual de Ventas & Cierre B2B</span>
@@ -1909,6 +1914,514 @@
           </div>
         </div>
 
+        <!-- ==================== TAB: CÓMO CONSEGUIR CLIENTES CON GOOGLE MAPS & CIERRE B2B ==================== -->
+        <div id="tab-acquisition" class="tab-view">
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">
+                  <i class="fa-solid fa-map-location-dot" style="color: #f59e0b;"></i>
+                  <span>Academia de Adquisición B2B: Cómo Conseguir Empresas con Google Maps & Cerrar Ventas</span>
+                </div>
+                <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+                  El método probado paso a paso para personas con 0 experiencia en ventas: encuentra negocios que pierden clientes hoy mismo, contáctalos sin ser invasivo y cierra contratos de $290 a $690 USD/mes.
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <span class="brand-badge" style="background: rgba(245,158,11,0.2); color: #fbbf24; font-weight: 800;">
+                  <i class="fa-solid fa-graduation-cap"></i> De 0 a Clientes
+                </span>
+                <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">
+                  100% Práctico
+                </span>
+              </div>
+            </div>
+
+            <!-- Top Banner: La Regla de Oro del Negocio B2B -->
+            <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-lg); padding: 22px 28px; margin-bottom: 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
+              <div style="max-width: 750px;">
+                <div style="font-size: 11.5px; text-transform: uppercase; font-weight: 800; color: #fbbf24; letter-spacing: 1px;">
+                  💡 EL PRINCIPIO FUNDAMENTAL QUE DEBES ENTENDER
+                </div>
+                <div style="font-size: 20px; font-weight: 900; color: white; margin-top: 4px; line-height: 1.35;">
+                  Las empresas NO compran "Inteligencia Artificial". Compran <span style="color: #34d399;">DEJAR DE PERDER VENTAS</span> en WhatsApp.
+                </div>
+                <div style="font-size: 13px; color: #cbd5e1; margin-top: 6px; line-height: 1.5;">
+                  El 78% de las personas que escriben a un negocio por WhatsApp le compran <strong>al primero que les responda</strong>. Si una clínica, inmobiliaria o concesionaria tarda 20 minutos en contestar, ese cliente ya le compró a la competencia. Tu agencia les vende <strong>responder en 2 segundos 24/7</strong>.
+                </div>
+              </div>
+              <button class="btn btn-emerald" onclick="switchTab('whitelabel')" style="white-space: nowrap;">
+                <i class="fa-solid fa-sliders"></i> Ver Mi Landing Lista
+              </button>
+            </div>
+
+            <!-- 4-Stage Visual Funnel Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px;">
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                  <span style="width: 28px; height: 28px; border-radius: 50%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: white;">1</span>
+                  <strong style="font-size: 14px; color: white;">Buscar en Maps</strong>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); line-height: 1.45;">
+                  Abres Google Maps y buscas negocios con alto ticket promedio en tu zona que tengan botón de WhatsApp.
+                </p>
+              </div>
+
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                  <span style="width: 28px; height: 28px; border-radius: 50%; background: #f59e0b; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: white;">2</span>
+                  <strong style="font-size: 14px; color: white;">La Auditoría 20:30h</strong>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); line-height: 1.45;">
+                  Les mandas una pregunta simple fuera de horario comercial. Si nadie responde, confirmas que están perdiendo dinero.
+                </p>
+              </div>
+
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                  <span style="width: 28px; height: 28px; border-radius: 50%; background: #8b5cf6; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: white;">3</span>
+                  <strong style="font-size: 14px; color: white;">Enviar Guión & Demo</strong>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); line-height: 1.45;">
+                  Les mandas el mensaje "Caballo de Troya" y tu Enlace Universal para que jueguen con el Asistente en su celular.
+                </p>
+              </div>
+
+              <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                  <span style="width: 28px; height: 28px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: white;">4</span>
+                  <strong style="font-size: 14px; color: white;">Cerrar en 15 Minutos</strong>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); line-height: 1.45;">
+                  Haces las 3 preguntas clave por WhatsApp o llamada, muestras el ROI y cobras tu mensualidad de $290 a $690/mes.
+                </p>
+              </div>
+            </div>
+
+            <!-- MÓDULO 1: EL BUSCADOR ASISTIDO DE GOOGLE MAPS -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-compass" style="color: #38bdf8;"></i> Módulo 1: Buscador Asistido de Negocios en Google Maps
+                </strong>
+                <span class="brand-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8;">Herramienta Interactiva</span>
+              </div>
+              <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 18px;">
+                Selecciona uno de los nichos con mayor ticket y escribe tu ciudad o provincia. Haz clic en <strong>"Abrir Búsqueda en Google Maps"</strong> y tendrás de inmediato una lista con decenas de empresas locales listas para contactar con su número de WhatsApp visible.
+              </p>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                <div>
+                  <label class="form-label" style="font-weight: 700; color: white; font-size: 12px;">1. Rubro o Nicho con Alto Dolor:</label>
+                  <select id="acqNicheSelect" class="form-control">
+                    <option value="clinica dental">🦷 Clínicas Dentales / Odontología (Ticket Alto: $300 - $3,000)</option>
+                    <option value="clinica estetica">💉 Clínicas Estéticas / Dermatología (Mucho volumen de consultas)</option>
+                    <option value="inmobiliaria">🏢 Inmobiliarias / Bienes Raíces (Ticket Gigante)</option>
+                    <option value="concesionaria de autos">🚗 Concesionarias / Venta de Autos Usados</option>
+                    <option value="taller mecanico">🔧 Talleres Mecánicos Especializados</option>
+                    <option value="salon de fiestas eventos">🏰 Salones de Fiestas / Bodas & Eventos</option>
+                    <option value="estudio juridico abogados">⚖️ Abogados / Estudios Jurídicos</option>
+                    <option value="veterinaria 24 horas">🐾 Veterinarias & Clínicas de Mascotas 24h</option>
+                    <option value="instalacion aire acondicionado">❄️ Climatización / Urgencias de Hogar</option>
+                    <option value="barberia premium">✂️ Salones de Belleza & Barberías Premium</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="form-label" style="font-weight: 700; color: white; font-size: 12px;">2. Tu Ciudad o Zona:</label>
+                  <input type="text" id="acqCityInput" class="form-control" placeholder="Ej: Buenos Aires, Madrid, Córdoba, Santiago..." value="Buenos Aires">
+                </div>
+
+                <div style="display: flex; align-items: flex-end;">
+                  <button class="btn btn-primary" onclick="launchGoogleMapsSearch()" style="width: 100%; height: 42px; justify-content: center; font-weight: 700;">
+                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Abrir Búsqueda en Google Maps
+                  </button>
+                </div>
+              </div>
+
+              <!-- Los 3 Filtros de Oro -->
+              <div style="margin-top: 18px; background: rgba(10, 13, 28, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                <div style="font-size: 13px; font-weight: 800; color: #fbbf24; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                  <i class="fa-solid fa-filter"></i> LOS 3 FILTROS DE ORO AL MIRAR LOS RESULTADOS EN GOOGLE MAPS:
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+                  <div>
+                    <strong style="color: white; display: block; margin-bottom: 3px;">✅ Filtro 1: +15 Reseñas</strong>
+                    El negocio está activo, tiene flujo constante de personas y dinero en caja para invertir $290/mes sin problemas.
+                  </div>
+                  <div>
+                    <strong style="color: white; display: block; margin-bottom: 3px;">✅ Filtro 2: WhatsApp o Sitio Web</strong>
+                    En su ficha de Maps o en su web tienen botón de WhatsApp. Esto confirma que dependen de WhatsApp para vender.
+                  </div>
+                  <div>
+                    <strong style="color: white; display: block; margin-bottom: 3px;">✅ Filtro 3: "La Prueba Nocturna"</strong>
+                    Escríbeles un mensaje a las 20:30h. Si tardan horas o sale un mensaje automático frío, ¡están perdiendo clientes hoy mismo!
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MÓDULO 2: GUIONES EXACTOS DE PRIMER CONTACTO (COPIA Y PEGA) -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
+              <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i> Módulo 2: Guiones Exactos para Hablarles por WhatsApp (Sin Vender en Frío)
+              </strong>
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+                A ningún dueño le gusta que le vendan, pero a todos les quita el sueño saber si están perdiendo dinero. Usa estos guiones diseñados psicológicamente para despertar curiosidad y hacer que el dueño te pida ver la demostración.
+              </p>
+
+              <div style="display: flex; flex-direction: column; gap: 18px;">
+                
+                <!-- Guión 1: Auditoría Sorpresa -->
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <strong style="font-size: 14.5px; color: #38bdf8;">
+                        🥇 Guión 1: "La Auditoría Sorpresa de 2 Minutos" (Tasa de Respuesta > 42%)
+                      </strong>
+                      <div style="font-size: 11.5px; color: var(--text-dim); margin-top: 2px;">
+                        Úsalo después de comprobar que tardaron en responderte o que tienen mensaje genérico fuera de horario.
+                      </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="copyAcquisitionScript('acqScript1Text')">
+                      <i class="fa-regular fa-copy"></i> Copiar Guión
+                    </button>
+                  </div>
+                  <div id="acqScript1Text" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: var(--radius-sm); padding: 16px; font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+Hola [Nombre del Dueño/Encargado], ¿cómo estás? 👋<br><br>
+Te escribo rápido porque ayer estuve viendo el perfil de [Nombre de la Empresa] en Google Maps y quise hacer una consulta por WhatsApp fuera del horario comercial.<br><br>
+Noté que al igual que en la mayoría de negocios del rubro, no tienen una forma de responder precios ni agendar citas en automático cuando ustedes o su equipo no están disponibles.<br><br>
+Hicimos un cálculo rápido y calculamos que un negocio de su nivel pierde entre 15 y 30 consultas mensuales frente a competidores que sí responden al instante.<br><br>
+Les armé un simulador interactivo exclusivo con inteligencia artificial que responde a sus clientes en 2 segundos y agenda turnos en el calendario 24/7.<br><br>
+¿Te gustaría que te comparta el enlace para que lo pruebes desde tu propio celular sin ningún compromiso?
+                  </div>
+                </div>
+
+                <!-- Guión 2: El Enlace con la Demo Personalizada -->
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <strong style="font-size: 14.5px; color: #34d399;">
+                        🎯 Guión 2: Qué Responder Cuando Te Dicen "¿De qué se trata?" o "A ver, muéstrame"
+                      </strong>
+                      <div style="font-size: 11.5px; color: var(--text-dim); margin-top: 2px;">
+                        Aquí es donde envías tu Enlace Universal Anti-404 para que jueguen con el simulador interactivo.
+                      </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="copyAcquisitionScript('acqScript2Text')">
+                      <i class="fa-regular fa-copy"></i> Copiar Guión
+                    </button>
+                  </div>
+                  <div id="acqScript2Text" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(52, 211, 153, 0.3); border-radius: var(--radius-sm); padding: 16px; font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+¡Excelente [Nombre]! Te preparé una demostración interactiva en vivo.<br><br>
+Entra a este enlace desde tu celular: <strong style="color: #38bdf8;">[PEGA AQUÍ TU ENLACE UNIVERSAL]</strong><br><br>
+En esa página verás el <strong>Simulador en Vivo</strong>. Escríbele preguntas reales como si fueras un paciente o cliente tuyo a las 11 de la noche (por ejemplo: "¿cuánto cuesta una consulta?", "¿qué horarios tienen?", "quiero agendar un turno").<br><br>
+Fíjate cómo te responde en 2 segundos exactos, califica tu interés y te agenda en el calendario.<br><br>
+Pruébalo 2 minutos y me dices qué te parece.
+                  </div>
+                </div>
+
+                <!-- Guión 3: Nota de Voz de 20 Segundos -->
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <strong style="font-size: 14.5px; color: #fbbf24;">
+                        🎙️ Guión 3: El Audio de WhatsApp de 20 Segundos (Genera 3X más Confianza)
+                      </strong>
+                      <div style="font-size: 11.5px; color: var(--text-dim); margin-top: 2px;">
+                        Si el negocio tiene un teléfono directo, mandar una nota de voz con este tono relajado genera una respuesta casi inmediata.
+                      </div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="copyAcquisitionScript('acqScript3Text')">
+                      <i class="fa-regular fa-copy"></i> Copiar Guión
+                    </button>
+                  </div>
+                  <div id="acqScript3Text" style="background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: var(--radius-sm); padding: 16px; font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+<em>(Tono relajado y profesional, sin hablar como locutor comercial)</em><br><br>
+"Hola [Nombre], ¿cómo estás? Te mandaba este audio rápido porque vi que en [Nombre de Empresa] tienen muchísimas consultas en Google y WhatsApp, y me fijé que fuera del horario no tienen nadie atendiendo. Les armamos un asistente con inteligencia artificial que responde precios y agenda turnos en 2 segundos en el WhatsApp de ustedes. Te dejé el enlace aquí arriba para que lo pruebes en 1 minuto en tu teléfono. Si te gusta cómo responde, avísame y vemos cómo instalarlo esta semana. ¡Un saludo!"
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- MÓDULO 3: CALCULADORA DE PÉRDIDAS FINANCIERAS EN VIVO -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+                <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">
+                  <i class="fa-solid fa-calculator" style="color: #a855f7;"></i> Módulo 3: Calculadora de Pérdidas por Respuesta Tardía (Demuéstrales con Números)
+                </strong>
+                <span class="brand-badge" style="background: rgba(168, 85, 247, 0.2); color: #a855f7;">Arma de Cierre Inmediato</span>
+              </div>
+              <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+                Cuando un dueño de negocio ve con números exactos cuánto dinero está perdiendo cada mes por no responder de inmediato, el precio de tu agencia ($290 USD/mes) se convierte en una inversión insignificante. Usa esta calculadora en vivo para enviarle una propuesta financiera irresistible:
+              </p>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <!-- Inputs de la Empresa -->
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 20px;">
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px; color: white; font-weight: 700;">Nombre de la Empresa Prospecto:</label>
+                    <input type="text" id="calcBusinessName" class="form-control" value="Clínica Dental San Lucas" oninput="updateLossCalculator()">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px; color: white; font-weight: 700;">
+                      Consultas estimadas que reciben al mes por WhatsApp:
+                    </label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                      <input type="range" id="calcLeadsRange" min="50" max="1500" step="25" value="250" class="form-control" style="padding: 0;" oninput="document.getElementById('calcLeadsInput').value = this.value; updateLossCalculator();">
+                      <input type="number" id="calcLeadsInput" class="form-control" style="width: 100px; text-align: center; font-weight: 700; color: #38bdf8;" value="250" oninput="document.getElementById('calcLeadsRange').value = this.value; updateLossCalculator();">
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px; color: white; font-weight: 700;">
+                      Valor promedio de una venta / servicio ($ USD):
+                    </label>
+                    <input type="number" id="calcTicketValue" class="form-control" style="font-weight: 700; color: #34d399;" value="180" oninput="updateLossCalculator()">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px; color: white; font-weight: 700;">
+                      % de personas que se van por no responder en 2 seg (Promedio industria: 25% - 40%):
+                    </label>
+                    <select id="calcLossRateSelect" class="form-control" onchange="updateLossCalculator()">
+                      <option value="0.20">20% (Pérdida moderada)</option>
+                      <option value="0.30" selected>30% (Pérdida promedio del mercado)</option>
+                      <option value="0.45">45% (Pérdida alta - Sin atención nocturna ni fines de semana)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Panel de Resultados Financieros -->
+                <div style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(52, 211, 153, 0.4); border-radius: var(--radius-md); padding: 22px; display: flex; flex-direction: column; justify-content: space-between;">
+                  <div>
+                    <div style="font-size: 12px; text-transform: uppercase; font-weight: 800; color: #f43f5e; letter-spacing: 0.5px;">
+                      ⚠️ IMPACTO FINANCIERO ESTIMADO PARA EL NEGOCIO
+                    </div>
+                    <div style="font-size: 32px; font-weight: 900; color: #f43f5e; margin-top: 6px;" id="calcMonthlyLossDisplay">
+                      -$13,500 USD / mes
+                    </div>
+                    <div style="font-size: 12.5px; color: #94a3b8; margin-top: 2px;">
+                      Dinero que la empresa deja sobre la mesa cada mes por demoras en WhatsApp.
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
+                      <div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Clientes Perdidos / Mes:</div>
+                        <div style="font-size: 18px; font-weight: 800; color: white;" id="calcLostCustomersDisplay">75 clientes</div>
+                      </div>
+                      <div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Para pagar tu plan ($290/mes):</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #34d399;" id="calcBreakEvenDisplay">Solo 2 clientes</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="margin-top: 20px;">
+                    <button class="btn btn-emerald" style="width: 100%; justify-content: center; font-weight: 700; padding: 12px;" onclick="copyLossPitchMessage()">
+                      <i class="fa-solid fa-copy"></i> Copiar Mensaje con este Cálculo para WhatsApp
+                    </button>
+                    <span style="font-size: 11px; color: var(--text-dim); text-align: center; display: block; margin-top: 6px;">
+                      Genera un texto listo para enviar por WhatsApp personalizado con estos números exactos.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MÓDULO 4: LAS 3 PREGUNTAS DE CIERRE (CÓMO CONVENCERLOS EN 15 MINUTOS) -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
+              <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <i class="fa-solid fa-handshake" style="color: #34d399;"></i> Módulo 4: Las 3 Preguntas de Cierre (Cómo Convencerlos sin Parecer Vendedor)
+              </strong>
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+                Cuando tengas una llamada de 15 minutos o una conversación por WhatsApp con el dueño, no te pongas a explicar tecnología. Hazle estas 3 preguntas en este orden exacto:
+              </p>
+
+              <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <strong style="color: #38bdf8; font-size: 13.5px;">1. Pregunta de Volumen:</strong>
+                  <p style="color: white; font-size: 14px; margin-top: 4px; font-weight: 600;">
+                    <em>"¿Cuántos mensajes de personas interesadas reciben al día o a la semana en su WhatsApp aproximadamente?"</em>
+                  </p>
+                  <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">
+                    👉 El cliente te dirá: <em>"Recibimos unos 15 a 20 mensajes al día"</em>. Con esto el cliente acaba de admitir que tiene demanda alta.
+                  </span>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <strong style="color: #f59e0b; font-size: 13.5px;">2. Pregunta de Dolor y Pérdida:</strong>
+                  <p style="color: white; font-size: 14px; margin-top: 4px; font-weight: 600;">
+                    <em>"Cuando tú o tu equipo están ocupados atendiendo a alguien, o si escriben después de las 20h o en fin de semana... ¿cuánto tiempo pasa hasta que alguien les responde?"</em>
+                  </p>
+                  <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">
+                    👉 El cliente dirá: <em>"Y... a veces tardamos 1 o 2 horas, o hasta el día siguiente"</em>. En su mente ya sintió la fuga de dinero.
+                  </span>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <strong style="color: #34d399; font-size: 13.5px;">3. La Pregunta del Cierre Matemático:</strong>
+                  <p style="color: white; font-size: 14px; margin-top: 4px; font-weight: 600;">
+                    <em>"Si logramos que el 100% de esas personas reciban respuesta en 2 segundos, y que rescates apenas 2 o 3 clientes al mes que antes se iban con otro... ¿cuánto dinero extra representa eso para tu negocio?"</em>
+                  </p>
+                  <span style="font-size: 12px; color: var(--text-muted); display: block; margin-top: 4px;">
+                    👉 El cliente hará la cuenta: <em>"Y... son como 800 o 1,500 dólares más al mes"</em>.
+                  </span>
+                </div>
+
+                <!-- La Frase Final de Cierre -->
+                <div style="background: linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(6,78,59,0.3) 100%); border: 1px solid rgba(52, 211, 153, 0.4); border-radius: var(--radius-md); padding: 18px;">
+                  <strong style="color: #34d399; font-size: 14px; display: block; margin-bottom: 6px;">
+                    🏁 LA FRASE EXACTA PARA CERRAR EL CONTRATO:
+                  </strong>
+                  <p style="color: white; font-size: 13.5px; line-height: 1.5; font-weight: 600;">
+                    "Perfecto. Nuestro servicio cuesta solo <strong>$290 USD al mes</strong>. Con un solo cliente que el Asistente te cierre en todo el mes, ya recuperaste la inversión completa. Te lo dejamos listo y funcionando en tu propio número en 48 horas. Si en los primeros 7 días no ves cómo atiende en 2 segundos a tus clientes, no nos pagas nada. ¿Lo dejamos configurado para esta misma semana?"
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- MÓDULO 5: MANEJO DE LAS 5 OBJECIONES MÁS FRECUENTES -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px; margin-bottom: 24px;">
+              <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+                <i class="fa-solid fa-shield-halved" style="color: #f59e0b;"></i> Módulo 5: Respuestas Maestras a las 5 Objeciones de los Dueños
+              </strong>
+
+              <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <div style="font-weight: 800; color: #fbbf24; font-size: 13.5px; margin-bottom: 6px;">
+                    ❓ Objeción 1: "Ya tengo una secretaria o recepcionista que contesta WhatsApp."
+                  </div>
+                  <p style="font-size: 13px; color: #e2e8f0; line-height: 1.5;">
+                    👉 <strong>Respuesta:</strong> <em>"Totalmente entendible [Nombre]. El Asistente no viene a reemplazar a tu secretaria, sino a potenciarla. Tu secretaria atiende a los clientes que están físicamente en tu local y no puede estar 24 horas pegada al teléfono. El Asistente le quita el 80% de preguntas repetitivas ('dónde quedan', 'qué precios tienen', 'qué horarios atienden') y atiende las noches y domingos. Tu secretaria solo se encarga de cerrar los clientes calificados."</em>
+                  </p>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <div style="font-weight: 800; color: #fbbf24; font-size: 13.5px; margin-bottom: 6px;">
+                    ❓ Objeción 2: "¿Y si la Inteligencia Artificial se equivoca o dice cosas que no corresponden?"
+                  </div>
+                  <p style="font-size: 13px; color: #e2e8f0; line-height: 1.5;">
+                    👉 <strong>Respuesta:</strong> <em>"Excelente pregunta. El Asistente no inventa respuestas libres: está entrenado con una base de conocimiento cerrada exclusivamente con tus servicios, precios, formas de pago y políticas de tu negocio. Si un cliente le pregunta algo muy específico que no está en la base de datos, el Asistente le dice: 'Déjame consultarlo con el especialista y te derivamos de inmediato', y te pasa la conversación a ti."</em>
+                  </p>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <div style="font-weight: 800; color: #fbbf24; font-size: 13.5px; margin-bottom: 6px;">
+                    ❓ Objeción 3: "¿Tengo que cambiar mi número de WhatsApp o comprar otro chip?"
+                  </div>
+                  <p style="font-size: 13px; color: #e2e8f0; line-height: 1.5;">
+                    👉 <strong>Respuesta:</strong> <em>"Para nada. Se instala directamente sobre tu número de WhatsApp actual. Lo vinculamos en 30 segundos escaneando un código QR oficial de WhatsApp Multi-Dispositivo, exactamente igual que cuando abres WhatsApp Web en tu computadora. Sigues usando tu celular normalmente."</em>
+                  </p>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <div style="font-weight: 800; color: #fbbf24; font-size: 13.5px; margin-bottom: 6px;">
+                    ❓ Objeción 4: "Está un poco caro para mí en este momento ($290 USD/mes)."
+                  </div>
+                  <p style="font-size: 13px; color: #e2e8f0; line-height: 1.5;">
+                    👉 <strong>Respuesta:</strong> <em>"Te entiendo perfectamente. Pero compáralo con un empleado: un empleado de atención te costaría más de $600 USD al mes, pide vacaciones, se enferma y solo atiende 8 horas al día. El Asistente cuesta menos de $10 USD al día y atiende los 30 días del mes las 24 horas sin descanso. Con solo 1 cliente que rescates al mes, ya te generó ganancia neta."</em>
+                  </p>
+                </div>
+
+                <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                  <div style="font-weight: 800; color: #fbbf24; font-size: 13.5px; margin-bottom: 6px;">
+                    ❓ Objeción 5: "Déjame pensarlo y cualquier cosa te aviso."
+                  </div>
+                  <p style="font-size: 13px; color: #e2e8f0; line-height: 1.5;">
+                    👉 <strong>Respuesta:</strong> <em>"Totalmente comprensible [Nombre]. Solo ten en cuenta que para asegurar la calidad y el entrenamiento de los agentes solo tomamos 2 implementaciones por semana en tu zona para no saturar. Si dejamos tu lugar reservado hoy con un anticipo bonificado, te dejamos la instalación técnica 100% bonificada."</em>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <!-- MÓDULO 6: PLAN DE ACCIÓN DE 7 DÍAS (CHECKLIST INTERACTIVO) -->
+            <div style="background: rgba(15, 20, 42, 0.9); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); padding: 24px;">
+              <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <i class="fa-solid fa-list-check" style="color: #34d399;"></i> Módulo 6: Plan de Acción de 7 Días para Cerrar tu Primer Cliente
+              </strong>
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 18px;">
+                Sigue esta hoja de ruta día a día. Puedes ir marcando cada tarea realizada y tu progreso quedará guardado automáticamente en tu navegador.
+              </p>
+
+              <div style="display: flex; flex-direction: column; gap: 10px;" id="acqChecklistContainer">
+                <label style="display: flex; align-items: center; gap: 12px; background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer;">
+                  <input type="checkbox" id="acqCheckDay1" onchange="toggleAcquisitionChecklist(1)" style="width: 18px; height: 18px; accent-color: #34d399;">
+                  <div>
+                    <strong style="color: white; font-size: 13px;">Día 1: Configurar tu Marca y Enlace Universal</strong>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      Ve a la pestaña <em>"Personalización Marca Blanca"</em>, pon tu nombre de agencia, tu logo o color y copia tu <strong>Enlace Universal Anti-404</strong>.
+                    </div>
+                  </div>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 12px; background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer;">
+                  <input type="checkbox" id="acqCheckDay2" onchange="toggleAcquisitionChecklist(2)" style="width: 18px; height: 18px; accent-color: #34d399;">
+                  <div>
+                    <strong style="color: white; font-size: 13px;">Día 2: Extraer 30 Empresas en Google Maps</strong>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      Usa el Buscador de Google Maps de arriba, elige un nicho (ej: odontología o estética) y guarda el teléfono de WhatsApp de 30 negocios que tengan más de 15 reseñas.
+                    </div>
+                  </div>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 12px; background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer;">
+                  <input type="checkbox" id="acqCheckDay3" onchange="toggleAcquisitionChecklist(3)" style="width: 18px; height: 18px; accent-color: #34d399;">
+                  <div>
+                    <strong style="color: white; font-size: 13px;">Día 3: Auditoría y Primeros 15 Mensajes</strong>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      Envía una consulta a las 20:30h a los primeros 15 negocios. A los que no respondan, envíales el <strong>Guión 1: La Auditoría Sorpresa</strong> al día siguiente a las 10:30 de la mañana.
+                    </div>
+                  </div>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 12px; background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer;">
+                  <input type="checkbox" id="acqCheckDay4" onchange="toggleAcquisitionChecklist(4)" style="width: 18px; height: 18px; accent-color: #34d399;">
+                  <div>
+                    <strong style="color: white; font-size: 13px;">Día 4: Enviar los siguientes 15 Mensajes</strong>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      Repite el proceso con los 15 negocios restantes de tu lista.
+                    </div>
+                  </div>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 12px; background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer;">
+                  <input type="checkbox" id="acqCheckDay5" onchange="toggleAcquisitionChecklist(5)" style="width: 18px; height: 18px; accent-color: #34d399;">
+                  <div>
+                    <strong style="color: white; font-size: 13px;">Día 5: Enviar el Enlace con la Demo Interactiva</strong>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      A todos los dueños que hayan respondido pidiendo información, envíales el <strong>Guión 2</strong> con tu Enlace Universal para que jueguen con el simulador.
+                    </div>
+                  </div>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 12px; background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer;">
+                  <input type="checkbox" id="acqCheckDay6" onchange="toggleAcquisitionChecklist(6)" style="width: 18px; height: 18px; accent-color: #34d399;">
+                  <div>
+                    <strong style="color: white; font-size: 13px;">Día 6: Llamada o Chat con las 3 Preguntas de Cierre</strong>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      Hazle las 3 preguntas clave para que ellos mismos reconozcan el dinero que pierden y ofréceles la garantía de 7 días.
+                    </div>
+                  </div>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 12px; background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; cursor: pointer;">
+                  <input type="checkbox" id="acqCheckDay7" onchange="toggleAcquisitionChecklist(7)" style="width: 18px; height: 18px; accent-color: #34d399;">
+                  <div>
+                    <strong style="color: white; font-size: 13px;">Día 7: Cobro y Conexión de WhatsApp</strong>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                      Cobra el primer mes por transferencia o pasarela, ve a <em>"APIs & WhatsApp Gateway"</em> y haz que el cliente escanee su código QR. ¡Primer cliente cerrado!
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
         <!-- ==================== TAB: PROSPECCIÓN B2B, DEMOS & CONTRATOS ==================== -->
         <div id="tab-prospecting" class="tab-view">
           <div class="glass-panel">
@@ -2341,36 +2854,28 @@
 
               <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 16px; align-items: flex-start;">
                 <div>
-                  <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">
-                    🔗 Enlace Web Directo (Limpio):
+                  <label style="font-size: 12px; color: #34d399; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; font-weight: 700;">
+                    <i class="fa-solid fa-globe"></i> Enlace Universal de tu Landing Page (Anti-404 Garantizado):
                   </label>
-                  <div class="wl-link-url-display" style="margin-bottom: 8px;">
-                    <i class="fa-solid fa-globe" style="color: #38bdf8;"></i>
-                    <input type="text" id="myAgencyUniqueLinkInput" readonly value="">
-                    <button class="btn btn-primary btn-sm" onclick="copyMyAgencyPublicUrl()" style="padding: 6px 12px; font-size: 12px;">
-                      Copiar
-                    </button>
-                  </div>
-
-                  <label style="font-size: 11px; color: #34d399; margin-bottom: 4px; display: flex; align-items: center; gap: 5px;">
-                    <i class="fa-solid fa-shield-halved"></i> Enlace Universal Anti-404 (Abre 100% en cualquier servidor Render/CDN):
-                  </label>
-                  <div class="wl-link-url-display" style="border-color: rgba(52, 211, 153, 0.4); background: rgba(6, 78, 59, 0.2);">
+                  <div class="wl-link-url-display" style="border-color: rgba(52, 211, 153, 0.4); background: rgba(6, 78, 59, 0.25);">
                     <i class="fa-solid fa-link" style="color: #34d399;"></i>
-                    <input type="text" id="myAgencyUniversalLinkInput" readonly value="" style="color: #34d399;">
-                    <button class="btn btn-emerald btn-sm" onclick="copyMyAgencyUniversalUrl()" style="padding: 6px 12px; font-size: 12px;">
-                      Copiar
+                    <input type="text" id="myAgencyUniqueLinkInput" readonly value="" style="color: #34d399; font-weight: 700;">
+                    <button class="btn btn-emerald btn-sm" onclick="copyMyAgencyPublicUrl()" style="padding: 6px 14px; font-size: 12px; white-space: nowrap;">
+                      <i class="fa-solid fa-copy"></i> Copiar
                     </button>
                   </div>
+                  <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 6px;">
+                    🛡️ Este enlace universal abre al 100% en Render, Vercel o cualquier servidor sin dar jamás error de página inexistente.
+                  </span>
                 </div>
 
                 <div>
                   <label style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px; display: block;">
-                    ✏️ Personalizar Dirección / Slug de tu Landing:
+                    ✏️ Personalizar Identificador / Slug de tu Landing:
                   </label>
                   <div style="display: flex; gap: 8px;">
                     <div style="display: flex; align-items: center; background: rgba(10, 13, 28, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0 10px; width: 100%;">
-                      <span style="font-size: 12px; color: var(--text-muted);">/p/</span>
+                      <span style="font-size: 12px; color: var(--text-muted);">?p=</span>
                       <input type="text" id="wlAgencySlug" class="form-control" style="border: none; background: transparent; padding: 8px; font-size: 13px; color: #38bdf8; font-weight: 700;" placeholder="mi-agencia-ia">
                     </div>
                     <button class="btn btn-secondary btn-sm" onclick="updateAgencySlugQuick()" style="white-space: nowrap;">
@@ -2378,7 +2883,7 @@
                     </button>
                   </div>
                   <span style="font-size: 11px; color: var(--text-dim); display: block; margin-top: 6px;">
-                    Al cambiar tu slug, ambos enlaces se actualizan automáticamente en tiempo real.
+                    Al cambiar tu slug, tu enlace se actualiza automáticamente en tiempo real.
                   </span>
                 </div>
               </div>
@@ -3072,23 +3577,18 @@
         </p>
         
         <div class="form-group">
-          <label class="form-label" style="font-weight: 700; color: white;">Enlace Directo (/p/slug):</label>
-          <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-            <input type="text" id="publicShareUrlInput" class="form-control" readonly style="font-weight: 600; color: #38bdf8; background: rgba(15,23,42,0.9); font-size: 13px;" value="">
-            <button class="btn btn-primary btn-sm" onclick="copyPublicShareUrl()" style="white-space: nowrap;">
-              <i class="fa-solid fa-copy"></i> Copiar
-            </button>
-          </div>
-
-          <label class="form-label" style="font-weight: 700; color: #34d399; font-size: 12px; display: flex; align-items: center; gap: 5px;">
-            <i class="fa-solid fa-shield-halved"></i> Enlace Universal Anti-404 (Abre 100% seguro en cualquier servidor):
+          <label class="form-label" style="font-weight: 700; color: #34d399; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-globe"></i> Enlace Universal de tu Landing Page:
           </label>
           <div style="display: flex; gap: 8px;">
-            <input type="text" id="publicShareUniversalUrlInput" class="form-control" readonly style="font-weight: 600; color: #34d399; background: rgba(6,78,59,0.3); border: 1px solid rgba(52,211,153,0.4); font-size: 13px;" value="">
-            <button class="btn btn-emerald btn-sm" onclick="copyMyAgencyUniversalUrl()" style="white-space: nowrap;">
+            <input type="text" id="publicShareUrlInput" class="form-control" readonly style="font-weight: 700; color: #34d399; background: rgba(6,78,59,0.3); border: 1px solid rgba(52,211,153,0.4); font-size: 13.5px;" value="">
+            <button class="btn btn-emerald btn-sm" onclick="copyPublicShareUrl()" style="white-space: nowrap;">
               <i class="fa-solid fa-copy"></i> Copiar
             </button>
           </div>
+          <span style="font-size: 11.5px; color: var(--text-muted); display: block; margin-top: 6px;">
+            🛡️ Enlace universal optimizado para WhatsApp y Redes Sociales. Abre instantáneamente en cualquier celular o PC sin errores 404.
+          </span>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px;">
