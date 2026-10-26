@@ -2910,34 +2910,108 @@ function sendCheckoutWhatsApp() {
   window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
 }
 
+async function loadAiConfigStatus() {
+  try {
+    const res = await fetch('/api/config/ai');
+    if (!res.ok) return;
+    const data = await res.json();
+    const keyInput = document.getElementById('apiAiKey');
+    const modelSelect = document.getElementById('apiAiModel');
+    const badgeEl = document.getElementById('aiEngineBadge');
+    const feedbackEl = document.getElementById('aiTestFeedback');
+
+    if (modelSelect && data.activeModel) {
+      modelSelect.value = data.activeModel;
+    }
+    if (keyInput && data.hasKey) {
+      keyInput.placeholder = `Clave activa (${data.maskedKey || data.provider})`;
+    }
+    if (badgeEl) {
+      if (data.hasKey) {
+        badgeEl.style.background = 'rgba(52, 211, 153, 0.2)';
+        badgeEl.style.color = '#34d399';
+        badgeEl.style.border = '1px solid rgba(52, 211, 153, 0.4)';
+        badgeEl.innerHTML = `<i class="fa-solid fa-bolt"></i> IA Generativa Activa (${data.activeModel || data.provider})`;
+      } else {
+        badgeEl.style.background = 'rgba(99, 102, 241, 0.2)';
+        badgeEl.style.color = '#818cf8';
+        badgeEl.style.border = '1px solid rgba(99, 102, 241, 0.4)';
+        badgeEl.innerHTML = `<i class="fa-solid fa-comment-dots"></i> Motor Conversacional Activo`;
+      }
+    }
+    if (feedbackEl && data.hasKey) {
+      feedbackEl.innerHTML = `<span style="color:#34d399;"><i class="fa-solid fa-circle-check"></i> Motor IA Activo con <strong>${data.provider} (${data.activeModel})</strong>.</span>`;
+    }
+  } catch (e) {
+    // Offline or serverless fallback
+  }
+}
+
 async function saveAndTestAiApi() {
   const keyInput = document.getElementById('apiAiKey');
   const modelSelect = document.getElementById('apiAiModel');
   const apiKey = keyInput ? keyInput.value.trim() : '';
-  const model = modelSelect ? modelSelect.value : 'gemini-2.5-flash';
+  const model = modelSelect ? modelSelect.value : 'gemini-1.5-flash';
+  const feedbackEl = document.getElementById('aiTestFeedback');
+  const badgeEl = document.getElementById('aiEngineBadge');
 
-  showToast('🔄 Verificando y activando clave de IA con el servidor...', 'info');
+  showToast('🔄 Verificando y conectando clave de IA con el servidor...', 'info');
+  if (feedbackEl) {
+    feedbackEl.innerHTML = '<span style="color:#818cf8;"><i class="fa-solid fa-spinner fa-spin"></i> Verificando conexión en vivo con la IA...</span>';
+  }
 
   try {
     const res = await fetch('/api/config/ai', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey, model })
+      body: JSON.stringify({ 
+        apiKey, 
+        model, 
+        agencyId: window.currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1' 
+      })
     });
     const data = await res.json();
     if (data.success) {
       if (data.isLiveAi) {
-        showToast(`⚡ ¡IA Generativa Activa (${data.activeModel})! Probada con éxito: "${data.sampleReply.slice(0, 45)}..."`, 'success');
+        showToast(`⚡ ¡IA Generativa Activa (${data.activeModel})! Respuestas 100% humanas activadas.`, 'success');
+        if (badgeEl) {
+          badgeEl.style.background = 'rgba(52, 211, 153, 0.2)';
+          badgeEl.style.color = '#34d399';
+          badgeEl.style.border = '1px solid rgba(52, 211, 153, 0.4)';
+          badgeEl.innerHTML = `<i class="fa-solid fa-bolt"></i> IA Generativa Activa (${data.activeModel})`;
+        }
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<span style="color:#34d399;"><i class="fa-solid fa-circle-check"></i> <strong>¡Conectado!</strong> Muestra en vivo: <em>"${(data.sampleReply || '').slice(0, 75)}..."</em></span>`;
+        }
+        if (keyInput && apiKey) {
+          keyInput.value = '';
+          keyInput.placeholder = `Clave guardada (${apiKey.slice(0, 4)}...${apiKey.slice(-4)})`;
+        }
       } else if (data.hasKey) {
         showToast(`Clave guardada para modelo ${data.activeModel}.`, 'success');
       } else {
-        showToast('Clave removida. Usando motor contextual de alta conversión.', 'info');
+        showToast('Clave removida. Usando motor conversacional inteligente de alta conversión.', 'info');
+        if (badgeEl) {
+          badgeEl.style.background = 'rgba(99, 102, 241, 0.2)';
+          badgeEl.style.color = '#818cf8';
+          badgeEl.style.border = '1px solid rgba(99, 102, 241, 0.4)';
+          badgeEl.innerHTML = `<i class="fa-solid fa-comment-dots"></i> Motor Conversacional Activo`;
+        }
+        if (feedbackEl) {
+          feedbackEl.innerHTML = `<span style="color:#818cf8;"><i class="fa-solid fa-circle-info"></i> Motor conversacional predeterminado activo (agradecimientos, saludos, precios, turnos y asesor).</span>`;
+        }
       }
     } else {
       showToast(data.error || 'Error al guardar la clave de IA', 'error');
+      if (feedbackEl) {
+        feedbackEl.innerHTML = `<span style="color:#f43f5e;"><i class="fa-solid fa-triangle-exclamation"></i> ${data.error || 'Error al validar clave'}</span>`;
+      }
     }
   } catch (e) {
     showToast('Error de conexión con el servidor', 'error');
+    if (feedbackEl) {
+      feedbackEl.innerHTML = `<span style="color:#f43f5e;"><i class="fa-solid fa-triangle-exclamation"></i> Error al conectar con el servidor</span>`;
+    }
   }
 }
 
@@ -3777,10 +3851,12 @@ function loadAcquisitionChecklist() {
   updateLossCalculator();
 }
 
-// Auto-load checklist on startup
+// Auto-load checklist and AI config status on startup
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
     setTimeout(loadAcquisitionChecklist, 300);
+    setTimeout(loadAiConfigStatus, 500);
   });
 }
+
 

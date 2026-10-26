@@ -223,8 +223,31 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
 }
 
 // AI Auto-Responder Engine (Supports Google Gemini & OpenAI)
+const AI_CONFIG_FILE = path.join(__dirname, 'ai_config.json');
 let customAiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
-let activeAiModel = process.env.AI_MODEL || 'gemini-2.5-flash';
+let activeAiModel = process.env.AI_MODEL || 'gemini-1.5-flash';
+
+function loadAiConfig() {
+  try {
+    if (fs.existsSync(AI_CONFIG_FILE)) {
+      const data = JSON.parse(fs.readFileSync(AI_CONFIG_FILE, 'utf8'));
+      if (data.apiKey) customAiKey = data.apiKey;
+      if (data.model) activeAiModel = data.model;
+      console.log(`[AI Engine] Configuración cargada: modelo ${activeAiModel}, proveedor: ${customAiKey.startsWith('sk-') ? 'OpenAI' : 'Google Gemini'}`);
+    }
+  } catch (e) {
+    console.error('Error cargando ai_config.json:', e.message);
+  }
+}
+loadAiConfig();
+
+function saveAiConfig(apiKey, model) {
+  try {
+    fs.writeFileSync(AI_CONFIG_FILE, JSON.stringify({ apiKey, model, updatedAt: new Date().toISOString() }, null, 2));
+  } catch (e) {
+    console.error('Error guardando ai_config.json:', e.message);
+  }
+}
 
 async function generateAiAgentResponse(userText, senderPhone, agencyId = 'agency_master_1') {
   const text = (userText || '').toLowerCase().trim();
@@ -239,9 +262,18 @@ async function generateAiAgentResponse(userText, senderPhone, agencyId = 'agency
   // 1. Call Real Generative LLM if API Key is configured
   if (customAiKey) {
     try {
-      const prompt = `Eres un asistente de inteligencia artificial profesional para una empresa. Responde de forma amable, vendedora, concisa (máximo 2 a 3 párrafos cortos) y en español neutro al siguiente mensaje de WhatsApp de un cliente (+${senderPhone}):\n${ragInstruction}\nMensaje del cliente: "${userText}"\n\nRespuesta:`;
+      const prompt = `Eres el asistente virtual con Inteligencia Artificial oficial de atención y ventas por WhatsApp para la empresa.
+Tu personalidad es cálida, cercana, altamente profesional y orientada a resolver dudas y concretar ventas.
+Responde de forma concisa (máximo 2 a 3 párrafos cortos, ideales para WhatsApp en el celular), usando emojis amables y en español neutro.
+Si el usuario te saluda, dale una bienvenida cordial.
+Si el usuario te agradece (ej: "gracias", "muchas gracias"), responde con amabilidad y disposición a ayudar.
+Si el usuario se despide, deséale un excelente día.
+${ragInstruction}
+Mensaje del cliente (+${senderPhone}): "${userText}"
+
+Respuesta para el cliente:`;
       
-      // OpenAI API Support
+      // OpenAI API Support (keys starting with sk-)
       if (customAiKey.startsWith('sk-')) {
         const oaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -252,31 +284,43 @@ async function generateAiAgentResponse(userText, senderPhone, agencyId = 'agency
           body: JSON.stringify({
             model: activeAiModel.includes('gpt') ? activeAiModel : 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: `Eres un asistente de ventas y atención al cliente con IA por WhatsApp. Responde siempre en español, con emojis amables y de manera concisa y vendedora.${ragInstruction}` },
+              { role: 'system', content: `Eres el asistente virtual con IA oficial por WhatsApp. Responde siempre en español, con calidez, usando emojis profesionales, de manera concisa y vendedora.${ragInstruction}` },
               { role: 'user', content: userText }
             ],
             temperature: 0.7,
-            max_tokens: 350
+            max_tokens: 450
           })
         });
         if (oaiRes.ok) {
           const oaiData = await oaiRes.json();
           const reply = oaiData.choices?.[0]?.message?.content;
           if (reply) return reply.trim();
+        } else {
+          const errData = await oaiRes.text();
+          console.error('[OpenAI API Error]', oaiRes.status, errData);
         }
       } else {
-        // Google Gemini API Support
-        const geminiModel = activeAiModel.includes('gemini') ? activeAiModel : 'gemini-2.5-flash';
+        // Google Gemini API Support (default model gemini-1.5-flash or gemini-2.0-flash)
+        const geminiModel = activeAiModel.includes('gemini') ? activeAiModel : 'gemini-1.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${customAiKey}`;
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 450
+            }
+          })
         });
         if (response.ok) {
           const json = await response.json();
           const candidate = json?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (candidate) return candidate.trim();
+        } else {
+          const errData = await response.text();
+          console.error('[Gemini API Error]', response.status, errData);
         }
       }
     } catch (err) {
@@ -289,28 +333,68 @@ async function generateAiAgentResponse(userText, senderPhone, agencyId = 'agency
     return `¡Hola! Aquí tienes la información oficial de nuestros servicios:\n\n${docContext.slice(0, 450)}...\n\n¿Te gustaría coordinar una cotización personalizada o agendar una cita con nuestro equipo?`;
   }
 
-  // High-converting smart contextual heuristics fallback
-  if (text.includes('hola') || text.includes('buenos') || text.includes('buenas') || text.includes('info') || text.includes('saludos')) {
+  // Agradecimientos (gracias, muchas gracias, etc.)
+  if (text.includes('gracia') || text.includes('graciela') || text.includes('agradecid') || text.includes('te agradezco') || text.includes('muy amable') || text === 'grx' || text === 'thx') {
+    return `¡De nada! 😊 Ha sido un placer ayudarte. Si tienes cualquier otra pregunta sobre nuestros servicios, o si deseas agendar una llamada con nuestro equipo, aquí estoy a tu disposición. ¡Que tengas un excelente día!`;
+  }
+
+  // Despedidas (chau, adiós, nos vemos, etc.)
+  if (text.includes('chau') || text.includes('adios') || text.includes('adiós') || text.includes('hasta luego') || text.includes('nos vemos') || text.includes('bye') || text.includes('hasta pronto') || text.includes('buenas noches') || text.includes('buen finde')) {
+    return `¡Hasta luego! 👋 Que tengas un excelente día. Si en algún momento deseas retomar la consulta, ver planes o coordinar una demo en vivo, solo escríbenos por aquí. ¡Estamos a tu disposición 24/7!`;
+  }
+
+  // Confirmaciones y asentimientos (ok, dale, perfecto, genial, listo)
+  if (text === 'ok' || text === 'dale' || text === 'perfecto' || text === 'genial' || text === 'buenisimo' || text === 'buenísimo' || text === 'excelente' || text === 'listo' || text === 'de una' || text === 'bien' || text.startsWith('ok ') || text.includes('entendido') || text.includes('comprendo')) {
+    return `¡Excelente! 👍 ¿Te gustaría que te preparemos una propuesta personalizada para tu empresa o prefieres coordinar una breve llamada de 15 minutos para ver una demo?`;
+  }
+
+  // Conversación casual e identidad (cómo estás, quién eres, qué haces)
+  if (text.includes('como estas') || text.includes('cómo estás') || text.includes('que tal') || text.includes('qué tal') || text.includes('todo bien') || text.includes('quien eres') || text.includes('quién eres') || text.includes('quien sos') || text.includes('quién sos') || text.includes('que haces') || text.includes('qué haces') || text.includes('como funciona') || text.includes('cómo funciona')) {
+    return `¡Todo excelente por aquí! 🚀 Soy el asistente con Inteligencia Artificial de la empresa, disponible 24/7 para responder tus consultas al instante, darte precios y coordinar reuniones. ¿En qué podemos colaborar con tu negocio hoy?`;
+  }
+
+  // Ubicación y oficinas (dónde están, dirección, etc.)
+  if (text.includes('donde estan') || text.includes('dónde están') || text.includes('donde quedan') || text.includes('dónde quedan') || text.includes('direccion') || text.includes('dirección') || text.includes('ubicacion') || text.includes('ubicación') || text.includes('de donde son') || text.includes('de dónde son')) {
+    return `📍 Atendemos a clientes de forma 100% remota y digital en toda la región, y también podemos coordinar reuniones virtuales por Google Meet o Zoom. ¿De qué ciudad o país nos escribes?`;
+  }
+
+  // Horarios de atención
+  if (text.includes('horario') || text.includes('a que hora') || text.includes('a qué hora') || text.includes('atienden hoy') || text.includes('estan abiertos') || text.includes('están abiertos')) {
+    return `🕒 Nuestro canal de WhatsApp con Inteligencia Artificial te atiende las 24 horas del día, los 7 días de la semana. Nuestro equipo humano está disponible de lunes a viernes para llamadas estratégicas y demos personalizadas.`;
+  }
+
+  // Saludos iniciales
+  if (text.includes('hola') || text.includes('buenos') || text.includes('buenas') || text.includes('info') || text.includes('saludos') || text === 'buen dia' || text === 'buen día') {
     return `¡Hola! 👋 Gracias por comunicarte con nuestro equipo. Soy el Asistente Virtual con IA 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar catálogo, servicios y precios\n2️⃣ Agendar una cita o demo estratégica\n3️⃣ Solicitar una cotización personalizada\n4️⃣ Hablar con un especialista humano`;
   }
 
-  if (text.includes('precio') || text.includes('costo') || text.includes('cuanto') || text.includes('plan') || text.includes('tarifa') || text.includes('1')) {
-    return `💵 ¡Excelente! Contamos con planes llave en mano para impulsar tu negocio:\n\n⭐ *Plan Starter:* Agente de WhatsApp 24/7 entrenado a medida.\n🚀 *Plan Growth Pro:* Agente + Agendamiento automático en Google Calendar + Generador de Cotizaciones + CRM.\n\n¿Te gustaría que te preparemos una propuesta personalizada para tu rubro?`;
+  // Servicios y catálogo
+  if (text.includes('servicio') || text.includes('catalogo') || text.includes('catálogo') || text.includes('ofrecen') || text.includes('solucion') || text.includes('solución') || text.includes('producto')) {
+    return `⭐ Brindamos soluciones llave en mano de Inteligencia Artificial para empresas:\n\n• 🤖 Agentes de IA en WhatsApp para atención y ventas 24/7\n• 📅 Agendamiento automático sincronizado con Google Calendar\n• 📄 Generador de Cotizaciones instantáneas con link de pago\n• 📊 CRM y embudos para captura y seguimiento de prospectos\n\n¿Te gustaría ver cómo funcionaría para tu rubro en una breve demo?`;
   }
 
-  if (text.includes('turno') || text.includes('cita') || text.includes('reunion') || text.includes('demo') || text.includes('agendar') || text.includes('2')) {
+  // Precios y planes
+  if (text.includes('precio') || text.includes('costo') || text.includes('cuanto') || text.includes('cuánto') || text.includes('plan') || text.includes('tarifa') || text === '1') {
+    return `💵 ¡Excelente! Contamos con planes adaptados a cada etapa de tu negocio:\n\n⭐ *Plan Starter:* Agente de WhatsApp 24/7 entrenado a medida de tu catálogo.\n🚀 *Plan Growth Pro:* Agente + Agendamiento en Google Calendar + Generador de Cotizaciones + CRM.\n👑 *Plan Enterprise:* Solución corporativa con múltiples agentes e integraciones avanzadas.\n\n¿Te gustaría que te preparemos una propuesta personalizada para tu empresa?`;
+  }
+
+  // Turnos y reuniones
+  if (text.includes('turno') || text.includes('cita') || text.includes('reunion') || text.includes('reunión') || text.includes('demo') || text.includes('agendar') || text.includes('llamada') || text === '2') {
     return `📅 ¡Con gusto! Para coordinar una demo o sesión estratégica de 15 minutos, indícanos qué día y horario te queda más cómodo (o déjanos tu correo) y nuestro sistema lo reservará en tu calendario.`;
   }
 
-  if (text.includes('cotiza') || text.includes('presupuesto') || text.includes('propuesta') || text.includes('3')) {
-    return `📄 ¡Por supuesto! Podemos generarte una cotización oficial con desglose de ítems y link de pago online. ¿Cuál es el nombre de tu empresa y qué solución necesitas implementar?`;
+  // Cotizaciones y presupuestos
+  if (text.includes('cotiza') || text.includes('presupuesto') || text.includes('propuesta') || text === '3') {
+    return `📄 ¡Por supuesto! Podemos generarte una cotización oficial con desglose de ítems y link de pago online. ¿Cuál es el nombre de tu empresa o negocio y qué solución necesitas implementar?`;
   }
 
-  if (text.includes('humano') || text.includes('asesor') || text.includes('persona') || text.includes('4')) {
+  // Asesor humano
+  if (text.includes('humano') || text.includes('asesor') || text.includes('persona') || text.includes('operador') || text === '4') {
     return `👤 Entendido. He notificado a uno de nuestros especialistas del equipo para que revise tu consulta y te responda a la brevedad por este mismo chat. ¡Muchas gracias por tu paciencia!`;
   }
 
-  return `¡Muchas gracias por tu mensaje! 🤖 He recibido tu consulta:\n\n"${userText}"\n\nUn asesor de nuestro equipo se pondrá en contacto contigo a la brevedad. Si deseas conocer nuestros servicios o precios, solo escribe *PRECIOS*.`;
+  // Fallback conversacional cálido (no repite mensajes en comillas)
+  return `¡Hola! 👋 He recibido tu mensaje. Como asistente virtual con Inteligencia Artificial de la empresa, estoy para ayudarte 24/7.\n\n¿Te gustaría conocer nuestros servicios y planes, agendar una breve demo de 15 minutos, o prefieres hablar directamente con un asesor humano?`;
 }
 
 // Meta Cloud API Fallback
@@ -609,16 +693,33 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { apiKey, model } = JSON.parse(body || '{}');
-        if (apiKey) customAiKey = apiKey.trim();
+        const { apiKey, model, agencyId } = JSON.parse(body || '{}');
+        if (apiKey !== undefined) customAiKey = apiKey.trim();
         if (model) activeAiModel = model.trim();
+
+        // Save to local file so it persists across server restarts
+        saveAiConfig(customAiKey, activeAiModel);
+
+        // Also save to Neon PostgreSQL if agencyId is provided
+        if (agencyId) {
+          try {
+            await db.query(
+              `UPDATE agencies 
+               SET portal_config = jsonb_set(COALESCE(portal_config, '{}'::jsonb), '{ai_key}', to_jsonb($1::text))
+               WHERE id = $2`,
+              [customAiKey, agencyId]
+            );
+          } catch (dbErr) {
+            console.error('[DB Note] No se pudo guardar ai_key en tabla agencies:', dbErr.message);
+          }
+        }
 
         // Test the AI key with a quick prompt
         let testSuccess = false;
         let testResponse = '';
         if (customAiKey) {
           try {
-            const reply = await generateAiAgentResponse('Hola, ¿qué servicios ofrecen?', '5491112345678', 'agency_master_1');
+            const reply = await generateAiAgentResponse('Hola, ¿qué servicios ofrecen?', '5491112345678', agencyId || 'agency_master_1');
             if (reply) {
               testSuccess = true;
               testResponse = reply;
@@ -634,7 +735,7 @@ const server = http.createServer(async (req, res) => {
           activeModel: activeAiModel,
           hasKey: !!customAiKey,
           isLiveAi: !!customAiKey && testSuccess,
-          sampleReply: testResponse.slice(0, 150)
+          sampleReply: (testResponse || 'Conexión verificada exitosamente').slice(0, 160)
         }));
       } catch (err) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -649,7 +750,8 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({
       hasKey: !!customAiKey,
       activeModel: activeAiModel,
-      provider: customAiKey.startsWith('sk-') ? 'OpenAI' : 'Google Gemini'
+      provider: customAiKey.startsWith('sk-') ? 'OpenAI' : 'Google Gemini',
+      maskedKey: customAiKey ? (customAiKey.slice(0, 4) + '...' + customAiKey.slice(-4)) : ''
     }));
     return;
   }
