@@ -35,8 +35,18 @@ function saveAgenciesRegistry(reg) {
   localStorage.setItem('nexus_all_agencies_registry', JSON.stringify(reg));
 }
 
-// Current Active Agency ID
-let currentAgencyId = localStorage.getItem('nexus_current_agency_id') || 'agency_master_1';
+// Current Active Agency ID (Isolated per User Session)
+let currentAgencyId = localStorage.getItem('nexus_current_agency_id');
+if (!currentAgencyId) {
+  const savedUser = localStorage.getItem('nexus_user_session');
+  if (savedUser) {
+    try {
+      const u = JSON.parse(savedUser);
+      if (u && u.agency_id) currentAgencyId = u.agency_id;
+    } catch (e) {}
+  }
+}
+if (!currentAgencyId) currentAgencyId = 'agency_master_1';
 
 // Isolated Data Getters for the Active Agency
 function getAgencyClients() {
@@ -2957,6 +2967,7 @@ function showToast(message, type = 'info') {
 }
 
 // ==================== NEON POSTGRESQL AUTH & ACCOUNTS ====================
+// ==================== NEON POSTGRESQL AUTH & MULTI-USER TENANCY ====================
 let currentUserSession = null;
 
 function openAuthModal() {
@@ -2965,6 +2976,11 @@ function openAuthModal() {
     modal.classList.add('active');
     checkNeonDatabaseStatus();
   }
+}
+
+function openAuthModalWithTab(mode = 'login') {
+  switchAuthTab(mode);
+  openAuthModal();
 }
 
 function switchAuthTab(mode) {
@@ -2984,6 +3000,62 @@ function switchAuthTab(mode) {
     if (boxRegister) boxRegister.style.display = 'block';
     if (boxLogin) boxLogin.style.display = 'none';
   }
+}
+
+// Hydrate and bind an authenticated user's dedicated agency workspace
+async function hydrateUserAgencyWorkspace(agencyId, user = null) {
+  if (!agencyId) return;
+  currentAgencyId = agencyId;
+  localStorage.setItem('nexus_current_agency_id', agencyId);
+
+  // Ensure registry has this agency profile entry
+  let reg = getAgenciesRegistry();
+  let existing = reg.find(a => a.id === agencyId);
+  const preferredName = (user && user.agency_name) ? user.agency_name : (existing ? existing.name : `${user?.name || 'Mi'} Agency`);
+  const preferredOwner = user?.name || (existing ? existing.owner : 'Administrador');
+
+  if (!existing) {
+    existing = {
+      id: agencyId,
+      name: preferredName,
+      owner: preferredOwner,
+      email: user?.email || '',
+      currency: 'USD',
+      brandColor: user?.brand_color || '#6366f1',
+      createdAt: new Date().toISOString()
+    };
+    reg.push(existing);
+    saveAgenciesRegistry(reg);
+  }
+
+  try {
+    const res = await fetch(`/api/agency/public-portal?id=${encodeURIComponent(agencyId)}`);
+    const data = await res.json();
+    if (data && data.success && data.agency) {
+      const ag = data.agency;
+      existing.name = ag.name || existing.name;
+      existing.slug = ag.slug || existing.slug;
+      existing.brandColor = ag.brandColor || existing.brandColor;
+      existing.billingPhone = ag.billingPhone || existing.billingPhone;
+      existing.bankName = ag.bankName || existing.bankName;
+      existing.bankHolder = ag.bankHolder || existing.bankHolder;
+      existing.bankCbu = ag.bankCbu || existing.bankCbu;
+      existing.bankTaxId = ag.bankTaxId || existing.bankTaxId;
+      existing.portalTitle = ag.portalTitle !== undefined ? ag.portalTitle : existing.portalTitle;
+      existing.portalSubtitle = ag.portalSubtitle !== undefined ? ag.portalSubtitle : existing.portalSubtitle;
+      existing.portalConfig = ag.portalConfig || existing.portalConfig || {};
+      if (Array.isArray(data.plans) && data.plans.length > 0) {
+        existing.plans = data.plans;
+        saveAgencyPlans(data.plans);
+      }
+      saveAgencyProfile(existing);
+    }
+  } catch (err) {
+    console.warn('Nota: sincronizando workspace localmente:', err);
+  }
+
+  loadAgencyWorkspace(agencyId);
+  updateUniqueLinkDisplays();
 }
 
 async function submitRegisterAccount() {
@@ -3013,9 +3085,19 @@ async function submitRegisterAccount() {
 
     currentUserSession = data.user;
     localStorage.setItem('nexus_user_session', JSON.stringify(data.user));
-    showToast(`¡Cuenta creada con éxito en Neon DB! Bienvenido, ${name}`, 'success');
+
+    if (data.user && data.user.agency_id) {
+      await hydrateUserAgencyWorkspace(data.user.agency_id, data.user);
+    }
+
+    showToast(`¡Cuenta y Agencia creadas con éxito! Bienvenido, ${name}`, 'success');
     updateUserSessionUI();
     closeModal('modalAuthAccount');
+
+    // If was on public portal, offer to view agency
+    if (document.body.classList.contains('public-portal-mode')) {
+      exitPublicPortalMode();
+    }
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
   } finally {
@@ -3048,9 +3130,18 @@ async function submitLoginAccount() {
 
     currentUserSession = data.user;
     localStorage.setItem('nexus_user_session', JSON.stringify(data.user));
+
+    if (data.user && data.user.agency_id) {
+      await hydrateUserAgencyWorkspace(data.user.agency_id, data.user);
+    }
+
     showToast(`¡Sesión iniciada correctamente!`, 'success');
     updateUserSessionUI();
     closeModal('modalAuthAccount');
+
+    if (document.body.classList.contains('public-portal-mode')) {
+      exitPublicPortalMode();
+    }
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
   } finally {
@@ -3058,18 +3149,86 @@ async function submitLoginAccount() {
   }
 }
 
+function logoutUserSession() {
+  localStorage.removeItem('nexus_user_session');
+  currentUserSession = null;
+  currentAgencyId = 'agency_master_1';
+  localStorage.setItem('nexus_current_agency_id', 'agency_master_1');
+  loadAgencyWorkspace('agency_master_1');
+  updateUserSessionUI();
+  showToast('Has cerrado sesión correctamente', 'info');
+}
+
+function exitPublicPortalMode() {
+  document.body.classList.remove('public-portal-mode');
+  const sidebar = document.getElementById('appSidebar');
+  if (sidebar) sidebar.style.display = '';
+  const topHeader = document.querySelector('.top-header');
+  if (topHeader) topHeader.style.display = '';
+  const adminBar = document.getElementById('agencyPortalAdminBar');
+  if (adminBar) adminBar.style.display = '';
+  const pubHeader = document.getElementById('publicPortalHeader');
+  if (pubHeader) pubHeader.style.display = 'none';
+  const pubFooter = document.getElementById('publicPortalFooter');
+  if (pubFooter) pubFooter.style.display = 'none';
+  switchTab('dashboard');
+  loadAgencyWorkspace(currentAgencyId);
+}
+
 function updateUserSessionUI() {
-  const lbl = document.getElementById('lblAccountAuth');
   const raw = localStorage.getItem('nexus_user_session');
+  let user = null;
   if (raw) {
-    try {
-      const u = JSON.parse(raw);
-      if (lbl) lbl.textContent = u.name.split(' ')[0];
-      const topName = document.getElementById('topAgencyName');
-      if (topName && u.agency_name) topName.textContent = u.agency_name;
-    } catch (e) {}
+    try { user = JSON.parse(raw); } catch (e) {}
+  }
+  currentUserSession = user;
+
+  // Header Elements
+  const headerGuest = document.getElementById('headerAuthGuest');
+  const headerLogged = document.getElementById('headerAuthLogged');
+  const lblAuth = document.getElementById('lblAccountAuth');
+
+  // Sidebar Elements
+  const sideGuest = document.getElementById('sidebarAuthGuest');
+  const sideLogged = document.getElementById('sidebarAuthLogged');
+  const sideName = document.getElementById('sidebarUserName');
+  const sideAgency = document.getElementById('sidebarUserAgency');
+  const sideAvatar = document.getElementById('sidebarUserAvatar');
+
+  // Public Portal Header Buttons
+  const pubLogin = document.getElementById('publicHeaderLoginBtn');
+  const pubReg = document.getElementById('publicHeaderRegisterBtn');
+  const pubDash = document.getElementById('publicHeaderDashboardBtn');
+
+  if (user) {
+    const firstName = user.name ? user.name.split(' ')[0] : 'Cuenta';
+    const initial = user.name ? user.name[0].toUpperCase() : 'U';
+    const agName = user.agency_name || 'Mi Agencia';
+
+    if (headerGuest) headerGuest.style.display = 'none';
+    if (headerLogged) headerLogged.style.display = 'flex';
+    if (lblAuth) lblAuth.textContent = firstName;
+
+    if (sideGuest) sideGuest.style.display = 'none';
+    if (sideLogged) sideLogged.style.display = 'block';
+    if (sideName) sideName.textContent = user.name;
+    if (sideAgency) sideAgency.textContent = agName;
+    if (sideAvatar) sideAvatar.textContent = initial;
+
+    if (pubLogin) pubLogin.style.display = 'none';
+    if (pubReg) pubReg.style.display = 'none';
+    if (pubDash) pubDash.style.display = 'inline-flex';
   } else {
-    if (lbl) lbl.textContent = 'Cuenta / Login';
+    if (headerGuest) headerGuest.style.display = 'flex';
+    if (headerLogged) headerLogged.style.display = 'none';
+    if (lblAuth) lblAuth.textContent = 'Cuenta / Login';
+
+    if (sideGuest) sideGuest.style.display = 'block';
+    if (sideLogged) sideLogged.style.display = 'none';
+
+    if (pubLogin) pubLogin.style.display = 'inline-flex';
+    if (pubReg) pubReg.style.display = 'inline-flex';
+    if (pubDash) pubDash.style.display = 'none';
   }
 }
 
@@ -3091,6 +3250,19 @@ async function checkNeonDatabaseStatus() {
 
 // Auto-check on load
 document.addEventListener('DOMContentLoaded', () => {
+  // Restore logged-in tenant if session exists
+  const raw = localStorage.getItem('nexus_user_session');
+  if (raw) {
+    try {
+      const u = JSON.parse(raw);
+      if (u && u.agency_id) {
+        currentAgencyId = u.agency_id;
+        localStorage.setItem('nexus_current_agency_id', u.agency_id);
+        hydrateUserAgencyWorkspace(u.agency_id, u);
+      }
+    } catch (e) {}
+  }
+
   updateUserSessionUI();
   checkNeonDatabaseStatus();
   loadOwnerAlertSettings();

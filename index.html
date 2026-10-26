@@ -50,6 +50,38 @@
         </select>
       </div>
 
+      <!-- Mobile & Desktop Sidebar Auth Section -->
+      <div class="sidebar-auth-section" id="sidebarAuthSection">
+        <!-- Guest View (Not Logged In) -->
+        <div id="sidebarAuthGuest">
+          <div class="sidebar-auth-title">
+            <i class="fa-solid fa-shield-halved"></i> Tu Cuenta de Agencia
+          </div>
+          <div class="sidebar-auth-btns">
+            <button class="btn btn-secondary btn-sm" onclick="openAuthModalWithTab('login'); if(window.innerWidth<=900) toggleMobileSidebar();">
+              <i class="fa-solid fa-right-to-bracket" style="color: #818cf8;"></i> Iniciar Sesión
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="openAuthModalWithTab('register'); if(window.innerWidth<=900) toggleMobileSidebar();">
+              <i class="fa-solid fa-user-plus"></i> Registrarse Gratis
+            </button>
+          </div>
+        </div>
+
+        <!-- Logged In View -->
+        <div id="sidebarAuthLogged" style="display: none;">
+          <div class="sidebar-user-card">
+            <div class="sidebar-user-avatar" id="sidebarUserAvatar">U</div>
+            <div class="sidebar-user-details">
+              <div class="sidebar-user-name" id="sidebarUserName">Usuario</div>
+              <div class="sidebar-user-agency" id="sidebarUserAgency">Mi Agencia</div>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm sidebar-logout-btn" onclick="logoutUserSession()">
+            <i class="fa-solid fa-power-off"></i> Cerrar Sesión
+          </button>
+        </div>
+      </div>
+
       <!-- Navigation Tabs -->
       <nav class="nav-menu">
         <div class="nav-section-title">Tu Agencia de IA</div>
@@ -148,8 +180,8 @@
           </h1>
         </div>
         <div class="header-actions">
-          <!-- Active Agency Account Badge & Switcher -->
-          <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+          <!-- Active Agency Account Badge & Switcher (Desktop Only) -->
+          <div class="desktop-only" style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 6px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
             <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: white;" id="topAgencyAvatar">
               N
             </div>
@@ -158,17 +190,34 @@
               <div style="font-size: 10.5px; color: #34d399;" id="topAgencyId">ID: #AG-PRINCIPAL</div>
             </div>
             <button class="btn btn-secondary btn-sm" onclick="openSwitchAgencyModal()" style="margin-left: 8px; padding: 4px 8px; font-size: 11px;">
-              <i class="fa-solid fa-repeat"></i> Cambiar Agencia
+              <i class="fa-solid fa-repeat"></i> Cambiar
             </button>
           </div>
 
-          <button class="btn btn-secondary btn-sm" onclick="openAuthModal()" id="btnAccountAuth">
-            <i class="fa-solid fa-user-circle" style="color: #818cf8;"></i> <span id="lblAccountAuth">Cuenta / Login</span>
-          </button>
-          <button class="btn btn-primary btn-sm" onclick="openNewAgencyWorkspaceModal()">
+          <!-- Guest Auth Buttons (Visible on Mobile & Desktop when logged out) -->
+          <div id="headerAuthGuest" style="display: flex; align-items: center; gap: 6px;">
+            <button class="btn btn-secondary btn-sm" onclick="openAuthModalWithTab('login')" id="btnHeaderLogin" style="padding: 6px 10px; font-size: 11.5px;">
+              <i class="fa-solid fa-right-to-bracket" style="color: #818cf8;"></i> <span>Iniciar Sesión</span>
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="openAuthModalWithTab('register')" id="btnHeaderRegister" style="padding: 6px 10px; font-size: 11.5px;">
+              <i class="fa-solid fa-user-plus"></i> <span>Registrarse</span>
+            </button>
+          </div>
+
+          <!-- Logged In User Status Badge (Visible when logged in) -->
+          <div id="headerAuthLogged" style="display: none; align-items: center; gap: 6px;">
+            <button class="btn btn-secondary btn-sm" onclick="openAuthModal()" id="btnAccountAuth" style="padding: 6px 10px; font-size: 11.5px;">
+              <i class="fa-solid fa-user-circle" style="color: #34d399;"></i> <span id="lblAccountAuth">Mi Cuenta</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="logoutUserSession()" style="padding: 6px 9px; font-size: 11px; color: #f87171; border-color: rgba(239,68,68,0.3);" title="Cerrar Sesión">
+              <i class="fa-solid fa-power-off"></i>
+            </button>
+          </div>
+
+          <button class="btn btn-primary btn-sm desktop-only" onclick="openNewAgencyWorkspaceModal()">
             <i class="fa-solid fa-plus"></i> Nueva Agencia
           </button>
-          <button class="btn btn-emerald btn-sm" onclick="openSendRealWaModal()">
+          <button class="btn btn-emerald btn-sm desktop-only" onclick="openSendRealWaModal()">
             <i class="fa-brands fa-whatsapp"></i> WhatsApp Real
           </button>
         </div>
@@ -275,23 +324,32 @@
             </div>
           </div>
 
-          <!-- Public Brand Header (Visible to external visitors on /portal) -->
-          <header id="publicPortalHeader" style="display: none; align-items: center; justify-content: space-between; padding: 14px 22px; background: rgba(13, 16, 33, 0.95); backdrop-filter: blur(15px); border: 1px solid var(--border-glow); border-radius: var(--radius-lg); margin-bottom: 24px; position: sticky; top: 10px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
-            <div style="display: flex; align-items: center; gap: 12px;">
-              <div style="width: 38px; height: 38px; border-radius: 10px; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;">
+          <!-- Public Brand Header (Visible to external visitors and owners on mobile/desktop) -->
+          <header id="publicPortalHeader" class="public-portal-header" style="display: none;">
+            <div class="public-header-brand">
+              <div class="public-header-logo">
                 <i class="fa-solid fa-brain"></i>
               </div>
-              <div>
-                <div style="font-size: 16px; font-weight: 800; color: white;" id="publicBrandName">NEXUS AI</div>
-                <div style="font-size: 11px; color: #34d399; font-weight: 700;">Agencia Oficial de Automatización con IA</div>
+              <div class="public-header-titles">
+                <div class="public-brand-name" id="publicBrandName">NEXUS AI</div>
+                <div class="public-brand-sub">Agencia Oficial de Automatización con IA</div>
               </div>
             </div>
-            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <div class="public-header-actions">
               <button class="btn btn-secondary btn-sm" onclick="document.getElementById('pricingSectionAnchor').scrollIntoView({behavior:'smooth'})">
                 <i class="fa-solid fa-tags"></i> Ver Planes & Precios
               </button>
               <button class="btn btn-emerald btn-sm" id="publicHeaderCta" onclick="openPublicContactWhatsApp()">
                 <i class="fa-brands fa-whatsapp"></i> Hablar con un Asesor
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="openAuthModalWithTab('login')" id="publicHeaderLoginBtn">
+                <i class="fa-solid fa-right-to-bracket" style="color: #818cf8;"></i> Iniciar Sesión
+              </button>
+              <button class="btn btn-primary btn-sm" onclick="openAuthModalWithTab('register')" id="publicHeaderRegisterBtn">
+                <i class="fa-solid fa-user-plus"></i> Registrarse
+              </button>
+              <button class="btn btn-secondary btn-sm" onclick="exitPublicPortalMode()" id="publicHeaderDashboardBtn" style="display: none;">
+                <i class="fa-solid fa-chart-pie" style="color: #34d399;"></i> Panel de Mi Agencia
               </button>
             </div>
           </header>

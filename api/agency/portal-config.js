@@ -69,7 +69,44 @@ module.exports = async (req, res) => {
       ]
     );
 
-    const realAgencyId = updatedAgency?.rows?.[0]?.id || agId;
+    let realAgencyRow = updatedAgency?.rows?.[0];
+    if (!realAgencyRow) {
+      const insertRes = await db.query(
+        `INSERT INTO agencies (id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name,
+           slug = EXCLUDED.slug,
+           brand_color = EXCLUDED.brand_color,
+           billing_phone = EXCLUDED.billing_phone,
+           bank_name = EXCLUDED.bank_name,
+           bank_holder = EXCLUDED.bank_holder,
+           bank_cbu = EXCLUDED.bank_cbu,
+           bank_tax_id = EXCLUDED.bank_tax_id,
+           portal_title = EXCLUDED.portal_title,
+           portal_subtitle = EXCLUDED.portal_subtitle,
+           portal_config = EXCLUDED.portal_config,
+           updated_at = CURRENT_TIMESTAMP
+         RETURNING id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config`,
+        [
+          agId,
+          name || 'Mi Agencia',
+          sanitizedSlug || `agencia-${agId.slice(-6)}`,
+          brandColor || '#6366f1',
+          billingPhone || null,
+          bankName || null,
+          bankHolder || null,
+          bankCbu || null,
+          bankTaxId || null,
+          portalTitle !== undefined ? portalTitle : null,
+          portalSubtitle !== undefined ? portalSubtitle : null,
+          JSON.stringify(portalConfig || {})
+        ]
+      );
+      realAgencyRow = insertRes?.rows?.[0];
+    }
+
+    const realAgencyId = realAgencyRow?.id || agId;
 
     if (Array.isArray(plans) && plans.length > 0) {
       await db.query(`DELETE FROM plans WHERE agency_id = $1`, [realAgencyId]);
@@ -104,7 +141,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: '¡Landing page y configuración de marca actualizadas en vivo!',
-      agency: updatedAgency?.rows?.[0]
+      agency: realAgencyRow
     });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
