@@ -3195,11 +3195,6 @@ function updateUserSessionUI() {
   const sideAgency = document.getElementById('sidebarUserAgency');
   const sideAvatar = document.getElementById('sidebarUserAvatar');
 
-  // Public Portal Header Buttons
-  const pubLogin = document.getElementById('publicHeaderLoginBtn');
-  const pubReg = document.getElementById('publicHeaderRegisterBtn');
-  const pubDash = document.getElementById('publicHeaderDashboardBtn');
-
   if (user) {
     const firstName = user.name ? user.name.split(' ')[0] : 'Cuenta';
     const initial = user.name ? user.name[0].toUpperCase() : 'U';
@@ -3214,10 +3209,6 @@ function updateUserSessionUI() {
     if (sideName) sideName.textContent = user.name;
     if (sideAgency) sideAgency.textContent = agName;
     if (sideAvatar) sideAvatar.textContent = initial;
-
-    if (pubLogin) pubLogin.style.display = 'none';
-    if (pubReg) pubReg.style.display = 'none';
-    if (pubDash) pubDash.style.display = 'inline-flex';
   } else {
     if (headerGuest) headerGuest.style.display = 'flex';
     if (headerLogged) headerLogged.style.display = 'none';
@@ -3225,10 +3216,6 @@ function updateUserSessionUI() {
 
     if (sideGuest) sideGuest.style.display = 'block';
     if (sideLogged) sideLogged.style.display = 'none';
-
-    if (pubLogin) pubLogin.style.display = 'inline-flex';
-    if (pubReg) pubReg.style.display = 'inline-flex';
-    if (pubDash) pubDash.style.display = 'none';
   }
 }
 
