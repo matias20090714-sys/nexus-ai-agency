@@ -1023,6 +1023,15 @@
               </div>
             </div>
 
+            <!-- Google Gemini Multi-Niche Engine Active Banner -->
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 10px 16px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #a7f3d0;">
+                <i class="fa-solid fa-bolt" style="color: #34d399; font-size: 14px;"></i>
+                <span><strong>Motor Google Gemini Gratis Activo</strong> para todos tus agentes. Cada empresa responde con su propio nicho, catálogo y horarios.</span>
+              </div>
+              <span class="brand-badge" style="background: rgba(52, 211, 153, 0.2); color: #34d399; font-size: 11px;">100% Gratis & Personalizado</span>
+            </div>
+
             <!-- Multi-Flow Subtabs Pill Navigation -->
             <div class="subtabs-nav-bar">
               <button class="subtab-btn active" id="subtabBtn-identity" onclick="switchAgentSubtab('identity')">
@@ -1060,8 +1069,10 @@
                       <option value="inmobiliarias">🏢 Bienes Raíces & Inmobiliarias</option>
                       <option value="belleza_barberias">✂️ Belleza & Barberías</option>
                       <option value="gastronomia">🍽️ Restaurantes & Gastronomía</option>
-                      <option value="servicios_b2b">⚖️ Empresas & Servicios B2B</option>
+                      <option value="servicios_b2b">⚖️ Empresas & Servicios B2B / Consultoría</option>
                       <option value="ecommerce_retail">🛍️ E-Commerce & Retail</option>
+                      <option value="fitness_gym">🏋️ Gimnasios & Centros de Fitness</option>
+                      <option value="automotriz">🚗 Talleres Mecánicos & Automotriz</option>
                     </select>
                   </div>
 
@@ -3304,10 +3315,12 @@ Pruébalo 2 minutos y me dices qué te parece.
           <select id="newClientIndustry" class="form-control">
             <option value="Salud & Clínicas">🏥 Salud & Clínicas</option>
             <option value="Bienes Raíces & Inmobiliarias">🏢 Bienes Raíces & Inmobiliarias</option>
-            <option value="Belleza & Barberías">✂️ Belleza, Barberías & Salones</option>
+            <option value="Belleza & Cuidado Personal">✂️ Belleza, Barberías & Salones</option>
             <option value="Restaurantes & Gastronomía">🍽️ Restaurantes & Gastronomía</option>
-            <option value="Empresas & Servicios B2B">⚖️ Empresas & Servicios B2B</option>
-            <option value="E-Commerce & Retail">🛍️ E-Commerce & Tiendas Online</option>
+            <option value="Empresas & Servicios B2B">⚖️ Empresas & Servicios B2B / Consultoría</option>
+            <option value="Tienda Online & Retail">🛍️ Tienda Online & Retail</option>
+            <option value="Gimnasios & Centros de Fitness">🏋️ Gimnasios & Centros de Fitness</option>
+            <option value="Talleres Mecánicos & Automotriz">🚗 Talleres Mecánicos & Automotriz</option>
             <option value="Otro Rubro">⚡ Otro Rubro</option>
           </select>
         </div>
@@ -3323,6 +3336,46 @@ Pruébalo 2 minutos y me dices qué te parece.
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('newClientModal')">Cancelar</button>
         <button class="btn btn-primary" onclick="saveNewAgencyClient()"><i class="fa-solid fa-check"></i> Crear Sub-Cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Test Agent Live Chat Simulator -->
+  <div id="modalTestAgentChat" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 480px; padding: 0; overflow: hidden; border-radius: var(--radius-lg); border: 1px solid var(--border-glow); background: #0b0f19;">
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #1e1b4b, #312e81); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 38px; height: 38px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;">
+            <i class="fa-solid fa-robot"></i>
+          </div>
+          <div>
+            <div style="font-size: 14px; font-weight: 700; color: white;" id="testModalAgentTitle">Asistente Virtual IA</div>
+            <div style="font-size: 11px; color: #34d399;" id="testModalAgentSubtitle">🟢 Motor Gemini 1.5 Flash Activo</div>
+          </div>
+        </div>
+        <button class="close-btn" onclick="closeModal('modalTestAgentChat')">&times;</button>
+      </div>
+
+      <!-- Chat Body -->
+      <div id="testAgentChatBody" style="height: 330px; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: rgba(10, 13, 28, 0.95);">
+        <!-- Messages injected dynamically -->
+      </div>
+
+      <!-- Quick Chips -->
+      <div style="padding: 8px 12px; background: rgba(15, 23, 42, 0.8); display: flex; gap: 6px; overflow-x: auto; border-top: 1px solid var(--border-subtle);">
+        <button class="quick-chip" onclick="sendTestChatMessage('Hola, ¿qué servicios ofrecen y cuáles son sus precios?')">💵 Precios</button>
+        <button class="quick-chip" onclick="sendTestChatMessage('¿Tienen turnos disponibles para esta semana?')">📅 Turnos</button>
+        <button class="quick-chip" onclick="sendTestChatMessage('¿Dónde están ubicados y cuáles son sus horarios?')">📍 Ubicación</button>
+        <button class="quick-chip" onclick="sendTestChatMessage('Muchas gracias por la información')">🙏 Gracias</button>
+      </div>
+
+      <!-- Input Area -->
+      <div style="padding: 12px 14px; background: #0f172a; border-top: 1px solid var(--border-subtle); display: flex; gap: 8px;">
+        <input type="text" id="testChatInput" class="form-control" placeholder="Escribe un mensaje de WhatsApp..." onkeydown="if(event.key==='Enter') sendTestChatMessage()">
+        <button class="btn btn-primary" onclick="sendTestChatMessage()" style="padding: 0 16px; flex-shrink: 0;">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
       </div>
     </div>
   </div>

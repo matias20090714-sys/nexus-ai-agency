@@ -1,0 +1,44 @@
+{
+  "agency_master_1": [
+    {
+      "id": "client_dental_1",
+      "name": "Clínica Dental San Lucas",
+      "industry": "Salud & Clínicas Odontológicas",
+      "agentName": "Sofía - Asistente Odontológica",
+      "tone": "profesional_calido",
+      "systemPrompt": "Eres la asistente dental. Atiende con calidez e informa de tratamientos y turnos.",
+      "catalog": [
+        {
+          "name": "Limpieza Dental Ultrasónica",
+          "price": 60,
+          "duration": "45 min"
+        },
+        {
+          "name": "Blanqueamiento Dental LED",
+          "price": 180,
+          "duration": "60 min"
+        }
+      ],
+      "knowledgeBase": "Horario: Lun a Sáb de 09:00 a 20:00. Dirección: Av. Principal 123."
+    },
+    {
+      "id": "client_resto_1",
+      "name": "Bistro Gourmet Italiano",
+      "industry": "Restaurantes & Gastronomía",
+      "agentName": "Marco - Concierge Gourmet",
+      "tone": "amable_gourmet",
+      "systemPrompt": "Eres el asistente del restaurante. Atiende reservas y muestra nuestra carta.",
+      "catalog": [
+        {
+          "name": "Pizza Artesanal Masa Madre",
+          "price": 14
+        },
+        {
+          "name": "Menú Degustación 3 Pasos",
+          "price": 24
+        }
+      ],
+      "knowledgeBase": "Horario: Mar a Dom de 19:30 a 01:00 hs. Terraza disponible."
+    }
+  ]
+}

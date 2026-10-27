@@ -132,6 +132,129 @@ const AGENCY_BLUEPRINTS = [
       googleReviewPrompt: "Tu testimonio nos ayuda a seguir impulsando más empresas: {link}",
       loyaltyDiscount: "1 mes gratis al referir a una empresa aliada."
     }
+  },
+  {
+    id: "gastronomia",
+    category: "Restaurantes & Gastronomía",
+    name: "Asistente Gourmet & Reservas",
+    icon: "🍽️",
+    description: "Carta de platos, reservas de mesas y pedidos para llevar con confirmación.",
+    defaultSystemPrompt: "Eres el asistente virtual del restaurante. Muestra los platos y precios de nuestra carta, consulta para cuántas personas es la reserva o pedido y confirma el horario.",
+    defaultCatalog: [
+      { id: "srv_14", name: "Menú Degustación Ejecutivo (3 Pasos)", price: 24, duration: "Servicio en mesa", description: "Entrada gourmet + plato principal a elección + postre artesanal y bebida." },
+      { id: "srv_15", name: "Pizza Artesanal a la Piedra Especial (8 Porciones)", price: 14, duration: "Elaboración 25 min", description: "Masa madre fermentada 48hs con mozzarella premium y jamón natural." },
+      { id: "srv_16", name: "Hamburguesa Gourmet Doble Carne con Papas Rústicas", price: 12, duration: "Elaboración 20 min", description: "Blend de entraña y bife con queso cheddar fundido y panceta crocante." },
+      { id: "srv_17", name: "Tabla de Carnes & Asado a las Brasas (para 2)", price: 38, duration: "Servicio en mesa", description: "Cortes seleccionados con guarnición de papas fritas y ensalada fresca." }
+    ],
+    salesFlow: {
+      qualification: "¿Te gustaría reservar una mesa en nuestro salón o prefieres hacer un pedido para retirar/delivery?",
+      objections: "Si consultan por opciones especiales, aclara que contamos con platos vegetarianos y opciones sin TACC.",
+      closing: "Para asegurar tu mesa, indícame cuántas personas vendrán y para qué hora te guardamos el lugar."
+    },
+    supportFlow: {
+      faqs: "Q: ¿Tienen estacionamiento? R: Sí, contamos con valet parking exclusivo.\nQ: ¿Se admiten mascotas? R: Sí, nuestro sector de terraza es 100% pet-friendly.",
+      emergency: "Para cancelaciones o modificaciones de reserva inmediatas, avísanos por este chat."
+    },
+    afterSalesFlow: {
+      enabled: true,
+      surveyDelayHours: 2,
+      message: "¡Hola {nombre}! Esperamos que hayas disfrutado tu comida en {empresa}. ¿Qué tal estuvo la experiencia?",
+      googleReviewUrl: "https://g.page/r/tu-restaurante/review",
+      googleReviewPrompt: "Si te gustó nuestra comida, nos encantaría tu reseña en Google: {link}",
+      loyaltyDiscount: "Postre gratis en tu próxima visita reservando por este chat."
+    }
+  },
+  {
+    id: "ecommerce_retail",
+    category: "Tienda Online & Retail",
+    name: "Asesor de Compras & Catálogo",
+    icon: "🛍️",
+    description: "Catálogo de productos, talles, stock, envíos y link de pago online.",
+    defaultSystemPrompt: "Eres el asesor de compras virtual de la tienda. Consulta qué producto o talle busca el cliente, explica los métodos de envío y proporciona el link de pago seguro.",
+    defaultCatalog: [
+      { id: "srv_18", name: "Remera / Camiseta Oversize 100% Algodón Peinado", price: 28, duration: "Stock inmediato", description: "Corte moderno disponible en talles S, M, L, XL y varios colores." },
+      { id: "srv_19", name: "Pantalón Cargo Streetwear Reforzado", price: 45, duration: "Stock inmediato", description: "Bolsillos utilitarios laterales y cintura ajustable de alta durabilidad." },
+      { id: "srv_20", name: "Zapatillas Urbanas Edición Limitada", price: 85, duration: "Stock inmediato", description: "Suela amortiguada antideslizante con diseño exclusivo de temporada." },
+      { id: "srv_21", name: "Envío Express a Domicilio (24 a 48 hs)", price: 5, duration: "24-48 hs", description: "Envío gratis a todo el país en compras superiores a $60." }
+    ],
+    salesFlow: {
+      qualification: "¿Qué prenda o producto te interesa y para qué talle o medida estás buscando?",
+      objections: "Si dudan del talle, explica que el primer cambio es 100% gratuito sin costo de envío.",
+      closing: "¿Te gustaría que te reserve la prenda ahora mismo y te envíe el link de pago seguro?"
+    },
+    supportFlow: {
+      faqs: "Q: ¿Cuáles son las formas de pago? R: Tarjetas de crédito/débito, transferencias y Mercado Pago con 3 cuotas sin interés.\nQ: ¿Hacen envíos a todo el país? R: Sí, por correo asegurado con código de seguimiento en tiempo real.",
+      emergency: "Por reclamos de entregas, indícanos tu número de orden."
+    },
+    afterSalesFlow: {
+      enabled: true,
+      surveyDelayHours: 72,
+      message: "¡Hola {nombre}! Vemos que tu pedido ya llegó. ¿Te quedó bien el talle y te gustaron tus productos?",
+      googleReviewUrl: "https://g.page/r/tu-tienda/review",
+      googleReviewPrompt: "¿Nos regalas una foto y opinión en Google? {link}",
+      loyaltyDiscount: "15% de descuento en tu siguiente compra con el código VIP15."
+    }
+  },
+  {
+    id: "fitness_gym",
+    category: "Gimnasios & Centros de Fitness",
+    name: "Coach & Asesor de Membresías",
+    icon: "🏋️",
+    description: "Planes de entrenamiento, pases libres, horarios de clases y pase de prueba.",
+    defaultSystemPrompt: "Eres el asesor virtual del gimnasio. Motiva al cliente, consulta sus objetivos físicos (perder peso, ganar masa o tonificar) y ofrécele un pase de prueba gratis o nuestras membresías.",
+    defaultCatalog: [
+      { id: "srv_22", name: "Membresía Mensual Pase Libre Full", price: 40, duration: "Acceso mensual", description: "Acceso ilimitado a sala de musculación, cardio y clases grupales guiadas." },
+      { id: "srv_23", name: "Plan Trimestral Pro con Entrenador & Rutina App", price: 99, duration: "3 meses", description: "Rutina personalizada según objetivo + seguimiento corporal mensual." },
+      { id: "srv_24", name: "Clase de Prueba Gratuita (Pase 1 Día)", price: 0, duration: "Pase diario", description: "Entrena gratis por 1 día y prueba todas nuestras instalaciones sin compromiso." }
+    ],
+    salesFlow: {
+      qualification: "¿Cuál es tu meta principal hoy: perder peso, tonificar, ganar masa o mejorar tu salud?",
+      objections: "Si dicen que no tienen tiempo, recuérdales que abrimos desde las 06:30 hs y las rutinas express toman solo 45 min.",
+      closing: "¿Te gustaría venir hoy o mañana a hacer tu primera sesión de prueba gratis?"
+    },
+    supportFlow: {
+      faqs: "Q: ¿Qué horarios tienen? R: Lunes a Viernes de 06:30 a 22:30 hs y Sábados de 09:00 a 18:00 hs.\nQ: ¿Tienen duchas y vestuarios? R: Sí, vestuarios completos con lockers individuales y duchas con agua caliente.",
+      emergency: "Por suspensiones de membresía médicas, envía el certificado por este medio."
+    },
+    afterSalesFlow: {
+      enabled: true,
+      surveyDelayHours: 24,
+      message: "¡Gran entrenamiento hoy {nombre}! ¿Cómo te sentiste en tu sesión de entrenamiento?",
+      googleReviewUrl: "https://g.page/r/tu-gym/review",
+      googleReviewPrompt: "Tu energía motiva a más personas: déjanos tu reseña en Google {link}",
+      loyaltyDiscount: "Trae un amigo y ambos tienen 25% OFF en su siguiente mes."
+    }
+  },
+  {
+    id: "automotriz",
+    category: "Talleres Mecánicos & Automotriz",
+    name: "Recepcionista de Taller Mecánico",
+    icon: "🚗",
+    description: "Turnos de service, cambio de aceite, frenos y diagnóstico computarizado.",
+    defaultSystemPrompt: "Eres el recepcionista virtual del taller mecánico. Consulta marca, modelo y año del vehículo, cuál es la falla o service requerido y coordina el día de ingreso al taller.",
+    defaultCatalog: [
+      { id: "srv_25", name: "Service Completo: Aceite Sintético + 3 Filtros", price: 85, duration: "Turno 2 hs", description: "Aceite premium 100% sintético, filtro de aceite, aire y habitáculo con chequeo de 25 puntos." },
+      { id: "srv_26", name: "Diagnóstico Computarizado por Escáner OBD2", price: 30, duration: "Turno 40 min", description: "Lectura completa de sensores, reseteo de fallas del tablero y reporte impreso." },
+      { id: "srv_27", name: "Cambio de Pastillas de Freno Delanteras", price: 75, duration: "Turno 90 min", description: "Pastillas de calidad de equipo original y rectificado de discos si aplica." },
+      { id: "srv_28", name: "Alineación Láser 3D y Balanceo de 4 Ruedas", price: 40, duration: "Turno 50 min", description: "Calibración con sensores de precisión para evitar el desgaste desparejo de neumáticos." }
+    ],
+    salesFlow: {
+      qualification: "¿Qué marca, modelo y año es tu vehículo y qué trabajo necesitas realizarle?",
+      objections: "Si consultan por repuestos, aclara que todos nuestros trabajos cuentan con garantía de 6 meses por escrito.",
+      closing: "¿Te queda cómodo traer el vehículo por la mañana a las 08:30 o prefieres por la tarde a las 14:00?"
+    },
+    supportFlow: {
+      faqs: "Q: ¿Aceptan tarjetas en cuotas? R: Sí, aceptamos todas las tarjetas en hasta 3 cuotas fijas.\nQ: ¿Cuánto demoran en un service? R: El service regular se completa en el mismo día en 2 a 3 horas.",
+      emergency: "Si el vehículo quedó varado, consúltanos por nuestro servicio de remolque aliado."
+    },
+    afterSalesFlow: {
+      enabled: true,
+      surveyDelayHours: 24,
+      message: "Hola {nombre}, ¿cómo notas el funcionamiento de tu vehículo luego del service en {empresa}?",
+      googleReviewUrl: "https://g.page/r/tu-taller/review",
+      googleReviewPrompt: "¿Nos calificarías con 5 estrellas en Google? {link}",
+      loyaltyDiscount: "Revisión de líquidos y presión de neumáticos gratis en tu próxima visita."
+    }
   }
 ];
 

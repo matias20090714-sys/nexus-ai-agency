@@ -186,12 +186,12 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
             if (textBody && textBody.trim()) {
               try {
                 // Feature 5: Check and Alert Owner for High-Intent Lead
-                const agId = sessionId.replace('agency_', '') || 'agency_master_1';
+                const agId = sessionId.replace('agency_', '').replace('client_', '') || 'agency_master_1';
                 checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
 
                 // Simulate human delay (1.2s)
                 await new Promise(r => setTimeout(r, 1200));
-                const aiReply = await generateAiAgentResponse(textBody, senderNumber, agId);
+                const aiReply = await generateAiAgentResponse(textBody, senderNumber, sessionId, agId);
                 if (aiReply && sock) {
                   await sock.sendMessage(senderJid, { text: aiReply });
                   console.log(`[Baileys - ${sessionId}] 🤖 IA respondió a +${senderNumber}: "${aiReply.slice(0, 40)}..."`);
@@ -224,8 +224,10 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
 
 // AI Auto-Responder Engine (Supports Google Gemini & OpenAI)
 const AI_CONFIG_FILE = path.join(__dirname, 'ai_config.json');
+const COMPANIES_FILE = path.join(__dirname, 'companies_agents.json');
 let customAiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
 let activeAiModel = process.env.AI_MODEL || 'gemini-1.5-flash';
+let memoryCompanies = {};
 
 function loadAiConfig() {
   try {
@@ -249,29 +251,157 @@ function saveAiConfig(apiKey, model) {
   }
 }
 
-async function generateAiAgentResponse(userText, senderPhone, agencyId = 'agency_master_1') {
+function loadCompaniesFromDisk() {
+  try {
+    if (fs.existsSync(COMPANIES_FILE)) {
+      memoryCompanies = JSON.parse(fs.readFileSync(COMPANIES_FILE, 'utf8'));
+      const total = Object.values(memoryCompanies).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
+      console.log(`[AI Engine] ${total} empresas y agentes por nicho cargados desde disco.`);
+    }
+  } catch (e) {
+    console.error('Error cargando companies_agents.json:', e.message);
+  }
+}
+loadCompaniesFromDisk();
+
+function saveCompaniesToDisk() {
+  try {
+    fs.writeFileSync(COMPANIES_FILE, JSON.stringify(memoryCompanies, null, 2));
+  } catch (e) {
+    console.error('Error guardando companies_agents.json:', e.message);
+  }
+}
+
+// Resolver context of specific client / company by session or agency ID
+async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_1') {
+  const allCompanies = Object.values(memoryCompanies).flat();
+  let matched = null;
+
+  // 1. Match by sessionId (e.g. client_client-1729... or client-1729...)
+  if (sessionId) {
+    const cleanSess = sessionId.replace('client_', '').replace('agency_', '');
+    matched = allCompanies.find(c => c.id === cleanSess || c.id === sessionId || `client_${c.id}` === sessionId || `agency_${c.id}` === sessionId);
+  }
+
+  // 2. Match by agencyId if not matched
+  if (!matched && agencyId) {
+    const cleanAg = agencyId.replace('agency_', '').replace('client_', '');
+    matched = allCompanies.find(c => c.id === cleanAg || c.id === agencyId);
+    if (!matched && memoryCompanies[agencyId] && memoryCompanies[agencyId].length > 0) {
+      matched = memoryCompanies[agencyId][0];
+    }
+    if (!matched && memoryCompanies[cleanAg] && memoryCompanies[cleanAg].length > 0) {
+      matched = memoryCompanies[cleanAg][0];
+    }
+  }
+
+  // 3. Fallback to first company in memory if available
+  if (!matched && allCompanies.length > 0) {
+    matched = allCompanies[0];
+  }
+
+  // Default fallback if no custom company is registered yet
+  if (!matched) {
+    return {
+      id: 'default_agency',
+      companyName: 'NEXUS AI Agency',
+      industry: 'Soluciones de Inteligencia Artificial & Automatización',
+      agentName: 'Asistente Virtual IA',
+      tone: 'profesional_calido',
+      systemPrompt: 'Eres el asistente virtual con IA oficial de la empresa. Atiende consultas, explica servicios y precios con calidez e invita a agendar una cita o llamada estratégica.',
+      catalogSummary: '• Plan Starter: $290 USD/mes (Agente de WhatsApp 24/7 entrenado a medida)\n• Plan Growth Pro: $490 USD/mes (Agente + Calendar + Cotizador + CRM)\n• Plan Enterprise: $890 USD/mes (Multi-agentes corporativos con integraciones avanzadas)',
+      knowledgeBase: 'Horario: Atención 24/7 por WhatsApp. Oficinas: Atención remota para clientes de todo el mundo.',
+      salesFlow: 'Califica la necesidad del cliente y ofrece coordinar una breve demo de 15 minutos.'
+    };
+  }
+
+  // Build catalog summary text from matched company's catalog
+  let catalogSummary = '';
+  if (Array.isArray(matched.catalog) && matched.catalog.length > 0) {
+    catalogSummary = matched.catalog.map(item => 
+      `• ${item.name}: $${item.price} ${item.duration ? `(${item.duration})` : ''} - ${item.description || ''}`
+    ).join('\n');
+  } else if (matched.notes && matched.notes.includes('$')) {
+    catalogSummary = matched.notes;
+  } else {
+    catalogSummary = 'Contamos con servicios especializados y propuestas a medida para tu necesidad.';
+  }
+
+  // Build sales flow string
+  let salesFlowStr = '';
+  if (matched.salesFlow && typeof matched.salesFlow === 'object') {
+    salesFlowStr = [
+      matched.salesFlow.qualification ? `Pregunta de calificación: ${matched.salesFlow.qualification}` : '',
+      matched.salesFlow.objections ? `Manejo de objeciones: ${matched.salesFlow.objections}` : '',
+      matched.salesFlow.closing ? `Cierre / Agendamiento: ${matched.salesFlow.closing}` : ''
+    ].filter(Boolean).join('\n');
+  } else if (matched.salesFlow) {
+    salesFlowStr = matched.salesFlow;
+  } else {
+    salesFlowStr = 'Invita cordialmente a coordinar una cita, llamada o turno según corresponda.';
+  }
+
+  return {
+    id: matched.id,
+    companyName: matched.name || 'Empresa',
+    industry: matched.industry || 'Servicios Especializados',
+    agentName: matched.agentName || `Asistente de ${matched.name}`,
+    tone: matched.tone || 'profesional_calido',
+    systemPrompt: matched.systemPrompt || `Eres el asistente virtual oficial de ${matched.name}. Atiende con amabilidad y orienta a resolver consultas y agendar turnos o ventas.`,
+    catalogSummary: catalogSummary,
+    knowledgeBase: matched.knowledgeBase || `Atención de Lunes a Sábados. Consultas y reservas por WhatsApp.`,
+    salesFlow: salesFlowStr
+  };
+}
+
+async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId = '', maybeAgencyId = '') {
   const text = (userText || '').toLowerCase().trim();
   if (!text) return null;
 
-  // Feature 1: Load RAG Knowledge Documents & Client details for this agency/company
-  const docContext = await getAgencyKnowledgeContext(agencyId);
+  let sessionId = sessionOrAgencyId;
+  let agencyId = maybeAgencyId || sessionOrAgencyId || 'agency_master_1';
+  if (sessionOrAgencyId && !maybeAgencyId && !sessionOrAgencyId.startsWith('client_') && !sessionOrAgencyId.startsWith('agency_')) {
+    agencyId = sessionOrAgencyId;
+  }
+
+  // 1. Resolve company & niche training
+  const ctx = await getAgentCompanyContext(sessionId, agencyId);
+
+  // 2. Load RAG Knowledge Documents if present
+  const docContext = await getAgencyKnowledgeContext(ctx.id || agencyId);
   const ragInstruction = docContext 
-    ? `\n\nCATÁLOGO Y DOCUMENTACIÓN OFICIAL DE LA EMPRESA (usa esta información como verdad absoluta):\n${docContext}\n` 
+    ? `\n\nDOCUMENTACIÓN OFICIAL DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n` 
     : '';
 
-  // 1. Call Real Generative LLM if API Key is configured
+  // 3. Call Real Generative LLM if API Key is configured
   if (customAiKey) {
     try {
-      const prompt = `Eres el asistente virtual con Inteligencia Artificial oficial de atención y ventas por WhatsApp para la empresa.
-Tu personalidad es cálida, cercana, altamente profesional y orientada a resolver dudas y concretar ventas.
-Responde de forma concisa (máximo 2 a 3 párrafos cortos, ideales para WhatsApp en el celular), usando emojis amables y en español neutro.
-Si el usuario te saluda, dale una bienvenida cordial.
-Si el usuario te agradece (ej: "gracias", "muchas gracias"), responde con amabilidad y disposición a ayudar.
-Si el usuario se despide, deséale un excelente día.
-${ragInstruction}
-Mensaje del cliente (+${senderPhone}): "${userText}"
+      const prompt = `Eres ${ctx.agentName}, el asistente virtual con Inteligencia Artificial oficial de ${ctx.companyName} (${ctx.industry}).
+Tu personalidad y tono son: ${ctx.tone}.
 
-Respuesta para el cliente:`;
+INSTRUCCIONES Y REGLAS DE ATENCIÓN DE ${ctx.companyName.toUpperCase()}:
+${ctx.systemPrompt}
+
+CATÁLOGO OFICIAL DE SERVICIOS Y PRECIOS:
+${ctx.catalogSummary}
+
+INFORMACIÓN DEL NEGOCIO (HORARIOS, UBICACIÓN, POLÍTICAS):
+${ctx.knowledgeBase}
+
+PAUTAS DE VENTAS Y AGENDAMIENTO:
+${ctx.salesFlow}
+${ragInstruction}
+MENSAJE DEL CLIENTE (+${senderPhone}): "${userText}"
+
+REGLAS DE RESPUESTA:
+- Responde estrictamente adoptando la identidad de ${ctx.companyName} en el rubro de ${ctx.industry}.
+- Si el cliente pregunta por servicios o precios, cítale los ítems y precios exactos de su catálogo.
+- Si el cliente pide turno o cita, solicítale el día y horario preferido según la información del negocio.
+- Si el cliente agradece, responde con amabilidad manteniendo la calidez del negocio.
+- Si el cliente se despide, deséale un excelente día.
+- Responde siempre en español, de forma concisa (máximo 2 a 3 párrafos cortos para WhatsApp móvil), usando emojis profesionales acordes al rubro.
+
+Respuesta:`;
       
       // OpenAI API Support (keys starting with sk-)
       if (customAiKey.startsWith('sk-')) {
@@ -284,8 +414,8 @@ Respuesta para el cliente:`;
           body: JSON.stringify({
             model: activeAiModel.includes('gpt') ? activeAiModel : 'gpt-4o-mini',
             messages: [
-              { role: 'system', content: `Eres el asistente virtual con IA oficial por WhatsApp. Responde siempre en español, con calidez, usando emojis profesionales, de manera concisa y vendedora.${ragInstruction}` },
-              { role: 'user', content: userText }
+              { role: 'system', content: `Eres ${ctx.agentName}, asistente virtual de ${ctx.companyName} (${ctx.industry}). Responde siempre en español, con calidez, usando emojis profesionales, conciso y orientado a solucionar y vender.` },
+              { role: 'user', content: prompt }
             ],
             temperature: 0.7,
             max_tokens: 450
@@ -328,73 +458,73 @@ Respuesta para el cliente:`;
     }
   }
 
-  // 2. High-converting smart contextual heuristics fallback (enhanced with RAG if present)
+  // 4. High-converting smart contextual heuristics fallback (TAILORED TO THIS COMPANY & NICHE)
   if (docContext && (text.includes('precio') || text.includes('catalogo') || text.includes('servicio') || text.includes('costo') || text.includes('cuanto'))) {
-    return `¡Hola! Aquí tienes la información oficial de nuestros servicios:\n\n${docContext.slice(0, 450)}...\n\n¿Te gustaría coordinar una cotización personalizada o agendar una cita con nuestro equipo?`;
+    return `¡Hola! Aquí tienes la información oficial de ${ctx.companyName}:\n\n${docContext.slice(0, 450)}...\n\n¿Te gustaría coordinar una cotización personalizada o agendar un turno?`;
   }
 
   // Agradecimientos (gracias, muchas gracias, etc.)
   if (text.includes('gracia') || text.includes('graciela') || text.includes('agradecid') || text.includes('te agradezco') || text.includes('muy amable') || text === 'grx' || text === 'thx') {
-    return `¡De nada! 😊 Ha sido un placer ayudarte. Si tienes cualquier otra pregunta sobre nuestros servicios, o si deseas agendar una llamada con nuestro equipo, aquí estoy a tu disposición. ¡Que tengas un excelente día!`;
+    return `¡De nada! 😊 En ${ctx.companyName} es un placer ayudarte. Si tienes cualquier otra pregunta sobre nuestros servicios de ${ctx.industry} o deseas agendar una cita, aquí estoy a tu disposición. ¡Que tengas un excelente día!`;
   }
 
   // Despedidas (chau, adiós, nos vemos, etc.)
   if (text.includes('chau') || text.includes('adios') || text.includes('adiós') || text.includes('hasta luego') || text.includes('nos vemos') || text.includes('bye') || text.includes('hasta pronto') || text.includes('buenas noches') || text.includes('buen finde')) {
-    return `¡Hasta luego! 👋 Que tengas un excelente día. Si en algún momento deseas retomar la consulta, ver planes o coordinar una demo en vivo, solo escríbenos por aquí. ¡Estamos a tu disposición 24/7!`;
+    return `¡Hasta luego! 👋 Que tengas un excelente día. Si en algún momento deseas retomar la consulta en ${ctx.companyName}, ver servicios o coordinar una visita, solo escríbenos por aquí. ¡Estamos a tu disposición 24/7!`;
   }
 
   // Confirmaciones y asentimientos (ok, dale, perfecto, genial, listo)
   if (text === 'ok' || text === 'dale' || text === 'perfecto' || text === 'genial' || text === 'buenisimo' || text === 'buenísimo' || text === 'excelente' || text === 'listo' || text === 'de una' || text === 'bien' || text.startsWith('ok ') || text.includes('entendido') || text.includes('comprendo')) {
-    return `¡Excelente! 👍 ¿Te gustaría que te preparemos una propuesta personalizada para tu empresa o prefieres coordinar una breve llamada de 15 minutos para ver una demo?`;
+    return `¡Excelente! 👍 ¿Te gustaría que te preparemos una propuesta personalizada para ${ctx.companyName} o prefieres coordinar un turno/cita en nuestro calendario?`;
   }
 
   // Conversación casual e identidad (cómo estás, quién eres, qué haces)
   if (text.includes('como estas') || text.includes('cómo estás') || text.includes('que tal') || text.includes('qué tal') || text.includes('todo bien') || text.includes('quien eres') || text.includes('quién eres') || text.includes('quien sos') || text.includes('quién sos') || text.includes('que haces') || text.includes('qué haces') || text.includes('como funciona') || text.includes('cómo funciona')) {
-    return `¡Todo excelente por aquí! 🚀 Soy el asistente con Inteligencia Artificial de la empresa, disponible 24/7 para responder tus consultas al instante, darte precios y coordinar reuniones. ¿En qué podemos colaborar con tu negocio hoy?`;
+    return `¡Todo excelente por aquí! 🚀 Soy ${ctx.agentName}, el asistente virtual de ${ctx.companyName} (${ctx.industry}), disponible 24/7 para responder tus consultas al instante, informarte de nuestros servicios y coordinar turnos. ¿En qué podemos ayudarte hoy?`;
   }
 
   // Ubicación y oficinas (dónde están, dirección, etc.)
   if (text.includes('donde estan') || text.includes('dónde están') || text.includes('donde quedan') || text.includes('dónde quedan') || text.includes('direccion') || text.includes('dirección') || text.includes('ubicacion') || text.includes('ubicación') || text.includes('de donde son') || text.includes('de dónde son')) {
-    return `📍 Atendemos a clientes de forma 100% remota y digital en toda la región, y también podemos coordinar reuniones virtuales por Google Meet o Zoom. ¿De qué ciudad o país nos escribes?`;
+    return `📍 Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Deseas coordinar un turno o visita presencial?`;
   }
 
   // Horarios de atención
   if (text.includes('horario') || text.includes('a que hora') || text.includes('a qué hora') || text.includes('atienden hoy') || text.includes('estan abiertos') || text.includes('están abiertos')) {
-    return `🕒 Nuestro canal de WhatsApp con Inteligencia Artificial te atiende las 24 horas del día, los 7 días de la semana. Nuestro equipo humano está disponible de lunes a viernes para llamadas estratégicas y demos personalizadas.`;
+    return `🕒 Horarios de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nNuestro canal de WhatsApp con IA atiende consultas las 24 horas del día.`;
   }
 
   // Saludos iniciales
   if (text.includes('hola') || text.includes('buenos') || text.includes('buenas') || text.includes('info') || text.includes('saludos') || text === 'buen dia' || text === 'buen día') {
-    return `¡Hola! 👋 Gracias por comunicarte con nuestro equipo. Soy el Asistente Virtual con IA 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar catálogo, servicios y precios\n2️⃣ Agendar una cita o demo estratégica\n3️⃣ Solicitar una cotización personalizada\n4️⃣ Hablar con un especialista humano`;
+    return `¡Hola! 👋 Gracias por comunicarte con ${ctx.companyName} (${ctx.industry}). Soy ${ctx.agentName}, tu asistente 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar catálogo de servicios y precios\n2️⃣ Agendar una cita o turno\n3️⃣ Solicitar una cotización personalizada\n4️⃣ Hablar con un especialista humano`;
   }
 
-  // Servicios y catálogo
+  // Servicios y catálogo de la empresa
   if (text.includes('servicio') || text.includes('catalogo') || text.includes('catálogo') || text.includes('ofrecen') || text.includes('solucion') || text.includes('solución') || text.includes('producto')) {
-    return `⭐ Brindamos soluciones llave en mano de Inteligencia Artificial para empresas:\n\n• 🤖 Agentes de IA en WhatsApp para atención y ventas 24/7\n• 📅 Agendamiento automático sincronizado con Google Calendar\n• 📄 Generador de Cotizaciones instantáneas con link de pago\n• 📊 CRM y embudos para captura y seguimiento de prospectos\n\n¿Te gustaría ver cómo funcionaría para tu rubro en una breve demo?`;
+    return `⭐ Servicios oficiales de ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Te gustaría coordinar un turno o solicitar más detalles sobre alguno en particular?`;
   }
 
-  // Precios y planes
+  // Precios y planes de la empresa
   if (text.includes('precio') || text.includes('costo') || text.includes('cuanto') || text.includes('cuánto') || text.includes('plan') || text.includes('tarifa') || text === '1') {
-    return `💵 ¡Excelente! Contamos con planes adaptados a cada etapa de tu negocio:\n\n⭐ *Plan Starter:* Agente de WhatsApp 24/7 entrenado a medida de tu catálogo.\n🚀 *Plan Growth Pro:* Agente + Agendamiento en Google Calendar + Generador de Cotizaciones + CRM.\n👑 *Plan Enterprise:* Solución corporativa con múltiples agentes e integraciones avanzadas.\n\n¿Te gustaría que te preparemos una propuesta personalizada para tu empresa?`;
+    return `💵 ¡Con gusto! Aquí tienes nuestros precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Te gustaría que te reservemos un turno o te preparemos una propuesta personalizada?`;
   }
 
   // Turnos y reuniones
   if (text.includes('turno') || text.includes('cita') || text.includes('reunion') || text.includes('reunión') || text.includes('demo') || text.includes('agendar') || text.includes('llamada') || text === '2') {
-    return `📅 ¡Con gusto! Para coordinar una demo o sesión estratégica de 15 minutos, indícanos qué día y horario te queda más cómodo (o déjanos tu correo) y nuestro sistema lo reservará en tu calendario.`;
+    return `📅 ¡Con gusto! Para coordinar tu turno en ${ctx.companyName}, indícanos qué día y horario te queda más cómodo (o déjanos tu correo) y nuestro sistema lo reservará de inmediato.`;
   }
 
   // Cotizaciones y presupuestos
   if (text.includes('cotiza') || text.includes('presupuesto') || text.includes('propuesta') || text === '3') {
-    return `📄 ¡Por supuesto! Podemos generarte una cotización oficial con desglose de ítems y link de pago online. ¿Cuál es el nombre de tu empresa o negocio y qué solución necesitas implementar?`;
+    return `📄 ¡Por supuesto! En ${ctx.companyName} podemos generarte una cotización oficial con desglose de ítems. ¿Cuál es tu nombre y qué solución o servicio necesitas?`;
   }
 
   // Asesor humano
   if (text.includes('humano') || text.includes('asesor') || text.includes('persona') || text.includes('operador') || text === '4') {
-    return `👤 Entendido. He notificado a uno de nuestros especialistas del equipo para que revise tu consulta y te responda a la brevedad por este mismo chat. ¡Muchas gracias por tu paciencia!`;
+    return `👤 Entendido. He notificado a uno de nuestros especialistas de ${ctx.companyName} para que revise tu consulta y te responda a la brevedad por este mismo chat. ¡Muchas gracias por tu paciencia!`;
   }
 
-  // Fallback conversacional cálido (no repite mensajes en comillas)
-  return `¡Hola! 👋 He recibido tu mensaje. Como asistente virtual con Inteligencia Artificial de la empresa, estoy para ayudarte 24/7.\n\n¿Te gustaría conocer nuestros servicios y planes, agendar una breve demo de 15 minutos, o prefieres hablar directamente con un asesor humano?`;
+  // Fallback conversacional cálido de la empresa
+  return `¡Hola! 👋 He recibido tu mensaje en ${ctx.companyName}. Como asistente virtual de ${ctx.industry}, estoy disponible 24/7.\n\n¿Te gustaría conocer nuestros servicios y precios, reservar un turno, o prefieres hablar directamente con un asesor humano?`;
 }
 
 // Meta Cloud API Fallback
@@ -753,6 +883,95 @@ const server = http.createServer(async (req, res) => {
       provider: customAiKey.startsWith('sk-') ? 'OpenAI' : 'Google Gemini',
       maskedKey: customAiKey ? (customAiKey.slice(0, 4) + '...' + customAiKey.slice(-4)) : ''
     }));
+    return;
+  }
+
+  // 7.1 Sync Multi-Tenant Clients & Agents by Niche
+  if (pathname === '/api/agency/clients/sync' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { agencyId, clients } = JSON.parse(body || '{}');
+        const agId = agencyId || 'agency_master_1';
+        if (Array.isArray(clients)) {
+          memoryCompanies[agId] = clients;
+          saveCompaniesToDisk();
+
+          // Also persist to Neon PostgreSQL clients table if available
+          if (db) {
+            for (const c of clients) {
+              try {
+                await db.query(
+                  `INSERT INTO clients (id, agency_id, name, industry, phone, notes)
+                   VALUES ($1, $2, $3, $4, $5, $6)
+                   ON CONFLICT (id) DO UPDATE SET 
+                     name = EXCLUDED.name,
+                     industry = EXCLUDED.industry,
+                     phone = EXCLUDED.phone,
+                     notes = EXCLUDED.notes`,
+                  [
+                    c.id, 
+                    agId, 
+                    c.name, 
+                    c.industry || 'Servicios', 
+                    c.phone || null, 
+                    JSON.stringify({ 
+                      agentName: c.agentName, 
+                      systemPrompt: c.systemPrompt, 
+                      knowledgeBase: c.knowledgeBase, 
+                      catalog: c.catalog, 
+                      salesFlow: c.salesFlow,
+                      supportFlow: c.supportFlow,
+                      afterSalesFlow: c.afterSalesFlow 
+                    })
+                  ]
+                );
+              } catch (cErr) {}
+            }
+          }
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, count: Array.isArray(clients) ? clients.length : 0 }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/agency/clients/sync' && req.method === 'GET') {
+    const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
+    const clients = memoryCompanies[agId] || memoryCompanies['agency_master_1'] || [];
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, clients }));
+    return;
+  }
+
+  // 7.2 Test Chat with Specific Trained Agent / Niche
+  if (pathname === '/api/agents/test-chat' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { message, clientId, agencyId } = JSON.parse(body || '{}');
+        const ctx = await getAgentCompanyContext(clientId, agencyId);
+        const reply = await generateAiAgentResponse(message || 'Hola', '5491100000000', clientId, agencyId);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          reply,
+          companyName: ctx.companyName,
+          industry: ctx.industry,
+          agentName: ctx.agentName
+        }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
     return;
   }
 

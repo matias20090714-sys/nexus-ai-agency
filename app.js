@@ -54,8 +54,42 @@ function getAgencyClients() {
   return data ? JSON.parse(data) : [];
 }
 
+async function syncAgencyClientsWithServer(clients) {
+  try {
+    const agencyId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
+    await fetch('/api/agency/clients/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agencyId, clients })
+    });
+  } catch (e) {
+    console.warn('Sync clients note:', e.message);
+  }
+}
+
+async function loadAgencyClientsFromServer() {
+  try {
+    const agencyId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
+    const res = await fetch(`/api/agency/clients/sync?agencyId=${agencyId}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.success && Array.isArray(data.clients) && data.clients.length > 0) {
+      const local = getAgencyClients();
+      if (local.length === 0) {
+        agencyClients = data.clients;
+        localStorage.setItem(`nexus_clients_${currentAgencyId}`, JSON.stringify(agencyClients));
+        localStorage.setItem('nexus_agency_clients', JSON.stringify(agencyClients));
+        if (typeof renderClientsList === 'function') renderClientsList();
+        if (typeof renderClientSelector === 'function') renderClientSelector();
+      }
+    }
+  } catch (e) {}
+}
+
 function saveAgencyClients(clients) {
   localStorage.setItem(`nexus_clients_${currentAgencyId}`, JSON.stringify(clients));
+  localStorage.setItem('nexus_agency_clients', JSON.stringify(clients));
+  syncAgencyClientsWithServer(clients);
 }
 
 function getAgencyLeads() {
@@ -1310,36 +1344,105 @@ function testGoogleCalendarLink() {
   showToast('Abriendo plantilla de evento en Google Calendar...', 'info');
 }
 
-async function testAgentLiveDialog() {
-  const prompt = document.getElementById('agentEditorPrompt').value.trim();
-  const knowledge = document.getElementById('agentEditorKnowledge').value.trim();
-  const apiKey = localStorage.getItem('nexus_ai_key') || DEFAULT_GEMINI_KEY;
+function testAgentLiveDialog() {
+  const client = agencyClients.find(c => c.id === activeClientId);
+  const companyName = client ? client.name : 'NEXUS AI Agency HQ';
+  const industry = client ? client.industry : 'Agencia de IA & Automatización';
+  const agentName = client ? (client.agentName || `Asistente de ${companyName}`) : 'Asistente Virtual IA';
 
-  if (!prompt) {
-    showToast('Ingresa un prompt para probar el agente', 'error');
-    return;
+  const titleEl = document.getElementById('testModalAgentTitle');
+  const subEl = document.getElementById('testModalAgentSubtitle');
+  if (titleEl) titleEl.innerText = `${agentName} • ${companyName}`;
+  if (subEl) subEl.innerText = `🟢 Nicho: ${industry} | Motor Gemini Activo`;
+
+  const chatBody = document.getElementById('testAgentChatBody');
+  if (chatBody) {
+    chatBody.innerHTML = `
+      <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
+        👋 ¡Hola! Soy el asistente virtual oficial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
+      </div>
+    `;
   }
 
-  showToast('Enviando consulta de prueba a Google Gemini...', 'info');
+  const modal = document.getElementById('modalTestAgentChat');
+  if (modal) modal.classList.add('active');
+  setTimeout(() => {
+    const inp = document.getElementById('testChatInput');
+    if (inp) inp.focus();
+  }, 200);
+}
+
+async function sendTestChatMessage(customText) {
+  const input = document.getElementById('testChatInput');
+  const text = (customText || (input ? input.value : '')).trim();
+  if (!text) return;
+  if (input) input.value = '';
+
+  const chatBody = document.getElementById('testAgentChatBody');
+  if (!chatBody) return;
+
+  // Add User message
+  const userDiv = document.createElement('div');
+  userDiv.style.alignSelf = 'flex-end';
+  userDiv.style.maxWidth = '85%';
+  userDiv.style.background = '#059669';
+  userDiv.style.color = 'white';
+  userDiv.style.padding = '9px 13px';
+  userDiv.style.borderRadius = '12px';
+  userDiv.style.fontSize = '13px';
+  userDiv.innerText = text;
+  chatBody.appendChild(userDiv);
+
+  // Typing indicator
+  const typingDiv = document.createElement('div');
+  typingDiv.id = 'testChatTypingIndicator';
+  typingDiv.style.alignSelf = 'flex-start';
+  typingDiv.style.maxWidth = '85%';
+  typingDiv.style.background = 'rgba(30, 41, 59, 0.9)';
+  typingDiv.style.color = '#94a3b8';
+  typingDiv.style.padding = '8px 12px';
+  typingDiv.style.borderRadius = '12px';
+  typingDiv.style.fontSize = '12.5px';
+  typingDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color:#34d399;"></i> Analizando consulta con IA...';
+  chatBody.appendChild(typingDiv);
+  chatBody.scrollTop = chatBody.scrollHeight;
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    const agencyId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
+    const res = await fetch('/api/agents/test-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          role: 'user',
-          parts: [{ text: `[INSTRUCCIONES]: ${prompt}\n\n[BASE DE CONOCIMIENTO]: ${knowledge}\n\n[MENSAJE DEL CLIENTE]: Hola, ¿cuáles son sus horarios y cómo puedo agendar?` }]
-        }]
+        message: text,
+        clientId: activeClientId,
+        agencyId
       })
     });
+    const data = await res.json();
+    if (typingDiv && typingDiv.parentNode) typingDiv.remove();
 
-    if (!response.ok) throw new Error('Error en API de Gemini');
-    const data = await response.json();
-    const replyText = data.candidates[0].content.parts[0].text;
-    alert(`🤖 RESPUESTA REAL DE GEMINI IA:\n\n${replyText}`);
+    const agentDiv = document.createElement('div');
+    agentDiv.style.alignSelf = 'flex-start';
+    agentDiv.style.maxWidth = '85%';
+    agentDiv.style.background = 'rgba(30, 41, 59, 0.95)';
+    agentDiv.style.border = '1px solid rgba(255,255,255,0.08)';
+    agentDiv.style.padding = '10px 14px';
+    agentDiv.style.borderRadius = '12px';
+    agentDiv.style.color = '#f1f5f9';
+    agentDiv.style.fontSize = '13px';
+    agentDiv.style.lineHeight = '1.45';
+    agentDiv.style.whiteSpace = 'pre-wrap';
+    agentDiv.innerText = data.reply || 'Hola, ¿en qué podemos ayudarte?';
+    chatBody.appendChild(agentDiv);
+    chatBody.scrollTop = chatBody.scrollHeight;
   } catch (err) {
-    alert(`🤖 RESPUESTA DEL ASISTENTE:\n\n"¡Hola! Con gusto. Atendemos de Lunes a Sábados y puedes agendar indicándome tu nombre y fecha preferida."\n\n(Fallback activo)`);
+    if (typingDiv && typingDiv.parentNode) typingDiv.remove();
+    const errDiv = document.createElement('div');
+    errDiv.style.alignSelf = 'flex-start';
+    errDiv.style.color = '#f43f5e';
+    errDiv.style.fontSize = '12px';
+    errDiv.innerText = 'Error al generar respuesta.';
+    chatBody.appendChild(errDiv);
   }
 }
 
@@ -3851,11 +3954,12 @@ function loadAcquisitionChecklist() {
   updateLossCalculator();
 }
 
-// Auto-load checklist and AI config status on startup
+// Auto-load checklist, AI config status and agency clients on startup
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
     setTimeout(loadAcquisitionChecklist, 300);
     setTimeout(loadAiConfigStatus, 500);
+    setTimeout(loadAgencyClientsFromServer, 650);
   });
 }
 
