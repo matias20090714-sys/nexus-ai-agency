@@ -225,9 +225,32 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
 // AI Auto-Responder Engine (Supports Google Gemini & OpenAI)
 const AI_CONFIG_FILE = path.join(__dirname, 'ai_config.json');
 const COMPANIES_FILE = path.join(__dirname, 'companies_agents.json');
+const PORTALS_FILE = path.join(__dirname, 'agency_portals.json');
 let customAiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
 let activeAiModel = process.env.AI_MODEL || 'gemini-1.5-flash';
 let memoryCompanies = {};
+let memoryPortals = {};
+
+function loadPortalsFromDisk() {
+  try {
+    if (fs.existsSync(PORTALS_FILE)) {
+      memoryPortals = JSON.parse(fs.readFileSync(PORTALS_FILE, 'utf8'));
+      return memoryPortals;
+    }
+  } catch (e) {
+    console.warn('Advertencia cargando agency_portals.json:', e.message);
+  }
+  return memoryPortals || {};
+}
+loadPortalsFromDisk();
+
+function savePortalsToDisk() {
+  try {
+    fs.writeFileSync(PORTALS_FILE, JSON.stringify(memoryPortals, null, 2), 'utf8');
+  } catch (e) {
+    console.warn('Advertencia guardando agency_portals.json:', e.message);
+  }
+}
 
 function loadAiConfig() {
   try {
@@ -1333,17 +1356,37 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/agency/public-portal' && req.method === 'GET') {
     try {
       const identifier = urlObj.searchParams.get('id') || urlObj.searchParams.get('slug') || urlObj.searchParams.get('agency') || 'agency_master_1';
-      
-      const agencyRes = await db.query(
-        `SELECT id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config FROM agencies WHERE id = $1 OR slug = $1 LIMIT 1`,
-        [identifier]
-      );
+      const allPortals = loadPortalsFromDisk();
+      const localEntry = allPortals[identifier] || allPortals['agency_master_1'] || Object.values(allPortals)[0];
 
-      let agencyData = agencyRes?.rows?.[0];
-      if (!agencyData) {
-        // Fallback to first agency in DB
-        const fallbackRes = await db.query(`SELECT id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config FROM agencies ORDER BY created_at ASC LIMIT 1`);
-        agencyData = fallbackRes?.rows?.[0];
+      let agencyData = null;
+      let returnPlans = [];
+
+      try {
+        const agencyRes = await db.query(
+          `SELECT id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config FROM agencies WHERE id = $1 OR slug = $1 LIMIT 1`,
+          [identifier]
+        );
+        agencyData = agencyRes?.rows?.[0];
+      } catch (dbErr) {
+        // Fallback to local disk storage
+      }
+
+      if (!agencyData && localEntry?.agency) {
+        agencyData = {
+          id: localEntry.agency.id || identifier,
+          name: localEntry.agency.name || 'NEXUS AI Agency',
+          slug: localEntry.agency.slug || identifier,
+          brand_color: localEntry.agency.brandColor || '#6366f1',
+          billing_phone: localEntry.agency.billingPhone || '',
+          bank_name: localEntry.agency.bankName || '',
+          bank_holder: localEntry.agency.bankHolder || '',
+          bank_cbu: localEntry.agency.bankCbu || '',
+          bank_tax_id: localEntry.agency.bankTaxId || '',
+          portal_title: localEntry.agency.portalTitle !== undefined ? localEntry.agency.portalTitle : null,
+          portal_subtitle: localEntry.agency.portalSubtitle !== undefined ? localEntry.agency.portalSubtitle : null,
+          portal_config: localEntry.agency.portalConfig || {}
+        };
       }
 
       if (!agencyData) {
@@ -1359,19 +1402,25 @@ const server = http.createServer(async (req, res) => {
         };
       }
 
-      // Fetch plans for this specific agency
-      const plansRes = await db.query(
-        `SELECT id, name, price, currency, period, category, features, payment_link, is_featured FROM plans WHERE agency_id = $1 ORDER BY price ASC`,
-        [agencyData.id]
-      );
-
-      let returnPlans = plansRes?.rows || [];
-      if (returnPlans.length === 0) {
-        // Fallback default plans so landing page always has high-converting plans ready
-        const defaultPlansRes = await db.query(
-          `SELECT id, name, price, currency, period, category, features, payment_link, is_featured FROM plans WHERE agency_id = 'agency_master_1' ORDER BY price ASC`
+      // Fetch plans from DB if possible
+      try {
+        const plansRes = await db.query(
+          `SELECT id, name, price, currency, period, category, features, payment_link, is_featured FROM plans WHERE agency_id = $1 ORDER BY price ASC`,
+          [agencyData.id]
         );
-        returnPlans = defaultPlansRes?.rows && defaultPlansRes.rows.length > 0 ? defaultPlansRes.rows : [
+        if (plansRes?.rows && plansRes.rows.length > 0) {
+          returnPlans = plansRes.rows;
+        }
+      } catch (e) {}
+
+      // If DB had no plans, check if local disk has custom saved plans!
+      if (returnPlans.length === 0 && localEntry?.plans && Array.isArray(localEntry.plans) && localEntry.plans.length > 0) {
+        returnPlans = localEntry.plans;
+      }
+
+      // Fallback default plans only if absolutely no custom plans were ever created
+      if (returnPlans.length === 0) {
+        returnPlans = [
           {
             id: 'plan_starter',
             name: 'Plan Starter IA',
@@ -1463,115 +1512,146 @@ const server = http.createServer(async (req, res) => {
         if (sanitizedSlug && sanitizedSlug.startsWith('-')) sanitizedSlug = sanitizedSlug.substring(1);
         if (sanitizedSlug && sanitizedSlug.endsWith('-')) sanitizedSlug = sanitizedSlug.substring(0, sanitizedSlug.length - 1);
 
-        // Update agency profile in database
-        const updatedAgency = await db.query(
-          `UPDATE agencies SET 
-            name = COALESCE($1, name),
-            brand_color = COALESCE($2, brand_color),
-            billing_phone = COALESCE($3, billing_phone),
-            portal_title = $4,
-            portal_subtitle = $5,
-            portal_config = $6,
-            bank_name = COALESCE($7, bank_name),
-            bank_holder = COALESCE($8, bank_holder),
-            bank_cbu = COALESCE($9, bank_cbu),
-            bank_tax_id = COALESCE($10, bank_tax_id),
-            slug = COALESCE($11, slug),
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = $12 OR slug = $12
-          RETURNING id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config`,
-          [
-            name || null,
-            brandColor || null,
-            billingPhone || null,
-            portalTitle !== undefined ? portalTitle : null,
-            portalSubtitle !== undefined ? portalSubtitle : null,
-            JSON.stringify(portalConfig || {}),
-            bankName || null,
-            bankHolder || null,
-            bankCbu || null,
-            bankTaxId || null,
-            sanitizedSlug || null,
-            agId
-          ]
-        );
+        // 1. Instantly persist to local disk agency_portals.json (zero-loss guarantee)
+        const currentPortals = loadPortalsFromDisk();
+        const agencyConfigObj = {
+          id: agId,
+          name: name || 'Mi Agencia',
+          slug: sanitizedSlug || currentPortals[agId]?.agency?.slug || 'nexus-ai',
+          brandColor: brandColor || '#6366f1',
+          billingPhone: billingPhone || '',
+          bankName: bankName || '',
+          bankHolder: bankHolder || '',
+          bankCbu: bankCbu || '',
+          bankTaxId: bankTaxId || '',
+          portalTitle: portalTitle !== undefined ? portalTitle : null,
+          portalSubtitle: portalSubtitle !== undefined ? portalSubtitle : null,
+          portalConfig: portalConfig || {}
+        };
+        const safePlans = (Array.isArray(plans) && plans.length > 0) ? plans : (currentPortals[agId]?.plans || []);
+        currentPortals[agId] = {
+          agency: agencyConfigObj,
+          plans: safePlans
+        };
+        if (sanitizedSlug) {
+          currentPortals[sanitizedSlug] = currentPortals[agId];
+        }
+        memoryPortals = currentPortals;
+        savePortalsToDisk();
 
-        let realAgencyRow = updatedAgency?.rows?.[0];
-        if (!realAgencyRow) {
-          const insertRes = await db.query(
-            `INSERT INTO agencies (id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-             ON CONFLICT (id) DO UPDATE SET
-               name = EXCLUDED.name,
-               slug = EXCLUDED.slug,
-               brand_color = EXCLUDED.brand_color,
-               billing_phone = EXCLUDED.billing_phone,
-               bank_name = EXCLUDED.bank_name,
-               bank_holder = EXCLUDED.bank_holder,
-               bank_cbu = EXCLUDED.bank_cbu,
-               bank_tax_id = EXCLUDED.bank_tax_id,
-               portal_title = EXCLUDED.portal_title,
-               portal_subtitle = EXCLUDED.portal_subtitle,
-               portal_config = EXCLUDED.portal_config,
-               updated_at = CURRENT_TIMESTAMP
-             RETURNING id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config`,
+        // 2. Persist to Neon DB if connected
+        let realAgencyRow = null;
+        try {
+          const updatedAgency = await db.query(
+            `UPDATE agencies SET 
+              name = COALESCE($1, name),
+              brand_color = COALESCE($2, brand_color),
+              billing_phone = COALESCE($3, billing_phone),
+              portal_title = $4,
+              portal_subtitle = $5,
+              portal_config = $6,
+              bank_name = COALESCE($7, bank_name),
+              bank_holder = COALESCE($8, bank_holder),
+              bank_cbu = COALESCE($9, bank_cbu),
+              bank_tax_id = COALESCE($10, bank_tax_id),
+              slug = COALESCE($11, slug),
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = $12 OR slug = $12
+            RETURNING id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config`,
             [
-              agId,
-              name || 'Mi Agencia',
-              sanitizedSlug || `agencia-${agId.slice(-6)}`,
-              brandColor || '#6366f1',
+              name || null,
+              brandColor || null,
               billingPhone || null,
+              portalTitle !== undefined ? portalTitle : null,
+              portalSubtitle !== undefined ? portalSubtitle : null,
+              JSON.stringify(portalConfig || {}),
               bankName || null,
               bankHolder || null,
               bankCbu || null,
               bankTaxId || null,
-              portalTitle !== undefined ? portalTitle : null,
-              portalSubtitle !== undefined ? portalSubtitle : null,
-              JSON.stringify(portalConfig || {})
+              sanitizedSlug || null,
+              agId
             ]
           );
-          realAgencyRow = insertRes?.rows?.[0];
-        }
 
-        const realAgencyId = realAgencyRow?.id || agId;
-
-        // Synchronize plans if provided
-        if (Array.isArray(plans) && plans.length > 0) {
-          // Clean existing plans for this agency
-          await db.query(`DELETE FROM plans WHERE agency_id = $1`, [realAgencyId]);
-
-          for (let i = 0; i < plans.length; i++) {
-            const plan = plans[i];
-            const pId = plan.id && !plan.id.startsWith('temp_') ? plan.id : `plan_${Date.now()}_${i}`;
-            const featuresList = Array.isArray(plan.features)
-              ? plan.features
-              : (typeof plan.features === 'string' ? plan.features.split('\n').map(x => x.trim()).filter(Boolean) : []);
-            const featuresJson = JSON.stringify(featuresList);
-
-            await db.query(
-              `INSERT INTO plans (id, agency_id, name, price, currency, period, category, features, payment_link, is_featured)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          realAgencyRow = updatedAgency?.rows?.[0];
+          if (!realAgencyRow) {
+            const insertRes = await db.query(
+              `INSERT INTO agencies (id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+               ON CONFLICT (id) DO UPDATE SET
+                 name = EXCLUDED.name,
+                 slug = EXCLUDED.slug,
+                 brand_color = EXCLUDED.brand_color,
+                 billing_phone = EXCLUDED.billing_phone,
+                 bank_name = EXCLUDED.bank_name,
+                 bank_holder = EXCLUDED.bank_holder,
+                 bank_cbu = EXCLUDED.bank_cbu,
+                 bank_tax_id = EXCLUDED.bank_tax_id,
+                 portal_title = EXCLUDED.portal_title,
+                 portal_subtitle = EXCLUDED.portal_subtitle,
+                 portal_config = EXCLUDED.portal_config,
+                 updated_at = CURRENT_TIMESTAMP
+               RETURNING id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id, portal_title, portal_subtitle, portal_config`,
               [
-                pId,
-                realAgencyId,
-                plan.name || 'Plan Comercial',
-                parseFloat(plan.price) || 0,
-                plan.currency || 'USD',
-                plan.period || plan.billingPeriod || 'mes',
-                plan.category || 'General',
-                featuresJson,
-                plan.paymentLink || plan.payment_link || '',
-                !!(plan.isFeatured || plan.is_featured)
+                agId,
+                name || 'Mi Agencia',
+                sanitizedSlug || `agencia-${agId.slice(-6)}`,
+                brandColor || '#6366f1',
+                billingPhone || null,
+                bankName || null,
+                bankHolder || null,
+                bankCbu || null,
+                bankTaxId || null,
+                portalTitle !== undefined ? portalTitle : null,
+                portalSubtitle !== undefined ? portalSubtitle : null,
+                JSON.stringify(portalConfig || {})
               ]
             );
+            realAgencyRow = insertRes?.rows?.[0];
           }
+
+          const realAgencyId = realAgencyRow?.id || agId;
+
+          // Synchronize plans to DB
+          if (Array.isArray(plans) && plans.length > 0) {
+            await db.query(`DELETE FROM plans WHERE agency_id = $1`, [realAgencyId]);
+
+            for (let i = 0; i < plans.length; i++) {
+              const plan = plans[i];
+              const pId = plan.id && !plan.id.startsWith('temp_') ? plan.id : `plan_${Date.now()}_${i}`;
+              const featuresList = Array.isArray(plan.features)
+                ? plan.features
+                : (typeof plan.features === 'string' ? plan.features.split('\n').map(x => x.trim()).filter(Boolean) : []);
+              const featuresJson = JSON.stringify(featuresList);
+
+              await db.query(
+                `INSERT INTO plans (id, agency_id, name, price, currency, period, category, features, payment_link, is_featured)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                [
+                  pId,
+                  realAgencyId,
+                  plan.name || 'Plan Comercial',
+                  parseFloat(plan.price) || 0,
+                  plan.currency || 'USD',
+                  plan.period || plan.billingPeriod || 'mes',
+                  plan.category || 'General',
+                  featuresJson,
+                  plan.paymentLink || plan.payment_link || '',
+                  !!(plan.isFeatured || plan.is_featured)
+                ]
+              );
+            }
+          }
+        } catch (dbErr) {
+          console.warn('[Portal Config] DB save warning, persisted via disk:', dbErr.message);
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
-          message: '¡Landing page y configuración de marca actualizadas en vivo!',
-          agency: realAgencyRow
+          message: '¡Landing page y configuración de planes y precios guardadas en vivo!',
+          agency: realAgencyRow || agencyConfigObj
         }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });

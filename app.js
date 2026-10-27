@@ -410,7 +410,26 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
         if (ag.portalTitle !== undefined) { profile.portalTitle = ag.portalTitle; }
         if (ag.portalSubtitle !== undefined) { profile.portalSubtitle = ag.portalSubtitle; }
         if (ag.portalConfig) { profile.portalConfig = ag.portalConfig; }
-        if (data.plans && data.plans.length > 0) { profile.plans = data.plans; }
+
+        if (data.plans && data.plans.length > 0) {
+          const isGenericDefaultServer = data.plans.length === 2 &&
+            data.plans[0].id === 'plan_starter' && String(data.plans[0].price).startsWith('290') &&
+            data.plans[1].id === 'plan_pro' && String(data.plans[1].price).startsWith('690');
+
+          const hasUserCustomPlans = profile.plans && Array.isArray(profile.plans) && profile.plans.length > 0 &&
+            (profile.plans.some(p => String(p.price) !== '290' && String(p.price) !== '690') || profile.plans.length !== 2);
+
+          if (!hasUserCustomPlans || !isGenericDefaultServer) {
+            profile.plans = data.plans.map(p => ({
+              ...p,
+              price: String(p.price || '0').replace(/\.00$/, ''),
+              billingPeriod: p.period || p.billingPeriod || 'mes',
+              paymentLink: p.payment_link || p.paymentLink || '',
+              isFeatured: !!(p.is_featured || p.isFeatured)
+            }));
+            changed = true;
+          }
+        }
         if (changed) saveAgencyProfile(profile);
 
         if (wlSlug) wlSlug.value = profile.slug || '';
@@ -2047,7 +2066,7 @@ function updateLossCalculator() {
 
   // Update labels
   const lblLeads = document.getElementById('calcLeadsValue');
-  const lblTicket = document.getElementById('calcTicketValue');
+  const lblTicket = document.getElementById('calcTicketLabel') || document.getElementById('calcTicketValue');
   const lblLoss = document.getElementById('calcLossPercentValue');
 
   if (lblLeads) lblLeads.textContent = `${leads} consultas/mes`;
@@ -2064,19 +2083,29 @@ function updateLossCalculator() {
   const elLostYearly = document.getElementById('calcLostYearly');
   const elRecoveredMonthly = document.getElementById('calcRecoveredMonthly');
 
-  if (elLostMonthly) elLostMonthly.textContent = `-$${lostRevenueMonthly.toLocaleString()} USD`;
-  if (elLostYearly) elLostYearly.textContent = `-$${lostRevenueYearly.toLocaleString()} USD`;
-  if (elRecoveredMonthly) elRecoveredMonthly.textContent = `+$${recoveredRevenueMonthly.toLocaleString()} USD extras/mes`;
+  if (elLostMonthly) elLostMonthly.textContent = `-$${lostRevenueMonthly.toLocaleString('en-US')} USD`;
+  if (elLostYearly) elLostYearly.textContent = `-$${lostRevenueYearly.toLocaleString('en-US')} USD`;
+  if (elRecoveredMonthly) elRecoveredMonthly.textContent = `+$${recoveredRevenueMonthly.toLocaleString('en-US')} USD extras/mes`;
 }
+
+let isSimulatingPortalReply = false;
 
 function simulatePortalReply(type) {
   const container = document.getElementById('portalSimChatBody');
   if (!container) return;
 
+  // Prevent overlapping race conditions if tapped rapidly
+  if (isSimulatingPortalReply) {
+    const existingTyping = document.getElementById('tempSimTyping');
+    if (existingTyping) existingTyping.remove();
+  }
+  isSimulatingPortalReply = true;
+
   const profile = getAgencyProfile();
   const agencyName = profile ? profile.name : 'NEXUS AI';
-  const priceStarter = profile ? (profile.priceStarter || '290') : '290';
-  const pricePro = profile ? (profile.pricePro || '690') : '690';
+  const plans = getAgencyPlans(profile);
+  const starterPlan = (plans && plans.length > 0) ? plans[0] : { name: 'Plan Starter IA', price: '290', currency: 'USD', billingPeriod: 'mes' };
+  const proPlan = (plans && plans.length > 1) ? plans[1] : (plans[0] || { name: 'Plan Growth Pro', price: '690', currency: 'USD', billingPeriod: 'mes' });
 
   const userMessages = {
     'turnos': '🦷 Hola, ¿tienen turnos disponibles para hoy?',
@@ -2087,8 +2116,8 @@ function simulatePortalReply(type) {
 
   const agentReplies = {
     'turnos': `¡Hola! Con gusto te ayudo 📅 Sí, para el día de hoy tenemos los siguientes espacios libres:<br><br>• <strong>15:30 hs</strong><br>• <strong>18:00 hs</strong><br><br>¿Cuál de estos horarios te queda más cómodo para reservarte el turno a tu nombre en Google Calendar?`,
-    'precios': `¡Hola! En <strong>${agencyName}</strong> contamos con planes llave en mano:<br><br>• <strong>Plan Starter:</strong> $${priceStarter} USD/mes (Agente WhatsApp 24/7)<br>• <strong>Plan Growth Pro:</strong> $${pricePro} USD/mes (Agente + Citas Calendar + Cotizador + CRM)<br><br>Ambos sin contratos forzados. ¿Te gustaría activar tu prueba de 48 horas?`,
-    'cotizacion': `¡Excelente! 📑 Te preparo una propuesta formal en PDF de inmediato.<br><br>Incluye: <strong>Configuración Multi-Flujo 24/7 + Conexión WhatsApp + Dashboard de Control</strong>.<br><br>🔗 Puedes ver y abonar la cotización oficial aquí: <a href="javascript:void(0)" onclick="openAgencyRealCheckout('pro')" style="color:#38bdf8; text-decoration:underline; font-weight:bold;">Ver Cotización con Link de Pago</a>`,
+    'precios': `¡Hola! En <strong>${escapeHtml(agencyName)}</strong> contamos con planes de IA llave en mano:<br><br>• <strong>${escapeHtml(starterPlan.name)}:</strong> $${escapeHtml(starterPlan.price)} ${escapeHtml(starterPlan.currency || 'USD')}/${escapeHtml(starterPlan.billingPeriod || starterPlan.period || 'mes')}<br>• <strong>${escapeHtml(proPlan.name)}:</strong> $${escapeHtml(proPlan.price)} ${escapeHtml(proPlan.currency || 'USD')}/${escapeHtml(proPlan.billingPeriod || proPlan.period || 'mes')}<br><br>Ambos sin contratos forzados. ¿Te gustaría activar tu prueba de 48 horas?`,
+    'cotizacion': `¡Excelente! 📑 Te preparo una propuesta formal en PDF de inmediato.<br><br>Incluye: <strong>Configuración Multi-Flujo 24/7 + Conexión WhatsApp + Dashboard de Control</strong>.<br><br>🔗 Puedes ver y abonar la cotización oficial aquí: <a href="javascript:void(0)" onclick="openAgencyRealCheckout('${escapeHtml(proPlan.id || 'pro')}')" style="color:#38bdf8; text-decoration:underline; font-weight:bold;">Ver Cotización con Link de Pago</a>`,
     'ubicacion': `¡Hola! 📍 Nuestra sede central atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong>.<br><br>Sin embargo, ¡nuestro Asistente de IA te atiende por aquí las <strong>24 horas del día, los 365 días del año</strong>! ¿En qué más te puedo colaborar?`
   };
 
@@ -2097,9 +2126,9 @@ function simulatePortalReply(type) {
   // Add User Message
   const userMsgEl = document.createElement('div');
   userMsgEl.className = 'chat-sim-msg user';
-  userMsgEl.innerHTML = `${userMessages[type]}<div style="font-size: 10px; color: rgba(255,255,255,0.6); text-align: right; margin-top: 4px;">${now}</div>`;
+  userMsgEl.innerHTML = `${userMessages[type] || 'Hola'}<div style="font-size: 10px; color: rgba(255,255,255,0.6); text-align: right; margin-top: 4px;">${now}</div>`;
   container.appendChild(userMsgEl);
-  container.scrollTop = container.scrollHeight;
+  setTimeout(() => { container.scrollTop = container.scrollHeight; }, 10);
 
   // Add Typing Indicator
   const typingEl = document.createElement('div');
@@ -2107,7 +2136,7 @@ function simulatePortalReply(type) {
   typingEl.id = 'tempSimTyping';
   typingEl.innerHTML = `<i class="fa-solid fa-ellipsis fa-fade"></i> <em>Escribiendo respuesta...</em>`;
   container.appendChild(typingEl);
-  container.scrollTop = container.scrollHeight;
+  setTimeout(() => { container.scrollTop = container.scrollHeight; }, 20);
 
   // Render Real Agent Reply after short delay
   setTimeout(() => {
@@ -2116,10 +2145,11 @@ function simulatePortalReply(type) {
 
     const agentMsgEl = document.createElement('div');
     agentMsgEl.className = 'chat-sim-msg agent';
-    agentMsgEl.innerHTML = `${agentReplies[type]}<div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">${now}</div>`;
+    agentMsgEl.innerHTML = `${agentReplies[type] || '¡Hola! ¿En qué podemos ayudarte?'}<div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">${now}</div>`;
     container.appendChild(agentMsgEl);
-    container.scrollTop = container.scrollHeight;
-  }, 600);
+    setTimeout(() => { container.scrollTop = container.scrollHeight; }, 30);
+    isSimulatingPortalReply = false;
+  }, 500);
 }
 
 function openContactDemoModal(plan = 'Sesión Estratégica') {
@@ -2579,8 +2609,15 @@ function renderAgencyPlansAdmin() {
             ${p.isFeatured ? `<span class="brand-badge" style="background: rgba(99,102,241,0.25); color: #a5b4fc; font-size: 10px;">★ DESTACADO</span>` : ''}
           </div>
 
-          <div class="plan-admin-price">
-            $${escapeHtml(p.price)} <span style="font-size: 13px; color: var(--text-dim); font-weight: normal;">${escapeHtml(p.currency || 'USD')} / ${escapeHtml(p.billingPeriod || 'mes')}</span>
+          <div style="margin: 12px 0 10px 0; background: rgba(10, 13, 28, 0.7); padding: 10px 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+            <label style="font-size: 11px; color: #38bdf8; font-weight: 700; display: block; margin-bottom: 4px;">
+              <i class="fa-solid fa-dollar-sign"></i> Precio en tu Landing ($ USD):
+            </label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 20px; font-weight: 900; color: #34d399;">$</span>
+              <input type="number" class="form-control plan-card-price-input" data-plan-id="${p.id}" value="${escapeHtml(p.price)}" style="font-size: 18px; font-weight: 800; color: white; width: 120px; padding: 6px 10px; background: rgba(0,0,0,0.5); border: 1px solid rgba(52,211,153,0.4);" oninput="updatePlanPriceInline('${p.id}', this.value)" title="Edita el precio directamente aquí">
+              <span style="font-size: 13px; color: var(--text-dim); font-weight: 600;">${escapeHtml(p.currency || 'USD')} / ${escapeHtml(p.billingPeriod || p.period || 'mes')}</span>
+            </div>
           </div>
 
           <div style="font-size: 12px; color: #a5b4fc; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
@@ -2595,7 +2632,7 @@ function renderAgencyPlansAdmin() {
 
         <div class="plan-admin-actions">
           <button class="btn btn-secondary btn-sm" style="flex: 1;" onclick="openModalPlanEditor('${p.id}')">
-            <i class="fa-solid fa-pen-to-square"></i> Editar
+            <i class="fa-solid fa-pen-to-square"></i> Editar Completo
           </button>
           <button class="btn btn-secondary btn-sm" style="color: #f87171;" onclick="deletePlan('${p.id}')" title="Eliminar plan">
             <i class="fa-solid fa-trash"></i>
@@ -2604,6 +2641,17 @@ function renderAgencyPlansAdmin() {
       </div>
     `;
   }).join('');
+}
+
+function updatePlanPriceInline(planId, newPrice) {
+  const profile = getAgencyProfile();
+  if (!profile || !profile.plans) return;
+  const p = profile.plans.find(x => x.id === planId);
+  if (p) {
+    p.price = String(newPrice || '0').trim().replace(/\.00$/, '');
+    saveAgencyProfile(profile);
+    renderPortalPricing();
+  }
 }
 
 function openModalPlanEditor(planId = null) {
@@ -2869,6 +2917,21 @@ function saveWhiteLabelSettings() {
     urgencyText,
     ctaText
   };
+
+  // Collect all updated plan prices from plan cards
+  const priceInputs = document.querySelectorAll('.plan-card-price-input');
+  if (priceInputs.length > 0) {
+    if (!profile.plans || !Array.isArray(profile.plans)) {
+      profile.plans = getAgencyPlans(profile);
+    }
+    priceInputs.forEach(inp => {
+      const pId = inp.getAttribute('data-plan-id');
+      const target = profile.plans.find(x => x.id === pId);
+      if (target && inp.value.trim()) {
+        target.price = String(inp.value.trim()).replace(/\.00$/, '');
+      }
+    });
+  }
 
   saveAgencyProfile(profile);
 
@@ -3863,10 +3926,10 @@ function launchGoogleMapsSearch() {
   showToast(`¡Búsqueda de "${niche}" en ${city} abierta en Google Maps!`, 'success');
 }
 
-function updateLossCalculator() {
-  const leadsInput = document.getElementById('calcLeadsInput');
-  const ticketInput = document.getElementById('calcTicketValue');
-  const rateSelect = document.getElementById('calcLossRateSelect');
+function updateProspectPitchCalculator() {
+  const leadsInput = document.getElementById('calcPitchLeadsInput');
+  const ticketInput = document.getElementById('calcPitchTicketValue');
+  const rateSelect = document.getElementById('calcPitchLossRateSelect');
 
   const leads = parseInt(leadsInput ? leadsInput.value : 250) || 250;
   const ticket = parseFloat(ticketInput ? ticketInput.value : 180) || 180;
@@ -3876,9 +3939,9 @@ function updateLossCalculator() {
   const monthlyLoss = lostCustomers * ticket;
   const breakEven = Math.max(1, Math.ceil(290 / ticket));
 
-  const lossEl = document.getElementById('calcMonthlyLossDisplay');
-  const lostCustEl = document.getElementById('calcLostCustomersDisplay');
-  const breakEvenEl = document.getElementById('calcBreakEvenDisplay');
+  const lossEl = document.getElementById('calcPitchMonthlyLossDisplay');
+  const lostCustEl = document.getElementById('calcPitchLostCustomersDisplay');
+  const breakEvenEl = document.getElementById('calcPitchBreakEvenDisplay');
 
   if (lossEl) lossEl.innerText = `-$${monthlyLoss.toLocaleString('en-US')} USD / mes`;
   if (lostCustEl) lostCustEl.innerText = `${lostCustomers} clientes`;
@@ -3886,10 +3949,10 @@ function updateLossCalculator() {
 }
 
 function copyLossPitchMessage() {
-  const bizNameInput = document.getElementById('calcBusinessName');
-  const leadsInput = document.getElementById('calcLeadsInput');
-  const ticketInput = document.getElementById('calcTicketValue');
-  const rateSelect = document.getElementById('calcLossRateSelect');
+  const bizNameInput = document.getElementById('calcPitchBusinessName');
+  const leadsInput = document.getElementById('calcPitchLeadsInput');
+  const ticketInput = document.getElementById('calcPitchTicketValue');
+  const rateSelect = document.getElementById('calcPitchLossRateSelect');
 
   const name = (bizNameInput && bizNameInput.value.trim()) ? bizNameInput.value.trim() : 'su empresa';
   const leads = parseInt(leadsInput ? leadsInput.value : 250) || 250;
@@ -3951,12 +4014,14 @@ function loadAcquisitionChecklist() {
     }
   }
 
+  updateProspectPitchCalculator();
   updateLossCalculator();
 }
 
 // Auto-load checklist, AI config status and agency clients on startup
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(updateLossCalculator, 150);
     setTimeout(loadAcquisitionChecklist, 300);
     setTimeout(loadAiConfigStatus, 500);
     setTimeout(loadAgencyClientsFromServer, 650);

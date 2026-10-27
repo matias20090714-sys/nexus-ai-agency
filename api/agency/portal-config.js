@@ -1,4 +1,7 @@
 const db = require('../../db');
+const fs = require('fs');
+const path = require('path');
+const PORTALS_FILE = path.join(process.cwd(), 'agency_portals.json');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -36,6 +39,36 @@ module.exports = async (req, res) => {
     let sanitizedSlug = slug ? slug.toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-') : null;
     if (sanitizedSlug && sanitizedSlug.startsWith('-')) sanitizedSlug = sanitizedSlug.substring(1);
     if (sanitizedSlug && sanitizedSlug.endsWith('-')) sanitizedSlug = sanitizedSlug.substring(0, sanitizedSlug.length - 1);
+
+    // Save to disk agency_portals.json
+    try {
+      let portals = {};
+      if (fs.existsSync(PORTALS_FILE)) {
+        portals = JSON.parse(fs.readFileSync(PORTALS_FILE, 'utf8'));
+      }
+      const agencyObj = {
+        id: agId,
+        name: name || 'Mi Agencia',
+        slug: sanitizedSlug || portals[agId]?.agency?.slug || 'nexus-ai',
+        brandColor: brandColor || '#6366f1',
+        billingPhone: billingPhone || '',
+        bankName: bankName || '',
+        bankHolder: bankHolder || '',
+        bankCbu: bankCbu || '',
+        bankTaxId: bankTaxId || '',
+        portalTitle: portalTitle !== undefined ? portalTitle : null,
+        portalSubtitle: portalSubtitle !== undefined ? portalSubtitle : null,
+        portalConfig: portalConfig || {}
+      };
+      portals[agId] = {
+        agency: agencyObj,
+        plans: Array.isArray(plans) && plans.length > 0 ? plans : (portals[agId]?.plans || [])
+      };
+      if (sanitizedSlug) portals[sanitizedSlug] = portals[agId];
+      fs.writeFileSync(PORTALS_FILE, JSON.stringify(portals, null, 2));
+    } catch (diskErr) {
+      console.warn('Error guardando en disco portal-config:', diskErr.message);
+    }
 
     const updatedAgency = await db.query(
       `UPDATE agencies SET 

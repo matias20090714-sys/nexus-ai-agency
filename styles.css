@@ -1438,6 +1438,11 @@ textarea.form-control {
   flex-direction: column;
   gap: 12px;
   min-height: 260px;
+  max-height: 380px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 .chat-sim-msg {
@@ -1447,6 +1452,10 @@ textarea.form-control {
   font-size: 13.5px;
   line-height: 1.45;
   position: relative;
+  flex-shrink: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  box-sizing: border-box;
   animation: fadeInMsg 0.25s ease-out;
 }
 
@@ -1870,26 +1879,50 @@ textarea.form-control {
 
   /* Live Chat Simulator on Mobile */
   .portal-chat-simulator {
+    width: 100% !important;
     max-width: 100% !important;
-    border-radius: var(--radius-md) !important;
-    margin: 0 !important;
+    border-radius: var(--radius-lg) !important;
+    margin: 16px 0 !important;
+    overflow: hidden !important;
   }
 
   .chat-sim-body {
-    height: 220px !important;
-    padding: 10px !important;
+    height: 310px !important;
+    max-height: 350px !important;
+    min-height: 240px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 12px 14px !important;
+    gap: 10px !important;
+    box-sizing: border-box !important;
   }
 
   .chat-sim-msg {
-    font-size: 11.5px !important;
-    max-width: 92% !important;
+    font-size: 13px !important;
+    line-height: 1.45 !important;
+    max-width: 90% !important;
+    padding: 9px 12px !important;
+    flex-shrink: 0 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    box-sizing: border-box !important;
+  }
+
+  .chat-sim-chips-container {
+    padding: 10px !important;
+    gap: 6px !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
   }
 
   .quick-chip {
-    font-size: 10.5px !important;
-    padding: 6px 8px !important;
-    width: 100% !important;
-    text-align: left !important;
+    font-size: 11px !important;
+    padding: 7px 10px !important;
+    width: auto !important;
+    flex: 1 1 calc(50% - 6px) !important;
+    text-align: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
   }
 
   /* Buttons on Mobile */

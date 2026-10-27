@@ -1,0 +1,61 @@
+{
+  "agency_master_1": {
+    "agency": {
+      "id": "agency_master_1",
+      "name": "NEXUS AI Agency",
+      "slug": "nexus-ai",
+      "brandColor": "#6366f1",
+      "billingPhone": "5491148923310",
+      "bankName": "",
+      "bankHolder": "",
+      "bankCbu": "",
+      "bankTaxId": "",
+      "portalTitle": null,
+      "portalSubtitle": null,
+      "portalConfig": {}
+    },
+    "plans": [
+      {
+        "id": "plan_starter",
+        "name": "Plan Starter IA",
+        "price": "290",
+        "currency": "USD",
+        "period": "mes",
+        "billingPeriod": "mes",
+        "category": "Negocios & Comercios Locales",
+        "features": [
+          "1 Agente de WhatsApp 24/7 entrenado a medida",
+          "Respuestas instantáneas en menos de 2 seg",
+          "Catálogo interactivo de servicios/productos",
+          "Derivación a WhatsApp personal ante emergencias",
+          "Mantenimiento mensual e IA incluida"
+        ],
+        "paymentLink": "",
+        "payment_link": "",
+        "isFeatured": false,
+        "is_featured": false
+      },
+      {
+        "id": "plan_pro",
+        "name": "Plan Growth Pro Multi-Flujo",
+        "price": "690",
+        "currency": "USD",
+        "period": "mes",
+        "billingPeriod": "mes",
+        "category": "★ DESTACADO | Clínicas, Inmobiliarias & Empresas",
+        "features": [
+          "Todo lo incluido en Starter",
+          "Agendamiento Automático en Google Calendar",
+          "Recordatorios WhatsApp anti-ausentismo (24h y 2h)",
+          "Generador de Cotizaciones con links de pago",
+          "Encuestas NPS y Reseñas en Google Maps 5★",
+          "CRM Kanban y Pipeline de Leads en tiempo real"
+        ],
+        "paymentLink": "",
+        "payment_link": "",
+        "isFeatured": true,
+        "is_featured": true
+      }
+    ]
+  }
+}

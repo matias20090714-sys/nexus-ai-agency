@@ -428,7 +428,7 @@
                   <div class="calc-field-group" style="margin-top: 20px;">
                     <label style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
                       <span>💵 Valor promedio de tu producto/servicio (USD):</span>
-                      <strong id="calcTicketValue" style="color: #34d399; font-size: 15px;">$120 USD</strong>
+                      <strong id="calcTicketLabel" style="color: #34d399; font-size: 15px;">$120 USD</strong>
                     </label>
                     <input type="range" id="calcTicketInput" min="10" max="2000" step="10" value="120" class="landing-slider" oninput="updateLossCalculator()">
                   </div>
@@ -2222,7 +2222,7 @@ Pruébalo 2 minutos y me dices qué te parece.
                 <div style="background: rgba(10, 13, 28, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 20px;">
                   <div class="form-group">
                     <label class="form-label" style="font-size: 12px; color: white; font-weight: 700;">Nombre de la Empresa Prospecto:</label>
-                    <input type="text" id="calcBusinessName" class="form-control" value="Clínica Dental San Lucas" oninput="updateLossCalculator()">
+                    <input type="text" id="calcPitchBusinessName" class="form-control" value="Clínica Dental San Lucas" oninput="updateProspectPitchCalculator()">
                   </div>
 
                   <div class="form-group">
@@ -2230,8 +2230,8 @@ Pruébalo 2 minutos y me dices qué te parece.
                       Consultas estimadas que reciben al mes por WhatsApp:
                     </label>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                      <input type="range" id="calcLeadsRange" min="50" max="1500" step="25" value="250" class="form-control" style="padding: 0;" oninput="document.getElementById('calcLeadsInput').value = this.value; updateLossCalculator();">
-                      <input type="number" id="calcLeadsInput" class="form-control" style="width: 100px; text-align: center; font-weight: 700; color: #38bdf8;" value="250" oninput="document.getElementById('calcLeadsRange').value = this.value; updateLossCalculator();">
+                      <input type="range" id="calcPitchLeadsRange" min="50" max="1500" step="25" value="250" class="form-control" style="padding: 0;" oninput="document.getElementById('calcPitchLeadsInput').value = this.value; updateProspectPitchCalculator();">
+                      <input type="number" id="calcPitchLeadsInput" class="form-control" style="width: 100px; text-align: center; font-weight: 700; color: #38bdf8;" value="250" oninput="document.getElementById('calcPitchLeadsRange').value = this.value; updateProspectPitchCalculator();">
                     </div>
                   </div>
 
@@ -2239,14 +2239,14 @@ Pruébalo 2 minutos y me dices qué te parece.
                     <label class="form-label" style="font-size: 12px; color: white; font-weight: 700;">
                       Valor promedio de una venta / servicio ($ USD):
                     </label>
-                    <input type="number" id="calcTicketValue" class="form-control" style="font-weight: 700; color: #34d399;" value="180" oninput="updateLossCalculator()">
+                    <input type="number" id="calcPitchTicketValue" class="form-control" style="font-weight: 700; color: #34d399;" value="180" oninput="updateProspectPitchCalculator()">
                   </div>
 
                   <div class="form-group">
                     <label class="form-label" style="font-size: 12px; color: white; font-weight: 700;">
                       % de personas que se van por no responder en 2 seg (Promedio industria: 25% - 40%):
                     </label>
-                    <select id="calcLossRateSelect" class="form-control" onchange="updateLossCalculator()">
+                    <select id="calcPitchLossRateSelect" class="form-control" onchange="updateProspectPitchCalculator()">
                       <option value="0.20">20% (Pérdida moderada)</option>
                       <option value="0.30" selected>30% (Pérdida promedio del mercado)</option>
                       <option value="0.45">45% (Pérdida alta - Sin atención nocturna ni fines de semana)</option>
@@ -2260,7 +2260,7 @@ Pruébalo 2 minutos y me dices qué te parece.
                     <div style="font-size: 12px; text-transform: uppercase; font-weight: 800; color: #f43f5e; letter-spacing: 0.5px;">
                       ⚠️ IMPACTO FINANCIERO ESTIMADO PARA EL NEGOCIO
                     </div>
-                    <div style="font-size: 32px; font-weight: 900; color: #f43f5e; margin-top: 6px;" id="calcMonthlyLossDisplay">
+                    <div style="font-size: 32px; font-weight: 900; color: #f43f5e; margin-top: 6px;" id="calcPitchMonthlyLossDisplay">
                       -$13,500 USD / mes
                     </div>
                     <div style="font-size: 12.5px; color: #94a3b8; margin-top: 2px;">
@@ -2270,11 +2270,11 @@ Pruébalo 2 minutos y me dices qué te parece.
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
                       <div>
                         <div style="font-size: 11px; color: var(--text-muted);">Clientes Perdidos / Mes:</div>
-                        <div style="font-size: 18px; font-weight: 800; color: white;" id="calcLostCustomersDisplay">75 clientes</div>
+                        <div style="font-size: 18px; font-weight: 800; color: white;" id="calcPitchLostCustomersDisplay">75 clientes</div>
                       </div>
                       <div>
                         <div style="font-size: 11px; color: var(--text-muted);">Para pagar tu plan ($290/mes):</div>
-                        <div style="font-size: 18px; font-weight: 800; color: #34d399;" id="calcBreakEvenDisplay">Solo 2 clientes</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #34d399;" id="calcPitchBreakEvenDisplay">Solo 2 clientes</div>
                       </div>
                     </div>
                   </div>
