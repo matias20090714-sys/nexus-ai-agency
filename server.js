@@ -1,6 +1,24 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+
+// Auto-load .env configuration if present
+const ENV_PATH = path.join(__dirname, '.env');
+if (fs.existsSync(ENV_PATH)) {
+  try {
+    const lines = fs.readFileSync(ENV_PATH, 'utf8').split(/\r?\n/);
+    for (const l of lines) {
+      const trimmed = l.trim();
+      if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+        const [k, ...v] = trimmed.split('=');
+        const key = k.trim();
+        const val = v.join('=').trim().replace(/^['"]|['"]$/g, '');
+        if (key && !process.env[key]) process.env[key] = val;
+      }
+    }
+  } catch (e) {}
+}
+
 const https = require('https');
 const QRCode = require('qrcode');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
