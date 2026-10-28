@@ -427,7 +427,8 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
       salesFlow: 'Calificación: ¿Cuántas consultas comerciales reciben al mes en WhatsApp y cuántas ventas estiman que se pierden fuera de horario?\nObjeción de Precio: Rescatando apenas 1 o 2 ventas al mes con atención 24/7, el servicio se paga solo al 100%.\nCierre: Invita a coordinar una breve llamada estratégica o envía los datos para activar el servicio de inmediato.',
       supportSummary: 'Soporte 24/7 para incidencias y actualizaciones de catálogo. Garantía de operatividad 99.9%.',
       afterSalesSummary: 'Onboarding guiado en 48 horas, configuración personalizada y seguimiento continuo de métricas.',
-      nichePlaybook: getNicheSalesPlaybook('servicios_b2b')
+      nichePlaybook: getNicheSalesPlaybook('servicios_b2b'),
+      apiKey: portal.agency?.ai_key || portal.portalConfig?.ai_key || portal.aiKey || ''
     };
   }
 
@@ -530,7 +531,8 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     salesFlow: salesFlowStr,
     supportSummary: supportStr,
     afterSalesSummary: afterSalesStr,
-    nichePlaybook: nichePlaybook
+    nichePlaybook: nichePlaybook,
+    apiKey: hydrated.apiKey || hydrated.ai_key || hydrated.geminiApiKey || ''
   };
 }
 
@@ -605,155 +607,224 @@ function buildGeminiContents(history, currentMessage) {
 function generateContextualSalesReply(lowerText, rawText, history, ctx, docContext) {
   const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
   const lastUserMsg = history.filter(h => h.role === 'user').slice(-2, -1)[0]?.text || '';
-  const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan') || (h.text || '').toLowerCase().includes('costo'));
+  const lowerBot = lastBotMsg.toLowerCase();
+  const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan') || (h.text || '').toLowerCase().includes('costo') || (h.text || '').toLowerCase().includes('usd'));
   const hadTurnDiscussion = history.some(h => (h.text || '').toLowerCase().includes('turno') || (h.text || '').toLowerCase().includes('cita') || (h.text || '').toLowerCase().includes('agenda') || (h.text || '').toLowerCase().includes('horario'));
   const isConversationOngoing = history.length > 0;
 
+  let reply = '';
+
   // 1. RAG Documentation Match
   if (docContext && (lowerText.includes('precio') || lowerText.includes('catalogo') || lowerText.includes('catálogo') || lowerText.includes('servicio') || lowerText.includes('costo') || lowerText.includes('cuanto') || lowerText.includes('cuánto'))) {
-    return `¡Con gusto! Aquí tienes los detalles oficiales de ${ctx.companyName}:\n\n${docContext.slice(0, 480)}...\n\n¿Te gustaría coordinar una cotización a medida o prefieres agendar un turno para avanzar?`;
+    reply = `¡Con gusto! Aquí tienes los detalles oficiales de ${ctx.companyName}:\n\n${docContext.slice(0, 480)}...\n\n¿Te gustaría coordinar una cotización a medida o prefieres agendar un turno para avanzar?`;
   }
 
-  // 2. Intención de Compra Directa / Cierre / Acuerdo
+  // 2. Affirmations & Agreements (sii, si, sí, dale, opino que si, claro, etc.)
+  const isAffirmative = /^(s+i+|s+e+p|s+i+s+i+|clar+o+|obvio|totalmente|de una|dale|bueno|de acuerdo|me parece bien|opino que s+i+|me interesa|está bien|esta bien|por supuesto|vamos)/i.test(lowerText) ||
+    lowerText.includes('opino que si') || lowerText.includes('opino que sí') || lowerText.includes('me parece que si') || lowerText.includes('me parece bien') || lowerText.includes('de acuerdo') || lowerText.includes('totalmente') ||
+    lowerText === 'si' || lowerText.startsWith('si ') || lowerText === 'sí' || lowerText.startsWith('sí ') || lowerText.includes('sii') || lowerText.includes('siii');
+
+  if (!reply && isAffirmative) {
+    if (lowerBot.includes('activación') || lowerBot.includes('activacion') || lowerBot.includes('datos directos') || lowerBot.includes('llamada de 10') || lowerBot.includes('cuál te va mejor') || lowerBot.includes('cual te va mejor')) {
+      reply = `¡Excelente! 🚀 Quedamos a un solo paso de activar tu servicio en ${ctx.companyName}. Puedes realizar el alta directa o si prefieres la breve llamada estratégica de 10 minutos, indícanos por favor qué horario te queda más cómodo (mañana o tarde) y tu número o disponibilidad para agendarte de inmediato. ¡Te esperamos!`;
+    } else if (hadPriceDiscussion || lowerBot.includes('starter') || lowerBot.includes('growth') || lowerBot.includes('usd') || lowerBot.includes('$') || lowerBot.includes('planes y servicios') || lowerBot.includes('alternativas oficiales') || lowerBot.includes('prioritario')) {
+      reply = `¡Genial, avancemos! 🚀 Para dejar todo listo y comenzar a operar de inmediato en ${ctx.companyName}:\n\n¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales? ¿Cuál te va mejor?`;
+    } else {
+      reply = `¡Excelente! 🚀 Te cuento en concreto cómo te ayudamos en ${ctx.companyName}:\n\n` +
+        `1. ⚡ Automatizamos tu atención y ventas en WhatsApp 24/7 para responder al instante y nunca perder prospectos por demoras.\n` +
+        `2. 🎯 Calificamos a cada cliente, resolvemos dudas frecuentes y manejamos objeciones con total naturalidad.\n` +
+        `3. 📅 Agendamos citas en calendario y enviamos cotizaciones con medios de pago directo.\n\n` +
+        `Nuestros planes y servicios oficiales son:\n${ctx.catalogSummary}\n\n` +
+        `¿Cuál de estas alternativas se ajusta mejor a tu negocio o prefieres que coordinemos una breve demo para mostrártelo en vivo?`;
+    }
+  }
+
+  // 3. Intención de Compra Directa / Pago / Contratación
   const isBuyingSignal = lowerText.includes('me interesa') || lowerText.includes('quiero contratar') || lowerText.includes('como contrato') || lowerText.includes('cómo contrato') ||
     lowerText.includes('como pago') || lowerText.includes('cómo pago') || lowerText.includes('donde pago') || lowerText.includes('dónde pago') || lowerText.includes('donde transfiero') ||
     lowerText.includes('dónde transfiero') || lowerText.includes('empecemos') || lowerText.includes('lo quiero') || lowerText.includes('de una') || lowerText.includes('vamos con') ||
     lowerText.includes('acepto') || lowerText.includes('lo compro') || lowerText.includes('lo tomo') || lowerText.includes('reservamelo') || lowerText.includes('resérvamelo') ||
     lowerText.includes('agendemos') || lowerText.includes('dame los datos') || lowerText.includes('pasame el link') || lowerText.includes('pásame el link') ||
-    lowerText === 'dale' || lowerText.startsWith('dale ') || lowerText === 'si' || lowerText === 'sí' || lowerText === 'ok dale' || lowerText === 'listo dale';
+    lowerText.includes('quiero empezar') || lowerText.includes('lo cerramos');
 
-  if (isBuyingSignal) {
+  if (!reply && isBuyingSignal) {
     const isPaymentOrContract = lowerText.includes('contrat') || lowerText.includes('pago') || lowerText.includes('pagar') || lowerText.includes('activ') || lowerText.includes('empez') || lowerText.includes('compr') || lowerText.includes('link') || lowerText.includes('datos');
     if (hadTurnDiscussion && !isPaymentOrContract) {
-      return `¡Excelente! 🚀 Quedamos a un solo paso. Para dejar confirmada tu fecha en ${ctx.companyName}: ¿Te queda más cómodo en el turno de la mañana o prefieres por la tarde? Indícanos tu día preferido y te reservamos de inmediato.`;
+      reply = `¡Excelente! 🚀 Quedamos a un solo paso. Para dejar confirmada tu fecha en ${ctx.companyName}: ¿Te queda más cómodo en el turno de la mañana o prefieres por la tarde? Indícanos tu día preferido y te reservamos de inmediato.`;
+    } else {
+      reply = `¡Excelente decisión! 🚀 Nos entusiasma muchísimo comenzar a trabajar contigo en ${ctx.companyName}.\n\nPara dejar todo confirmado y avanzar de inmediato: ¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales?`;
     }
-    return `¡Excelente decisión! 🚀 Nos entusiasma muchísimo comenzar a trabajar contigo en ${ctx.companyName}.\n\nPara dejar todo confirmado y avanzar de inmediato: ¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales?`;
   }
 
-  // 3. Manejo de Objeción de Precio (Reencuadre de Valor, ROI y Presupuesto)
+  // 4. Pregunta de Propuesta de Valor, Ayuda y Servicios ("En qué me ayuda", "De qué trata", "Para qué sirve", "Qué hacen")
+  const isHelpOrValueQuestion = lowerText.includes('ayuda') || lowerText.includes('ayudan') || lowerText.includes('en que me') || lowerText.includes('en qué me') ||
+    lowerText.includes('como me ayuda') || lowerText.includes('cómo me ayuda') || lowerText.includes('de que trata') || lowerText.includes('de qué trata') ||
+    lowerText.includes('para que sirve') || lowerText.includes('para qué sirve') || lowerText.includes('que hacen') || lowerText.includes('qué hacen') ||
+    lowerText.includes('a que se dedican') || lowerText.includes('a qué se dedican') || lowerText.includes('que ofrecen') || lowerText.includes('qué ofrecen') ||
+    lowerText.includes('como funciona') || lowerText.includes('cómo funciona') || lowerText.includes('que es su agencia') || lowerText.includes('qué es su agencia') ||
+    lowerText.includes('por que contratarlos') || lowerText.includes('por qué contratarlos') || lowerText.includes('beneficio') || lowerText.includes('beneficios') ||
+    lowerText.includes('servicio') || lowerText.includes('servicios');
+
+  if (!reply && isHelpOrValueQuestion) {
+    reply = `⭐ En ${ctx.companyName} somos especialistas en ${ctx.industry}. Ayudamos a empresas y profesionales a multiplicar sus ventas y ahorrar cientos de horas operativas:\n\n` +
+      `1. ⚡ Atención y ventas inmediatas en WhatsApp 24/7: ningún prospecto se va con tu competencia por demoras.\n` +
+      `2. 🎯 Calificación comercial de leads y respuestas a dudas u objeciones con lenguaje 100% natural.\n` +
+      `3. 📅 Agendamiento automático en Google Calendar y links de pago para cobrar en el acto.\n\n` +
+      `Nuestros planes y servicios oficiales son:\n${ctx.catalogSummary}\n\n` +
+      `¿Cuál de estos objetivos es el más prioritario para tu negocio hoy o prefieres coordinar una demo de 10 minutos para verlo en vivo?`;
+  }
+
+  // 5. Manejo de Objeción de Precio (Reencuadre de Valor, ROI y Presupuesto)
   const isPriceObjection = lowerText.includes('caro') || lowerText.includes('cara') || lowerText.includes('no tengo plata') || lowerText.includes('no tengo dinero') ||
     lowerText.includes('no llego') || lowerText.includes('descuento') || lowerText.includes('rebaja') || lowerText.includes('muy costoso') || lowerText.includes('fuera de presupuesto') ||
     lowerText.includes('algo mas barato') || lowerText.includes('algo más barato') || lowerText.includes('menos plata') || lowerText.includes('muy alto');
 
-  if (isPriceObjection) {
-    return `Te entiendo perfectamente, cuidar la inversión es una prioridad inteligente. En ${ctx.companyName} nuestros valores están pensados para que el beneficio, la durabilidad y la tranquilidad que recibes superen con creces lo abonado, evitando gastos mayores o pérdidas de tiempo a futuro.\n\nAdemás, podemos evaluar alternativas o facilidades acordes a tu etapa actual. Cuéntame, ¿cuál de nuestras soluciones es la que más necesitas resolver hoy para ver cómo podemos adaptarla a tu caso?`;
+  if (!reply && isPriceObjection) {
+    reply = `Te entiendo perfectamente, cuidar la inversión es una prioridad inteligente. En ${ctx.companyName} nuestros valores están pensados para que el beneficio, la durabilidad y la tranquilidad que recibes superen con creces lo abonado, evitando gastos mayores o pérdidas de tiempo a futuro.\n\nAdemás, podemos evaluar alternativas o facilidades acordes a tu etapa actual. Cuéntame, ¿cuál de nuestras soluciones es la que más necesitas resolver hoy para ver cómo podemos adaptarla a tu caso?`;
   }
 
-  // 4. Facilidades y Métodos de Pago
+  // 6. Facilidades y Métodos de Pago
   const isPaymentMethods = lowerText.includes('facilidades') || lowerText.includes('formas de pago') || lowerText.includes('metodos de pago') || lowerText.includes('métodos de pago') ||
     lowerText.includes('como se paga') || lowerText.includes('cómo se paga') || lowerText.includes('tarjeta') || lowerText.includes('transferencia') || lowerText.includes('cuotas');
 
-  if (isPaymentMethods) {
-    return `¡Totalmente! En ${ctx.companyName} ofrecemos diversas facilidades para que comiences de forma cómoda y sin trabas: aceptamos transferencias directas, tarjetas de débito/crédito y esquemas acordes a tu negocio.\n\nAdemás, puedes iniciar con nuestro plan base y escalar a medida que compruebes los resultados. ¿Te gustaría que te preparemos el alta con la alternativa más accesible para empezar?`;
+  if (!reply && isPaymentMethods) {
+    reply = `¡Totalmente! En ${ctx.companyName} ofrecemos diversas facilidades para que comiences de forma cómoda y sin trabas: aceptamos transferencias directas, tarjetas de débito/crédito y esquemas acordes a tu negocio.\n\nAdemás, puedes iniciar con nuestro plan base y escalar a medida que compruebes los resultados. ¿Te gustaría que te preparemos el alta con la alternativa más accesible para empezar?`;
   }
 
-  // 5. Recomendación Consultiva / Por cuál empezar
+  // 7. Recomendación Consultiva / Por cuál empezar
   const isRecommendation = lowerText.includes('que me recomiend') || lowerText.includes('qué me recomiend') || lowerText.includes('cual me recomiend') || lowerText.includes('cuál me recomiend') ||
     lowerText.includes('por cual empiez') || lowerText.includes('por cuál empiez') || lowerText.includes('cual elijo') || lowerText.includes('cuál elijo') || lowerText.includes('recomiendan para empezar');
 
-  if (isRecommendation) {
-    return `Para darte una recomendación honesta y rentable: la mayoría de las empresas comienza con nuestro Plan Starter o Growth Pro, ya que cubren de inmediato el flujo de ventas 24/7 y se pagan solos al rescatar las primeras ventas que antes se perdían por demoras.\n\nCuéntame, ¿cuál es el volumen o la meta principal que necesitas alcanzar este mes para confirmarte cuál es la mejor alternativa para ti?`;
+  if (!reply && isRecommendation) {
+    reply = `Para darte una recomendación honesta y rentable: la mayoría de las empresas comienza con nuestro Plan Starter o Growth Pro, ya que cubren de inmediato el flujo de ventas 24/7 y se pagan solos al rescatar las primeras ventas que antes se perdían por demoras.\n\nCuéntame, ¿cuál es el volumen o la meta principal que necesitas alcanzar este mes para confirmarte cuál es la mejor alternativa para ti?`;
   }
 
-  // 6. Manejo de Indecisión ("Lo voy a pensar", consulta con terceros)
+  // 8. Manejo de Indecisión ("Lo voy a pensar", consulta con terceros)
   const isHesitation = lowerText.includes('lo voy a pensar') || lowerText.includes('lo tengo que pensar') || lowerText.includes('dejame ver') || lowerText.includes('déjame ver') ||
     lowerText.includes('despues te aviso') || lowerText.includes('después te aviso') || lowerText.includes('despues te escribo') || lowerText.includes('después te escribo') ||
     lowerText.includes('tengo que hablar') || lowerText.includes('tengo que consultar') || lowerText.includes('con mi socio') || lowerText.includes('con mi pareja') || lowerText.includes('con mi esposa') || lowerText.includes('con mi marido');
 
-  if (isHesitation) {
-    return `¡Totalmente comprensible! Es una decisión importante y es fundamental que la tomes con total seguridad y claridad. Para que tengas toda la información sobre la mesa: ¿Hay alguna duda puntual sobre la propuesta o los resultados que te gustaría que aclaremos?\n\nSi te parece bien, puedo guardarte la propuesta o disponibilidad de esta semana sin ningún compromiso para que no pierdas las condiciones mientras lo evalúas. ¿Qué opinas?`;
+  if (!reply && isHesitation) {
+    reply = `¡Totalmente comprensible! Es una decisión importante y es fundamental que la tomes con total seguridad y claridad. Para que tengas toda la información sobre la mesa: ¿Hay alguna duda puntual sobre la propuesta o los resultados que te gustaría que aclaremos?\n\nSi te parece bien, puedo guardarte la propuesta o disponibilidad de esta semana sin ningún compromiso para que no pierdas las condiciones mientras lo evalúas. ¿Qué opinas?`;
   }
 
-  // 7. Comparación con Competencia ("Encontré algo más barato")
+  // 9. Comparación con Competencia ("Encontré algo más barato")
   const isCompetitorComparison = lowerText.includes('la competencia') || lowerText.includes('otro lugar') || lowerText.includes('en otro lado') || lowerText.includes('mas barato en') ||
     lowerText.includes('más barato en') || lowerText.includes('otro proveedor') || lowerText.includes('otra empresa') || lowerText.includes('otro presupuesto');
 
-  if (isCompetitorComparison) {
-    return `Es una muy buena observación. Existen alternativas de menor precio en el mercado, pero en ${ctx.companyName} nos enfocamos en lo que realmente protege tu tiempo y tu dinero: calidad certificada, garantía real, soporte dedicado y resultados que no requieren rehacer el trabajo después.\n\nAl final del día, lo barato suele salir caro. ¿Qué aspecto del servicio es el más indispensable para ti para garantizar que quedes 100% satisfecho?`;
+  if (!reply && isCompetitorComparison) {
+    reply = `Es una muy buena observación. Existen alternativas de menor precio en el mercado, pero en ${ctx.companyName} nos enfocamos en lo que realmente protege tu tiempo y tu dinero: calidad certificada, garantía real, soporte dedicado y resultados que no requieren rehacer el trabajo después.\n\nAl final del día, lo barato suele salir caro. ¿Qué aspecto del servicio es el más indispensable para ti para garantizar que quedes 100% satisfecho?`;
   }
 
-  // 8. Confianza, Credibilidad y Garantías
+  // 10. Confianza, Credibilidad y Garantías
   const isTrustQuestion = lowerText.includes('es seguro') || lowerText.includes('garantia') || lowerText.includes('garantía') || lowerText.includes('confiable') ||
     lowerText.includes('como se que funciona') || lowerText.includes('cómo sé que funciona') || lowerText.includes('por que confiar') || lowerText.includes('por qué confiar') ||
     lowerText.includes('estafa') || lowerText.includes('referencias') || lowerText.includes('seguridad');
 
-  if (isTrustQuestion) {
-    return `Es una consulta sumamente válida y nos alegra que la hagas. En ${ctx.companyName} la transparencia y el compromiso con cada cliente son la base de todo: brindamos acompañamiento paso a paso, contratos y comprobantes formales, soporte continuo y total respaldo en cada servicio.\n\n¿Te gustaría coordinar una breve llamada o demo de 10 minutos para conocernos en vivo, ver casos prácticos y despejar cualquier duda antes de avanzar?`;
+  if (!reply && isTrustQuestion) {
+    reply = `Es una consulta sumamente válida y nos alegra que la hagas. En ${ctx.companyName} la transparencia y el compromiso con cada cliente son la base de todo: brindamos acompañamiento paso a paso, contratos y comprobantes formales, soporte continuo y total respaldo en cada servicio.\n\n¿Te gustaría coordinar una breve llamada o demo de 10 minutos para conocernos en vivo, ver casos prácticos y despejar cualquier duda antes de avanzar?`;
   }
 
-  // 9. Preguntas de Continuidad / Mensajes Cortos
-  if (lowerText === 'cuanto?' || lowerText === 'cuánto?' || lowerText === 'precio?' || lowerText === 'precios?' || lowerText === 'costo?' || lowerText === 'y el costo?') {
-    return `¡Con gusto! Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Cuál de estas opciones se ajusta más a lo que necesitas hoy?`;
+  // 11. Preguntas de Continuidad / Mensajes Cortos
+  if (!reply && (lowerText === 'cuanto?' || lowerText === 'cuánto?' || lowerText === 'precio?' || lowerText === 'precios?' || lowerText === 'costo?' || lowerText === 'y el costo?')) {
+    reply = `¡Con gusto! Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Cuál de estas opciones se ajusta más a lo que necesitas hoy?`;
   }
 
-  if (lowerText === 'y el otro?' || lowerText === 'que otro?' || lowerText === 'qué otro?' || lowerText === 'hay otro?') {
-    return `En ${ctx.companyName} contamos con distintas alternativas pensadas para cada necesidad y presupuesto:\n\n${ctx.catalogSummary}\n\nCuéntame un poco más sobre tu caso particular y te recomiendo exactamente el más conveniente para ti.`;
+  if (!reply && (lowerText === 'y el otro?' || lowerText === 'que otro?' || lowerText === 'qué otro?' || lowerText === 'hay otro?')) {
+    reply = `En ${ctx.companyName} contamos con distintas alternativas pensadas para cada necesidad y presupuesto:\n\n${ctx.catalogSummary}\n\nCuéntame un poco más sobre tu caso particular y te recomiendo exactamente el más conveniente para ti.`;
   }
 
-  if (lowerText === 'no se' || lowerText === 'no sé' || lowerText === 'dudo' || lowerText === 'no estoy seguro') {
-    return `Es completamente normal tener dudas al inicio. Para poder orientarte con exactitud y sin rodeos: ¿Cuál es el principal problema o resultado que te gustaría resolver en este momento? Con ese dato te digo exactamente qué alternativa es la ideal para ti.`;
+  if (!reply && (lowerText === 'no se' || lowerText === 'no sé' || lowerText === 'dudo' || lowerText === 'no estoy seguro')) {
+    reply = `Es completamente normal tener dudas al inicio. Para poder orientarte con exactitud y sin rodeos: ¿Cuál es el principal problema o resultado que te gustaría resolver en este momento? Con ese dato te digo exactamente qué alternativa es la ideal para ti.`;
   }
 
-  // 10. Precios y Catálogo Oficial
-  if (lowerText.includes('precio') || lowerText.includes('precios') || lowerText.includes('costo') || lowerText.includes('costos') || lowerText.includes('cuanto') || lowerText.includes('cuánto') || lowerText.includes('tarifa') || lowerText.includes('tarifas') || lowerText.includes('planes') || lowerText.includes('cotiza') || lowerText.includes('presupuesto')) {
-    return `¡Con gusto! Aquí tienes nuestros servicios y valores oficiales en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estas alternativas se ajusta mejor a lo que estás buscando resolver hoy?`;
+  // 12. Precios y Catálogo Oficial
+  if (!reply && (lowerText.includes('precio') || lowerText.includes('precios') || lowerText.includes('costo') || lowerText.includes('costos') || lowerText.includes('cuanto') || lowerText.includes('cuánto') || lowerText.includes('tarifa') || lowerText.includes('tarifas') || lowerText.includes('planes') || lowerText.includes('cotiza') || lowerText.includes('presupuesto') || lowerText.includes('catalogo') || lowerText.includes('catálogo'))) {
+    reply = `¡Con gusto! Aquí tienes nuestros servicios y valores oficiales en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estas alternativas se ajusta mejor a lo que estás buscando resolver hoy?`;
   }
 
-  // 11. Agendamiento de Turnos o Citas
-  if (lowerText.includes('turno') || lowerText.includes('turnos') || lowerText.includes('cita') || lowerText.includes('citas') || lowerText.includes('agendar') || lowerText.includes('reunion') || lowerText.includes('reunión') || lowerText.includes('llamada') || lowerText.includes('reserva') || lowerText.includes('reservar') || lowerText.includes('disponibilidad')) {
-    return `📅 ¡Por supuesto! Para coordinar tu cita en ${ctx.companyName}, indícanos por favor qué día te queda más cómodo (de lunes a sábados) y si prefieres un horario por la mañana o por la tarde. ¿Cuál te va mejor?`;
+  // 13. Agendamiento de Turnos o Citas
+  if (!reply && (lowerText.includes('turno') || lowerText.includes('turnos') || lowerText.includes('cita') || lowerText.includes('citas') || lowerText.includes('agendar') || lowerText.includes('reunion') || lowerText.includes('reunión') || lowerText.includes('llamada') || lowerText.includes('reserva') || lowerText.includes('reservar') || lowerText.includes('disponibilidad'))) {
+    reply = `📅 ¡Por supuesto! Para coordinar tu cita en ${ctx.companyName}, indícanos por favor qué día te queda más cómodo (de lunes a sábados) y si prefieres un horario por la mañana o por la tarde. ¿Cuál te va mejor?`;
   }
 
-  // 12. Servicios y qué hacen
-  if (lowerText.includes('servicio') || lowerText.includes('servicios') || lowerText.includes('ofrecen') || lowerText.includes('que hacen') || lowerText.includes('qué hacen') || lowerText.includes('como funciona') || lowerText.includes('cómo funciona')) {
-    return `⭐ En ${ctx.companyName} somos especialistas en ${ctx.industry}. Brindamos soluciones orientadas a darte los mejores resultados con atención personalizada:\n\n${ctx.catalogSummary}\n\n¿Te gustaría que te asesoremos sobre cómo resolver tu caso particular o deseas conocer más sobre alguno de nuestros planes?`;
+  // 14. Ubicación y Oficinas
+  if (!reply && (lowerText.includes('donde estan') || lowerText.includes('dónde están') || lowerText.includes('donde quedan') || lowerText.includes('dónde quedan') || lowerText.includes('direccion') || lowerText.includes('dirección') || lowerText.includes('ubicacion') || lowerText.includes('ubicación') || lowerText.includes('como llego') || lowerText.includes('cómo llego'))) {
+    reply = `📍 Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Te gustaría coordinar una visita presencial o prefieres que gestionemos todo directamente por WhatsApp?`;
   }
 
-  // 13. Ubicación y Oficinas
-  if (lowerText.includes('donde estan') || lowerText.includes('dónde están') || lowerText.includes('donde quedan') || lowerText.includes('dónde quedan') || lowerText.includes('direccion') || lowerText.includes('dirección') || lowerText.includes('ubicacion') || lowerText.includes('ubicación') || lowerText.includes('como llego') || lowerText.includes('cómo llego')) {
-    return `📍 Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Te gustaría coordinar una visita presencial o prefieres que gestionemos todo directamente por WhatsApp?`;
+  // 15. Horarios de atención
+  if (!reply && (lowerText.includes('horario') || lowerText.includes('horarios') || lowerText.includes('a que hora') || lowerText.includes('a qué hora') || lowerText.includes('atienden hoy') || lowerText.includes('estan abiertos') || lowerText.includes('están abiertos'))) {
+    reply = `🕒 Horarios de atención de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nRecuerda que por este chat de WhatsApp te atendemos las 24 horas. ¿En qué podemos ayudarte en este momento?`;
   }
 
-  // 14. Horarios de atención
-  if (lowerText.includes('horario') || lowerText.includes('horarios') || lowerText.includes('a que hora') || lowerText.includes('a qué hora') || lowerText.includes('atienden hoy') || lowerText.includes('estan abiertos') || lowerText.includes('están abiertos')) {
-    return `🕒 Horarios de atención de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nRecuerda que por este chat de WhatsApp te atendemos las 24 horas. ¿En qué podemos ayudarte en este momento?`;
-  }
-
-  // 15. Solicitud de asesor humano (Detección precisa de intención)
+  // 16. Solicitud de asesor humano (Detección precisa de intención)
   const isHumanAgentRequest = lowerText.includes('hablar con un') || lowerText.includes('hablar con una') || lowerText.includes('comunicarme con un') || lowerText.includes('comunicarme con una') ||
     lowerText.includes('atencion humana') || lowerText.includes('atención humana') || lowerText.includes('asesor humano') || lowerText.includes('persona real') || lowerText.includes('alguien real') ||
     lowerText.includes('un operador') || lowerText.includes('una persona') || lowerText.includes('con un humano') || lowerText.includes('pasame con un') || lowerText.includes('pásame con un') ||
     lowerText.includes('derivar con un') || lowerText.includes('derivar con una') || lowerText.includes('con el dueño') || lowerText.includes('con la dueña');
 
-  if (isHumanAgentRequest) {
-    return `👤 ¡Por supuesto! Ya he tomado nota para que un especialista de nuestro equipo en ${ctx.companyName} revise tu caso y se comunique contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
+  if (!reply && isHumanAgentRequest) {
+    reply = `👤 ¡Por supuesto! Ya he tomado nota para que un especialista de nuestro equipo en ${ctx.companyName} revise tu caso y se comunique contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
   }
 
-  // 14. Agradecimientos
-  if (lowerText.includes('gracia') || lowerText.includes('agradecid') || lowerText.includes('te agradezco') || lowerText.includes('muy amable') || lowerText === 'grx' || lowerText === 'thx') {
-    return `¡Al contrario, un verdadero placer! 😊 En ${ctx.companyName} estamos siempre a tu disposición para ayudarte. Si te gustaría que reservemos tu lugar o avancemos con tu propuesta, solo avísame y lo dejamos listo. ¡Que tengas un excelente día!`;
+  // 17. Agradecimientos
+  if (!reply && (lowerText.includes('gracia') || lowerText.includes('agradecid') || lowerText.includes('te agradezco') || lowerText.includes('muy amable') || lowerText === 'grx' || lowerText === 'thx')) {
+    reply = `¡Al contrario, un verdadero placer! 😊 En ${ctx.companyName} estamos siempre a tu disposición para ayudarte. Si te gustaría que reservemos tu lugar o avancemos con tu propuesta, solo avísame y lo dejamos listo. ¡Que tengas un excelente día!`;
   }
 
-  // 15. Despedidas
-  if (lowerText.includes('chau') || lowerText.includes('adios') || lowerText.includes('adiós') || lowerText.includes('hasta luego') || lowerText.includes('nos vemos') || lowerText.includes('bye') || lowerText.includes('buenas noches') || lowerText.includes('buen finde')) {
-    return `¡Hasta luego! 👋 Ha sido un gusto hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. ¡Que tengas un gran día!`;
+  // 18. Despedidas
+  if (!reply && (lowerText.includes('chau') || lowerText.includes('adios') || lowerText.includes('adiós') || lowerText.includes('hasta luego') || lowerText.includes('nos vemos') || lowerText.includes('bye') || lowerText.includes('buenas noches') || lowerText.includes('buen finde'))) {
+    reply = `¡Hasta luego! 👋 Ha sido un gusto hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. ¡Que tengas un gran día!`;
   }
 
-  // 16. Confirmaciones cortas (ok, genial, perfecto, entiendo)
-  if (lowerText === 'ok' || lowerText === 'genial' || lowerText === 'perfecto' || lowerText === 'buenisimo' || lowerText === 'buenísimo' || lowerText === 'excelente' || lowerText === 'entendido' || lowerText === 'comprendo' || lowerText === 'bien') {
+  // 19. Confirmaciones cortas (ok, genial, perfecto, entiendo)
+  if (!reply && (lowerText === 'ok' || lowerText === 'genial' || lowerText === 'perfecto' || lowerText === 'buenisimo' || lowerText === 'buenísimo' || lowerText === 'excelente' || lowerText === 'entendido' || lowerText === 'comprendo' || lowerText === 'bien')) {
     if (hadPriceDiscussion) {
-      return `¡Genial! 👍 Dado que estuvimos viendo nuestras opciones en ${ctx.companyName}, ¿te gustaría que te reservemos tu cupo hoy mismo o prefieres que coordinemos una breve llamada para afinar detalles?`;
+      reply = `¡Genial! 👍 Dado que estuvimos viendo nuestras opciones en ${ctx.companyName}, ¿te gustaría que te reservemos tu cupo hoy mismo o prefieres que coordinemos una breve llamada para afinar detalles?`;
+    } else {
+      reply = `¡Excelente! 👍 En ${ctx.companyName} estamos listos para ayudarte. ¿Deseas que coordinemos una fecha para tu servicio o tienes alguna otra pregunta que quieras hacernos?`;
     }
-    return `¡Excelente! 👍 En ${ctx.companyName} estamos listos para ayudarte. ¿Deseas que coordinemos una fecha para tu servicio o tienes alguna otra pregunta que quieras hacernos?`;
   }
 
-  // 17. Saludos iniciales (Solo si la conversación recién empieza)
-  if (!isConversationOngoing && (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal'))) {
-    return `¡Hola! 👋 Qué gusto saludarte. Te doy una cálida bienvenida a ${ctx.companyName} (${ctx.industry}). Mi nombre es ${ctx.agentName}.\n\nCuéntame, ¿qué consulta tienes o qué solución estás buscando para tu caso en este momento?`;
+  // 20. Saludos iniciales (Solo si la conversación recién empieza)
+  if (!reply && !isConversationOngoing && (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal'))) {
+    reply = `¡Hola! 👋 Qué gusto saludarte. Te doy una cálida bienvenida a ${ctx.companyName} (${ctx.industry}). Mi nombre es ${ctx.agentName}.\n\nCuéntame, ¿qué consulta tienes o qué solución estás buscando para tu caso en este momento?`;
   }
 
-  // 18. Respuesta universal inteligente y consultiva para CUALQUIER OTRA PREGUNTA ("CUALQUIER COSA")
-  return `¡Excelente consulta! Es un punto muy interesante. En ${ctx.companyName} nos tomamos el tiempo de analizar cada detalle para darte la respuesta exacta y profesional en el rubro de ${ctx.industry}.\n\nRespecto a lo que planteas, nuestro criterio siempre es priorizar la calidad, la tranquilidad y los resultados reales para cada persona que atendemos. Cuéntame un poco más sobre lo que tienes en mente o si te gustaría que veamos cómo nuestras soluciones pueden ayudarte a conseguirlo. ¿Qué opinas?`;
+  // 21. Multi-Turn Progressive Fallback (NEVER REPEATS)
+  if (!reply) {
+    const progressiveReplies = [
+      `¡Excelente punto! En ${ctx.companyName} nos enfocamos en brindarte soluciones concretas de ${ctx.industry}. Cuéntame, ¿cuál es el principal objetivo o desafío comercial que te gustaría resolver hoy?`,
+      `¡Comprendo perfectamente! Para avanzar y mostrarte cómo podemos ayudarte de forma práctica:\n\n${ctx.catalogSummary}\n\n¿Te gustaría que analicemos cuál de estos planes se adapta mejor a tu caso o prefieres coordinar una llamada de 10 minutos para verlo en vivo?`,
+      `¡Totalmente! Para no dar vueltas y darte una propuesta a tu medida: ¿Te queda más cómodo coordinar una breve llamada estratégica de 10 minutos, o prefieres que te envíe los datos de los planes por aquí? ¿Qué te resulta más cómodo?`
+    ];
+
+    for (const pr of progressiveReplies) {
+      if (!lastBotMsg || pr.slice(0, 35).toLowerCase() !== lastBotMsg.slice(0, 35).toLowerCase()) {
+        reply = pr;
+        break;
+      }
+    }
+    if (!reply) reply = progressiveReplies[2];
+  }
+
+  // 22. HARD ANTI-REPETITION GUARANTEE (Zero Duplicates Allowed)
+  const isDuplicate = lastBotMsg && (
+    reply.trim().toLowerCase() === lastBotMsg.trim().toLowerCase() ||
+    reply.slice(0, 30).toLowerCase().trim() === lastBotMsg.slice(0, 30).toLowerCase().trim() ||
+    (lastBotMsg.length > 35 && reply.toLowerCase().includes(lastBotMsg.slice(0, 35).toLowerCase()))
+  );
+
+  if (isDuplicate) {
+    if (hadPriceDiscussion || lowerBot.includes('starter') || lowerBot.includes('activación') || lowerBot.includes('activacion')) {
+      reply = `¡Totalmente de acuerdo! Para dar el siguiente paso en ${ctx.companyName}: ¿Prefieres que te pase los datos de pago / activación directa por aquí, o coordinamos una llamada de 10 minutos para dejarlo listo? ¿Qué te resulta más cómodo?`;
+    } else {
+      reply = `¡Comprendo perfectamente! Para avanzar y mostrarte cómo te ayudamos en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estos planes se adapta mejor a lo que buscas hoy o prefieres coordinar una demo de 10 minutos para verlo en vivo?`;
+    }
+  }
+
+  return reply;
 }
 
 // ==================== GENERATE AI AGENT RESPONSE ====================
@@ -833,10 +904,11 @@ REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
 
   // 5. Try Generative LLM with Multi-Turn Memory (Gemini / OpenAI)
   let generatedReply = null;
-  if (customAiKey) {
+  const effectiveAiKey = ctx.apiKey || customAiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
+  if (effectiveAiKey) {
     try {
       // 5.A OpenAI API
-      if (customAiKey.startsWith('sk-')) {
+      if (effectiveAiKey.startsWith('sk-')) {
         const oaiMessages = [
           { role: 'system', content: systemPrompt },
           ...history.map(h => ({
@@ -850,7 +922,7 @@ REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${customAiKey}`
+            'Authorization': `Bearer ${effectiveAiKey}`
           },
           body: JSON.stringify({
             model: activeAiModel.includes('gpt') ? activeAiModel : 'gpt-4o-mini',
@@ -869,7 +941,7 @@ REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
       } else {
         // 5.B Google Gemini API with Multi-Turn
         const geminiModel = activeAiModel.includes('gemini') ? activeAiModel : 'gemini-1.5-flash';
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${customAiKey}`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${effectiveAiKey}`;
         const formattedContents = buildGeminiContents(history, userText);
 
         let gRes = await fetch(url, {
@@ -918,12 +990,15 @@ REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
     }
   }
 
-  // If LLM returned a valid response, record history and return
+  // If LLM returned a valid response, ensure it does not duplicate the previous message
+  const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
   if (generatedReply && generatedReply.trim()) {
     const finalReply = generatedReply.trim();
-    appendToConversationHistory(convKey, 'user', userText);
-    appendToConversationHistory(convKey, 'assistant', finalReply);
-    return finalReply;
+    if (!lastBotMsg || finalReply.trim().toLowerCase() !== lastBotMsg.trim().toLowerCase()) {
+      appendToConversationHistory(convKey, 'user', userText);
+      appendToConversationHistory(convKey, 'assistant', finalReply);
+      return finalReply;
+    }
   }
 
   // 6. High-Converting Consultative Sales Heuristics Engine (Understands Multi-Turn Context & Human Intent)
