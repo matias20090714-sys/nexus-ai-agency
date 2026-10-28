@@ -245,7 +245,7 @@ const AI_CONFIG_FILE = path.join(__dirname, 'ai_config.json');
 const COMPANIES_FILE = path.join(__dirname, 'companies_agents.json');
 const PORTALS_FILE = path.join(__dirname, 'agency_portals.json');
 let customAiKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
-let activeAiModel = process.env.AI_MODEL || 'gemini-1.5-flash';
+let activeAiModel = process.env.AI_MODEL || 'gemini-3.1-flash-lite';
 let memoryCompanies = {};
 let memoryPortals = {};
 
@@ -958,8 +958,8 @@ REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
         }
       } else {
         // 5.B Google Gemini API with Multi-Turn
-        const geminiModel = activeAiModel.includes('gemini') ? activeAiModel : 'gemini-1.5-flash';
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${effectiveAiKey}`;
+        let geminiModel = activeAiModel && !activeAiModel.includes('1.5') && !activeAiModel.includes('2.5') ? activeAiModel : 'gemini-3.1-flash-lite';
+        let url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${effectiveAiKey}`;
         const formattedContents = buildGeminiContents(history, userText);
 
         let gRes = await fetch(url, {
@@ -981,10 +981,12 @@ REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
           const json = await gRes.json();
           generatedReply = json?.candidates?.[0]?.content?.parts?.[0]?.text;
         } else {
-          // Retry without system_instruction if unsupported on specific model
+          // If the model had issues (404/429), retry with gemini-3.1-flash-lite
+          const fallbackModel = 'gemini-3.1-flash-lite';
+          const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${effectiveAiKey}`;
           const fallbackContents = JSON.parse(JSON.stringify(formattedContents));
           fallbackContents[0].parts[0].text = `[INSTRUCCIONES OFICIALES DEL ASESOR COMERCIAL]\n${systemPrompt}\n\n[MENSAJE DEL CLIENTE]\n${fallbackContents[0].parts[0].text}`;
-          const retryRes = await fetch(url, {
+          const retryRes = await fetch(fallbackUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

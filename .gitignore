@@ -4,3 +4,5 @@ node_modules/
 sessions/
 push-to-github.js
 google-credentials.json
+.env
+ai_config.json
