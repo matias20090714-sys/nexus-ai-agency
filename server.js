@@ -301,6 +301,79 @@ function saveCompaniesToDisk() {
   }
 }
 
+// ==================== NICHE SALES PLAYBOOKS ====================
+function getNicheSalesPlaybook(industry = '') {
+  const ind = (industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  if (ind.includes('salud') || ind.includes('clinic') || ind.includes('dental') || ind.includes('odontolog') || ind.includes('medic') || ind.includes('estetica med')) {
+    return `• ESPECIALIDAD CLÍNICA & SALUD:
+  - Enfoque: Transmite máxima empatía clínica, profesionalismo médico y tranquilidad. El paciente busca confianza, no sentir dolor y resolver su salud o estética.
+  - Manejo de objeción de precio: Enfatiza que prevenir a tiempo evita procedimientos invasivos y mucho más costosos en el futuro. Destaca facilidades de pago o cobertura.
+  - Manejo de temor / dolor: Asegura que se emplean técnicas de vanguardia, anestesia tópica o protocolos indoloros de mínima invasión.
+  - Objetivo comercial: Agendar una consulta inicial de evaluación y diagnóstico clínico presencial.`;
+  }
+
+  if (ind.includes('inmobili') || ind.includes('propiedad') || ind.includes('bienes raic') || ind.includes('real estate') || ind.includes('inmueble')) {
+    return `• ESPECIALIDAD INMOBILIARIA & BIENES RAÍCES:
+  - Enfoque: Asesoramiento patrimonial de alta confianza. Comprar o alquilar una propiedad es una de las decisiones financieras y de vida más importantes.
+  - Manejo de objeción de precio: Argumenta el valor por metro cuadrado, plusvalía de la zona, potencial de revalorización y opciones de financiación o planes de cuotas.
+  - Manejo de indecisión ("lo voy a pensar"): Recuerda con sutileza que las mejores propiedades o unidades con alta demanda suelen señarse rápidamente, y que coordinar una visita no implica ningún compromiso.
+  - Objetivo comercial: Calificar presupuesto/zona preferida y coordinar una visita presencial exclusiva a la propiedad o videollamada de presentación.`;
+  }
+
+  if (ind.includes('belleza') || ind.includes('barber') || ind.includes('peluquer') || ind.includes('spa') || ind.includes('estetica') || ind.includes('unad') || ind.includes('unas') || ind.includes('salon')) {
+    return `• ESPECIALIDAD BELLEZA, ESTÉTICA & BARBERÍAS:
+  - Enfoque: Transformación de imagen, autoestima, higiene certificada y productos de gama alta. El cliente busca consentirse y verse impecable.
+  - Manejo de objeción de precio: Resalta la calidad de los productos utilizados (evitan daños capilares o en la piel) y la durabilidad del resultado.
+  - Manejo de tiempos: Destaca la puntualidad en los turnos para que no pierda tiempo esperando.
+  - Objetivo comercial: Reservar un turno exclusivo en la agenda semanal antes de que se agoten los horarios más solicitados.`;
+  }
+
+  if (ind.includes('software') || ind.includes('b2b') || ind.includes('agencia') || ind.includes('consultor') || ind.includes('marketing') || ind.includes('automatiz') || ind.includes('sistema') || ind.includes('tecnolog')) {
+    return `• ESPECIALIDAD SERVICIOS B2B, AUTOMATIZACIÓN & CONSULTORÍA:
+  - Enfoque: Retorno de inversión (ROI), horas operativas ahorradas, aumento de tasa de conversión y eliminación de pérdida silenciosa de clientes por demoras.
+  - Manejo de objeción de precio: Compara la inversión mensual contra el costo de contratar empleados adicionales o el valor financiero de los clientes que pierden al no responder 24/7. Rescatar apenas 1 o 2 clientes paga el 100% del servicio.
+  - Manejo de "tengo que hablarlo con mi socio": Ofrece preparar una propuesta ejecutiva clara con números de impacto o coordinar una llamada de 15 minutos con ambos socios para responder dudas técnicas.
+  - Objetivo comercial: Agendar una demo estratégica de 15 minutos o coordinar la activación inmediata del plan seleccionado.`;
+  }
+
+  if (ind.includes('restauran') || ind.includes('gastronom') || ind.includes('bar') || ind.includes('bistro') || ind.includes('catering') || ind.includes('comida') || ind.includes('cafe')) {
+    return `• ESPECIALIDAD GASTRONOMÍA & EVENTOS:
+  - Enfoque: Experiencia sensorial, sabor de alta calidad, frescura de ingredientes, calidez de servicio y ambiente ideal.
+  - Manejo de dudas sobre menú o alergias: Ofrece opciones adaptables y resalta la calidad y frescura de la cocina.
+  - Manejo de disponibilidad: Advierte amablemente que los fines de semana y horarios pico suelen llenarse con anticipación.
+  - Objetivo comercial: Confirmar la reserva de mesa VIP o coordinar los detalles del pedido/evento con horario y cantidad de personas.`;
+  }
+
+  if (ind.includes('retail') || ind.includes('ecommerce') || ind.includes('tienda') || ind.includes('ropa') || ind.includes('calzado') || ind.includes('moda') || ind.includes('indumentar')) {
+    return `• ESPECIALIDAD E-COMMERCE & RETAIL:
+  - Enfoque: Calidad y confección de prendas/artículos, asesoramiento exacto de talles, garantía total de cambio y envíos rápidos y seguros.
+  - Manejo de objeción de talles/calce: Explica la política de cambio sin complicaciones y guía al cliente con las medidas exactas.
+  - Manejo de confianza en pago/envío: Brinda links de pago oficiales protegidos y número de seguimiento para el envío a domicilio.
+  - Objetivo comercial: Facilitar el enlace directo de compra o coordinar los datos de despacho antes de que se agote el stock disponible.`;
+  }
+
+  if (ind.includes('fitness') || ind.includes('gym') || ind.includes('gimnasio') || ind.includes('crossfit') || ind.includes('entrenam') || ind.includes('yoga') || ind.includes('pilates')) {
+    return `• ESPECIALIDAD FITNESS, GYM & ENTRENAMIENTO:
+  - Enfoque: Resultados tangibles de salud, vitalidad, pérdida de grasa o ganancia muscular. Motivación, disciplina guiada y acompañamiento profesional.
+  - Manejo de objeción "no tengo tiempo": Propone rutinas efectivas y concentradas de 45 minutos que se adaptan a su agenda.
+  - Manejo de "no sé si voy a ser constante": Enfatiza el acompañamiento de los instructores y la medición periódica de progresos para mantener la motivación alta.
+  - Objetivo comercial: Agendar un pase libre de prueba o coordinar la primera sesión de diagnóstico con un entrenador.`;
+  }
+
+  if (ind.includes('auto') || ind.includes('concesionar') || ind.includes('taller') || ind.includes('mecanic') || ind.includes('vehicul') || ind.includes('moto')) {
+    return `• ESPECIALIDAD AUTOMOTRIZ & TALLERES:
+  - Enfoque: Seguridad vial, confiabilidad mecánica, repuestos originales garantizados y total transparencia presupuestaria.
+  - Manejo de incertidumbre en costos: Explica que siempre se realiza una inspección previa con presupuesto formal por escrito antes de autorizar cualquier trabajo.
+  - Objetivo comercial: Agendar turno para diagnóstico en taller o coordinar un test drive del vehículo.`;
+  }
+
+  return `• METODOLOGÍA CONSULTIVA UNIVERSAL:
+  - Enfoque: Escucha activa de alto nivel, validación de la necesidad del cliente, demostración clara de beneficios y resolución de objeciones con seguridad y datos concretos.
+  - Manejo de dudas: Aísla la inquietud puntual, explica el beneficio diferencial y conduce con amabilidad hacia el siguiente paso comercial.
+  - Objetivo comercial: Concretar la contratación, coordinar una reunión/demo o reservar el servicio según corresponda.`;
+}
+
 // Resolver context of specific client / company by session or agency ID
 async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_1') {
   const allCompanies = Object.values(memoryCompanies).flat();
@@ -336,61 +409,128 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     let plansSummary = '';
     if (Array.isArray(portal.plans) && portal.plans.length > 0) {
       plansSummary = portal.plans.map(p => 
-        `• ${p.name}: $${p.price} ${p.currency || 'USD'}/${p.period || p.billingPeriod || 'mes'} (${(p.features || []).slice(0, 3).join(', ')})`
-      ).join('\n');
+        `• ${p.name}: $${p.price} ${p.currency || 'USD'}/${p.period || p.billingPeriod || 'mes'}\n  - Beneficios: ${(p.features || []).join(', ')}`
+      ).join('\n\n');
     } else {
-      plansSummary = '• Plan Starter: $290 USD/mes (Agente de WhatsApp 24/7 entrenado a medida)\n• Plan Growth Pro: $490 USD/mes (Agente + Calendar + Cotizador + CRM)\n• Plan Enterprise: $890 USD/mes (Multi-agentes corporativos con integraciones avanzadas)';
+      plansSummary = '• Plan Starter: $290 USD/mes\n  - Beneficios: Agente de WhatsApp 24/7 entrenado a medida, soporte continuo, calificación de prospectos.\n\n• Plan Growth Pro: $490 USD/mes\n  - Beneficios: Agente con Google Calendar sincronizado, cotizador dinámico, derivación a CRM y reportes comerciales.\n\n• Plan Enterprise: $890 USD/mes\n  - Beneficios: Multi-agentes corporativos, integraciones de base de datos Neon DB, onboarding VIP y soporte dedicado.';
     }
 
     return {
       id: 'default_agency',
       companyName: agencyName,
-      industry: 'Soluciones de Inteligencia Artificial & Automatización Comercial',
-      agentName: `Asesor Comercial de ${agencyName}`,
-      tone: 'profesional_calido_y_persuasivo',
-      systemPrompt: `Eres el asesor y consultor comercial de ${agencyName}. Dialoga con empatía humana, explica los servicios con elocuencia, responde cualquier duda que te hagan y orienta la conversación hacia coordinar una breve llamada estratégica o contratar el servicio.`,
+      industry: 'Soluciones de Inteligencia Artificial & Automatización Comercial B2B',
+      agentName: `Asesor Comercial Senior de ${agencyName}`,
+      tone: 'profesional_consultivo_y_persuasivo',
+      systemPrompt: `Eres el Asesor y Consultor Comercial Senior de ${agencyName}. Dialoga con empatía, solvencia y lenguaje natural. Identifica el dolor operativo del cliente (pérdida de ventas por demoras en responder), explica cómo la IA soluciona ese problema de inmediato con un ROI positivo y orienta cada conversación hacia coordinar una demo estratégica de 15 minutos o activar el plan correspondiente.`,
       catalogSummary: plansSummary,
-      knowledgeBase: 'Horario: Atención 24/7 por WhatsApp. Modalidad: Servicios remotos llave en mano con soporte continuo para empresas de todo el mundo.',
-      salesFlow: 'Califica la empresa y necesidad del cliente, responde todas sus dudas y coordina una demo de 15 minutos o activación del plan.'
+      knowledgeBase: 'Horario: Atención 24/7 por WhatsApp. Modalidad: Servicios llave en mano en la nube con soporte técnico continuo para empresas de todo el mundo. Garantía de puesta en marcha en menos de 48 horas.',
+      salesFlow: 'Calificación: ¿Cuántas consultas comerciales reciben al mes en WhatsApp y cuántas ventas estiman que se pierden fuera de horario?\nObjeción de Precio: Rescatando apenas 1 o 2 ventas al mes con atención 24/7, el servicio se paga solo al 100%.\nCierre: Invita a coordinar una breve llamada estratégica o envía los datos para activar el servicio de inmediato.',
+      supportSummary: 'Soporte 24/7 para incidencias y actualizaciones de catálogo. Garantía de operatividad 99.9%.',
+      afterSalesSummary: 'Onboarding guiado en 48 horas, configuración personalizada y seguimiento continuo de métricas.',
+      nichePlaybook: getNicheSalesPlaybook('servicios_b2b')
     };
   }
 
-  // Build catalog summary text from matched company's catalog
+  // Hydrate deep fields if matched.notes contains packed JSON from PostgreSQL
+  let hydrated = { ...matched };
+  if (typeof matched.notes === 'string' && (matched.notes.trim().startsWith('{') || matched.notes.includes('"catalog"'))) {
+    try {
+      const parsed = JSON.parse(matched.notes);
+      if (parsed && typeof parsed === 'object') {
+        hydrated = {
+          ...parsed,
+          ...matched,
+          catalog: (Array.isArray(parsed.catalog) && parsed.catalog.length > 0) ? parsed.catalog : matched.catalog,
+          salesFlow: parsed.salesFlow || matched.salesFlow,
+          supportFlow: parsed.supportFlow || matched.supportFlow,
+          afterSalesFlow: parsed.afterSalesFlow || matched.afterSalesFlow,
+          knowledgeBase: parsed.knowledgeBase || matched.knowledgeBase,
+          systemPrompt: parsed.systemPrompt || matched.systemPrompt,
+          agentName: parsed.agentName || matched.agentName
+        };
+      }
+    } catch (e) {}
+  }
+
+  // Build rich catalog summary text from matched company's catalog
   let catalogSummary = '';
-  if (Array.isArray(matched.catalog) && matched.catalog.length > 0) {
-    catalogSummary = matched.catalog.map(item => 
-      `• ${item.name}: $${item.price} ${item.duration ? `(${item.duration})` : ''} - ${item.description || ''}`
-    ).join('\n');
-  } else if (matched.notes && matched.notes.includes('$')) {
-    catalogSummary = matched.notes;
+  if (Array.isArray(hydrated.catalog) && hydrated.catalog.length > 0) {
+    catalogSummary = hydrated.catalog.map(item => {
+      const parts = [`• ${item.name}: $${item.price}`];
+      if (item.duration) parts.push(`(${item.duration})`);
+      if (item.description || item.benefits) {
+        parts.push(`- ${item.description || item.benefits}`);
+      }
+      return parts.join(' ');
+    }).join('\n');
+  } else if (hydrated.notes && hydrated.notes.includes('$')) {
+    catalogSummary = hydrated.notes;
   } else {
-    catalogSummary = 'Contamos con servicios especializados y propuestas a medida para tu necesidad.';
+    catalogSummary = 'Contamos con servicios especializados y propuestas personalizadas adaptadas a cada cliente.';
   }
 
   // Build sales flow string
   let salesFlowStr = '';
-  if (matched.salesFlow && typeof matched.salesFlow === 'object') {
+  if (hydrated.salesFlow && typeof hydrated.salesFlow === 'object') {
     salesFlowStr = [
-      matched.salesFlow.qualification ? `Pregunta de calificación: ${matched.salesFlow.qualification}` : '',
-      matched.salesFlow.objections ? `Manejo de objeciones: ${matched.salesFlow.objections}` : '',
-      matched.salesFlow.closing ? `Cierre / Agendamiento: ${matched.salesFlow.closing}` : ''
+      hydrated.salesFlow.qualification ? `Pregunta de Calificación: ${hydrated.salesFlow.qualification}` : '',
+      hydrated.salesFlow.budgetQuestion ? `Pregunta de Presupuesto: ${hydrated.salesFlow.budgetQuestion}` : '',
+      hydrated.salesFlow.urgencyQuestion ? `Pregunta de Urgencia / Tiempo: ${hydrated.salesFlow.urgencyQuestion}` : '',
+      hydrated.salesFlow.objections ? `Manejo de Objeciones: ${hydrated.salesFlow.objections}` : '',
+      hydrated.salesFlow.closing ? `Llamado al Cierre: ${hydrated.salesFlow.closing}` : ''
     ].filter(Boolean).join('\n');
-  } else if (matched.salesFlow) {
-    salesFlowStr = matched.salesFlow;
+  } else if (hydrated.salesFlow) {
+    salesFlowStr = String(hydrated.salesFlow);
   } else {
-    salesFlowStr = 'Invita cordialmente a coordinar una cita, llamada o turno según corresponda.';
+    salesFlowStr = 'Comprende la necesidad del cliente, valida su situación y coordina el paso comercial adecuado (cita, turno o compra).';
   }
 
+  // Build support flow string
+  let supportStr = '';
+  if (hydrated.supportFlow && typeof hydrated.supportFlow === 'object') {
+    const faqs = Array.isArray(hydrated.supportFlow.faq) 
+      ? hydrated.supportFlow.faq.map(f => `P: ${f.q} | R: ${f.a}`).join('\n') 
+      : '';
+    supportStr = [
+      faqs ? `Preguntas Frecuentes:\n${faqs}` : '',
+      hydrated.supportFlow.emergency ? `Protocolo de Emergencia / Escalación: ${hydrated.supportFlow.emergency}` : ''
+    ].filter(Boolean).join('\n');
+  } else if (hydrated.supportFlow) {
+    supportStr = String(hydrated.supportFlow);
+  } else {
+    supportStr = 'Atención rápida y resolución de inquietudes operativas.';
+  }
+
+  // Build aftersales flow string
+  let afterSalesStr = '';
+  if (hydrated.afterSalesFlow && typeof hydrated.afterSalesFlow === 'object') {
+    afterSalesStr = [
+      hydrated.afterSalesFlow.onboarding ? `Onboarding: ${hydrated.afterSalesFlow.onboarding}` : '',
+      hydrated.afterSalesFlow.guarantee ? `Garantía y Respaldo: ${hydrated.afterSalesFlow.guarantee}` : '',
+      hydrated.afterSalesFlow.followUp ? `Seguimiento: ${hydrated.afterSalesFlow.followUp}` : ''
+    ].filter(Boolean).join('\n');
+  } else if (hydrated.afterSalesFlow) {
+    afterSalesStr = String(hydrated.afterSalesFlow);
+  } else {
+    afterSalesStr = 'Acompañamiento continuo y garantía oficial de satisfacción.';
+  }
+
+  const industryStr = hydrated.industry || 'Servicios Especializados';
+  const nichePlaybook = getNicheSalesPlaybook(industryStr);
+
   return {
-    id: matched.id,
-    companyName: matched.name || 'Empresa',
-    industry: matched.industry || 'Servicios Especializados',
-    agentName: matched.agentName || `Asistente de ${matched.name}`,
-    tone: matched.tone || 'profesional_calido',
-    systemPrompt: matched.systemPrompt || `Eres el asesor y asistente comercial oficial de ${matched.name}. Atiende con amabilidad y calidez humana, resuelve cualquier duda y orienta a cerrar ventas o turnos.`,
+    id: hydrated.id,
+    companyName: hydrated.name || 'Empresa',
+    industry: industryStr,
+    agentName: hydrated.agentName || `Asesor Comercial de ${hydrated.name || 'la empresa'}`,
+    tone: hydrated.tone || 'profesional_calido_y_persuasivo',
+    systemPrompt: hydrated.systemPrompt || `Eres el asesor y consultor comercial de ${hydrated.name}. Dialoga con empatía, elocuencia y calidez humana. Explica con claridad los beneficios de nuestros servicios, resuelve objeciones con seguridad y orienta con naturalidad hacia el cierre comercial o reserva de turno.`,
     catalogSummary: catalogSummary,
-    knowledgeBase: matched.knowledgeBase || `Atención de Lunes a Sábados. Consultas y reservas por WhatsApp.`,
-    salesFlow: salesFlowStr
+    knowledgeBase: hydrated.knowledgeBase || `Atención de Lunes a Sábados. Consultas y reservas directas por WhatsApp.`,
+    salesFlow: salesFlowStr,
+    supportSummary: supportStr,
+    afterSalesSummary: afterSalesStr,
+    nichePlaybook: nichePlaybook
   };
 }
 
@@ -465,105 +605,155 @@ function buildGeminiContents(history, currentMessage) {
 function generateContextualSalesReply(lowerText, rawText, history, ctx, docContext) {
   const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
   const lastUserMsg = history.filter(h => h.role === 'user').slice(-2, -1)[0]?.text || '';
-  const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan'));
+  const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan') || (h.text || '').toLowerCase().includes('costo'));
+  const hadTurnDiscussion = history.some(h => (h.text || '').toLowerCase().includes('turno') || (h.text || '').toLowerCase().includes('cita') || (h.text || '').toLowerCase().includes('agenda') || (h.text || '').toLowerCase().includes('horario'));
+  const isConversationOngoing = history.length > 0;
 
-  // 1. Si hay documentación RAG oficial y pregunta por algún dato del documento
+  // 1. RAG Documentation Match
   if (docContext && (lowerText.includes('precio') || lowerText.includes('catalogo') || lowerText.includes('catálogo') || lowerText.includes('servicio') || lowerText.includes('costo') || lowerText.includes('cuanto') || lowerText.includes('cuánto'))) {
-    return `¡Con gusto! Aquí tienes la información detallada de ${ctx.companyName}:\n\n${docContext.slice(0, 480)}...\n\n¿Te gustaría coordinar una cotización a medida o prefieres agendar un turno para avanzar?`;
+    return `¡Con gusto! Aquí tienes los detalles oficiales de ${ctx.companyName}:\n\n${docContext.slice(0, 480)}...\n\n¿Te gustaría coordinar una cotización a medida o prefieres agendar un turno para avanzar?`;
   }
 
-  // 2. Intención de compra / Cierre / Acuerdo (me interesa, dale, quiero contratar, cómo pago, lo quiero)
-  const isAgreementOrClose = lowerText.includes('me interesa') || lowerText.includes('quiero contratar') || lowerText.includes('como contrato') || lowerText.includes('cómo contrato') ||
+  // 2. Intención de Compra Directa / Cierre / Acuerdo
+  const isBuyingSignal = lowerText.includes('me interesa') || lowerText.includes('quiero contratar') || lowerText.includes('como contrato') || lowerText.includes('cómo contrato') ||
     lowerText.includes('como pago') || lowerText.includes('cómo pago') || lowerText.includes('donde pago') || lowerText.includes('dónde pago') || lowerText.includes('donde transfiero') ||
     lowerText.includes('dónde transfiero') || lowerText.includes('empecemos') || lowerText.includes('lo quiero') || lowerText.includes('de una') || lowerText.includes('vamos con') ||
-    lowerText.includes('acepto') || lowerText === 'dale' || lowerText.startsWith('dale ') || lowerText === 'si' || lowerText === 'sí' || lowerText === 'ok dale' || lowerText === 'listo dale';
+    lowerText.includes('acepto') || lowerText.includes('lo compro') || lowerText.includes('lo tomo') || lowerText.includes('reservamelo') || lowerText.includes('resérvamelo') ||
+    lowerText.includes('agendemos') || lowerText.includes('dame los datos') || lowerText.includes('pasame el link') || lowerText.includes('pásame el link') ||
+    lowerText === 'dale' || lowerText.startsWith('dale ') || lowerText === 'si' || lowerText === 'sí' || lowerText === 'ok dale' || lowerText === 'listo dale';
 
-  if (isAgreementOrClose) {
-    return `¡Excelente decisión! 🚀 Nos entusiasma muchísimo trabajar contigo y darte la mejor experiencia en ${ctx.companyName}.\n\nPara dejar todo confirmado y avanzar de inmediato: ¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales?`;
+  if (isBuyingSignal) {
+    const isPaymentOrContract = lowerText.includes('contrat') || lowerText.includes('pago') || lowerText.includes('pagar') || lowerText.includes('activ') || lowerText.includes('empez') || lowerText.includes('compr') || lowerText.includes('link') || lowerText.includes('datos');
+    if (hadTurnDiscussion && !isPaymentOrContract) {
+      return `¡Excelente! 🚀 Quedamos a un solo paso. Para dejar confirmada tu fecha en ${ctx.companyName}: ¿Te queda más cómodo en el turno de la mañana o prefieres por la tarde? Indícanos tu día preferido y te reservamos de inmediato.`;
+    }
+    return `¡Excelente decisión! 🚀 Nos entusiasma muchísimo comenzar a trabajar contigo en ${ctx.companyName}.\n\nPara dejar todo confirmado y avanzar de inmediato: ¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales?`;
   }
 
-  // 3. Manejo de objeción de precio (es caro, no llego, rebaja, descuento, presupuesto)
+  // 3. Manejo de Objeción de Precio (Reencuadre de Valor, ROI y Presupuesto)
   const isPriceObjection = lowerText.includes('caro') || lowerText.includes('cara') || lowerText.includes('no tengo plata') || lowerText.includes('no tengo dinero') ||
     lowerText.includes('no llego') || lowerText.includes('descuento') || lowerText.includes('rebaja') || lowerText.includes('muy costoso') || lowerText.includes('fuera de presupuesto') ||
-    lowerText.includes('algo mas barato') || lowerText.includes('algo más barato');
+    lowerText.includes('algo mas barato') || lowerText.includes('algo más barato') || lowerText.includes('menos plata') || lowerText.includes('muy alto');
 
   if (isPriceObjection) {
-    return `Te entiendo perfectamente, cuidar la inversión es una prioridad inteligente. En ${ctx.companyName} nuestros valores están pensados para que el retorno y la tranquilidad que recibes superen con creces lo abonado, sin sorpresas ni costos ocultos.\n\nAdemás, podemos ver facilidades o planes acordes a tu etapa actual. Cuéntame, ¿cuál de nuestras soluciones es la que más necesitas resolver hoy para ver cómo podemos adaptarla a ti?`;
+    return `Te entiendo perfectamente, cuidar la inversión es una prioridad inteligente. En ${ctx.companyName} nuestros valores están pensados para que el beneficio, la durabilidad y la tranquilidad que recibes superen con creces lo abonado, evitando gastos mayores o pérdidas de tiempo a futuro.\n\nAdemás, podemos evaluar alternativas o facilidades acordes a tu etapa actual. Cuéntame, ¿cuál de nuestras soluciones es la que más necesitas resolver hoy para ver cómo podemos adaptarla a tu caso?`;
   }
 
-  // 4. Indecisión / Pensarlo (lo voy a pensar, déjame ver, después te aviso, tengo que consultarlo)
+  // 4. Facilidades y Métodos de Pago
+  const isPaymentMethods = lowerText.includes('facilidades') || lowerText.includes('formas de pago') || lowerText.includes('metodos de pago') || lowerText.includes('métodos de pago') ||
+    lowerText.includes('como se paga') || lowerText.includes('cómo se paga') || lowerText.includes('tarjeta') || lowerText.includes('transferencia') || lowerText.includes('cuotas');
+
+  if (isPaymentMethods) {
+    return `¡Totalmente! En ${ctx.companyName} ofrecemos diversas facilidades para que comiences de forma cómoda y sin trabas: aceptamos transferencias directas, tarjetas de débito/crédito y esquemas acordes a tu negocio.\n\nAdemás, puedes iniciar con nuestro plan base y escalar a medida que compruebes los resultados. ¿Te gustaría que te preparemos el alta con la alternativa más accesible para empezar?`;
+  }
+
+  // 5. Recomendación Consultiva / Por cuál empezar
+  const isRecommendation = lowerText.includes('que me recomiend') || lowerText.includes('qué me recomiend') || lowerText.includes('cual me recomiend') || lowerText.includes('cuál me recomiend') ||
+    lowerText.includes('por cual empiez') || lowerText.includes('por cuál empiez') || lowerText.includes('cual elijo') || lowerText.includes('cuál elijo') || lowerText.includes('recomiendan para empezar');
+
+  if (isRecommendation) {
+    return `Para darte una recomendación honesta y rentable: la mayoría de las empresas comienza con nuestro Plan Starter o Growth Pro, ya que cubren de inmediato el flujo de ventas 24/7 y se pagan solos al rescatar las primeras ventas que antes se perdían por demoras.\n\nCuéntame, ¿cuál es el volumen o la meta principal que necesitas alcanzar este mes para confirmarte cuál es la mejor alternativa para ti?`;
+  }
+
+  // 6. Manejo de Indecisión ("Lo voy a pensar", consulta con terceros)
   const isHesitation = lowerText.includes('lo voy a pensar') || lowerText.includes('lo tengo que pensar') || lowerText.includes('dejame ver') || lowerText.includes('déjame ver') ||
     lowerText.includes('despues te aviso') || lowerText.includes('después te aviso') || lowerText.includes('despues te escribo') || lowerText.includes('después te escribo') ||
-    lowerText.includes('tengo que hablar') || lowerText.includes('tengo que consultar') || lowerText.includes('con mi socio') || lowerText.includes('con mi pareja') || lowerText.includes('con mi esposa');
+    lowerText.includes('tengo que hablar') || lowerText.includes('tengo que consultar') || lowerText.includes('con mi socio') || lowerText.includes('con mi pareja') || lowerText.includes('con mi esposa') || lowerText.includes('con mi marido');
 
   if (isHesitation) {
-    return `¡Totalmente comprensible! Es una decisión clave y es fundamental que la tomes con total seguridad. Para que tengas toda la información sobre la mesa: ¿Hay alguna duda puntual sobre la implementación o los resultados que te gustaría que aclaremos?\n\nSi te parece bien, puedo guardarte la disponibilidad o propuesta de esta semana sin ningún compromiso para que no pierdas el cupo mientras lo evalúas. ¿Qué opinas?`;
+    return `¡Totalmente comprensible! Es una decisión importante y es fundamental que la tomes con total seguridad y claridad. Para que tengas toda la información sobre la mesa: ¿Hay alguna duda puntual sobre la propuesta o los resultados que te gustaría que aclaremos?\n\nSi te parece bien, puedo guardarte la propuesta o disponibilidad de esta semana sin ningún compromiso para que no pierdas las condiciones mientras lo evalúas. ¿Qué opinas?`;
   }
 
-  // 5. Confianza y Garantías (es seguro, tienen garantía, cómo sé que funciona, por qué confiar)
+  // 7. Comparación con Competencia ("Encontré algo más barato")
+  const isCompetitorComparison = lowerText.includes('la competencia') || lowerText.includes('otro lugar') || lowerText.includes('en otro lado') || lowerText.includes('mas barato en') ||
+    lowerText.includes('más barato en') || lowerText.includes('otro proveedor') || lowerText.includes('otra empresa') || lowerText.includes('otro presupuesto');
+
+  if (isCompetitorComparison) {
+    return `Es una muy buena observación. Existen alternativas de menor precio en el mercado, pero en ${ctx.companyName} nos enfocamos en lo que realmente protege tu tiempo y tu dinero: calidad certificada, garantía real, soporte dedicado y resultados que no requieren rehacer el trabajo después.\n\nAl final del día, lo barato suele salir caro. ¿Qué aspecto del servicio es el más indispensable para ti para garantizar que quedes 100% satisfecho?`;
+  }
+
+  // 8. Confianza, Credibilidad y Garantías
   const isTrustQuestion = lowerText.includes('es seguro') || lowerText.includes('garantia') || lowerText.includes('garantía') || lowerText.includes('confiable') ||
     lowerText.includes('como se que funciona') || lowerText.includes('cómo sé que funciona') || lowerText.includes('por que confiar') || lowerText.includes('por qué confiar') ||
-    lowerText.includes('estafa') || lowerText.includes('referencias');
+    lowerText.includes('estafa') || lowerText.includes('referencias') || lowerText.includes('seguridad');
 
   if (isTrustQuestion) {
-    return `Es una consulta sumamente válida y nos alegra que la hagas. En ${ctx.companyName} la transparencia y el compromiso con cada cliente son la base de todo: brindamos acompañamiento paso a paso, comunicación constante y total respaldo en cada servicio.\n\n¿Te gustaría coordinar una breve llamada o demo de 10 minutos para conocernos en vivo, ver casos prácticos y despejar cualquier duda antes de avanzar?`;
+    return `Es una consulta sumamente válida y nos alegra que la hagas. En ${ctx.companyName} la transparencia y el compromiso con cada cliente son la base de todo: brindamos acompañamiento paso a paso, contratos y comprobantes formales, soporte continuo y total respaldo en cada servicio.\n\n¿Te gustaría coordinar una breve llamada o demo de 10 minutos para conocernos en vivo, ver casos prácticos y despejar cualquier duda antes de avanzar?`;
   }
 
-  // 6. Precios y Catálogo oficial
+  // 9. Preguntas de Continuidad / Mensajes Cortos
+  if (lowerText === 'cuanto?' || lowerText === 'cuánto?' || lowerText === 'precio?' || lowerText === 'precios?' || lowerText === 'costo?' || lowerText === 'y el costo?') {
+    return `¡Con gusto! Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Cuál de estas opciones se ajusta más a lo que necesitas hoy?`;
+  }
+
+  if (lowerText === 'y el otro?' || lowerText === 'que otro?' || lowerText === 'qué otro?' || lowerText === 'hay otro?') {
+    return `En ${ctx.companyName} contamos con distintas alternativas pensadas para cada necesidad y presupuesto:\n\n${ctx.catalogSummary}\n\nCuéntame un poco más sobre tu caso particular y te recomiendo exactamente el más conveniente para ti.`;
+  }
+
+  if (lowerText === 'no se' || lowerText === 'no sé' || lowerText === 'dudo' || lowerText === 'no estoy seguro') {
+    return `Es completamente normal tener dudas al inicio. Para poder orientarte con exactitud y sin rodeos: ¿Cuál es el principal problema o resultado que te gustaría resolver en este momento? Con ese dato te digo exactamente qué alternativa es la ideal para ti.`;
+  }
+
+  // 10. Precios y Catálogo Oficial
   if (lowerText.includes('precio') || lowerText.includes('precios') || lowerText.includes('costo') || lowerText.includes('costos') || lowerText.includes('cuanto') || lowerText.includes('cuánto') || lowerText.includes('tarifa') || lowerText.includes('tarifas') || lowerText.includes('planes') || lowerText.includes('cotiza') || lowerText.includes('presupuesto')) {
-    return `¡Con gusto! Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estas alternativas se ajusta mejor a lo que estás buscando hoy?`;
+    return `¡Con gusto! Aquí tienes nuestros servicios y valores oficiales en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estas alternativas se ajusta mejor a lo que estás buscando resolver hoy?`;
   }
 
-  // 7. Agendamiento de Turnos o Citas
+  // 11. Agendamiento de Turnos o Citas
   if (lowerText.includes('turno') || lowerText.includes('turnos') || lowerText.includes('cita') || lowerText.includes('citas') || lowerText.includes('agendar') || lowerText.includes('reunion') || lowerText.includes('reunión') || lowerText.includes('llamada') || lowerText.includes('reserva') || lowerText.includes('reservar') || lowerText.includes('disponibilidad')) {
     return `📅 ¡Por supuesto! Para coordinar tu cita en ${ctx.companyName}, indícanos por favor qué día te queda más cómodo (de lunes a sábados) y si prefieres un horario por la mañana o por la tarde. ¿Cuál te va mejor?`;
   }
 
-  // 8. Servicios y qué hacen
+  // 12. Servicios y qué hacen
   if (lowerText.includes('servicio') || lowerText.includes('servicios') || lowerText.includes('ofrecen') || lowerText.includes('que hacen') || lowerText.includes('qué hacen') || lowerText.includes('como funciona') || lowerText.includes('cómo funciona')) {
     return `⭐ En ${ctx.companyName} somos especialistas en ${ctx.industry}. Brindamos soluciones orientadas a darte los mejores resultados con atención personalizada:\n\n${ctx.catalogSummary}\n\n¿Te gustaría que te asesoremos sobre cómo resolver tu caso particular o deseas conocer más sobre alguno de nuestros planes?`;
   }
 
-  // 9. Ubicación y Oficinas
+  // 13. Ubicación y Oficinas
   if (lowerText.includes('donde estan') || lowerText.includes('dónde están') || lowerText.includes('donde quedan') || lowerText.includes('dónde quedan') || lowerText.includes('direccion') || lowerText.includes('dirección') || lowerText.includes('ubicacion') || lowerText.includes('ubicación') || lowerText.includes('como llego') || lowerText.includes('cómo llego')) {
     return `📍 Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Te gustaría coordinar una visita presencial o prefieres que gestionemos todo directamente por WhatsApp?`;
   }
 
-  // 10. Horarios de atención
+  // 14. Horarios de atención
   if (lowerText.includes('horario') || lowerText.includes('horarios') || lowerText.includes('a que hora') || lowerText.includes('a qué hora') || lowerText.includes('atienden hoy') || lowerText.includes('estan abiertos') || lowerText.includes('están abiertos')) {
     return `🕒 Horarios de atención de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nRecuerda que por este chat de WhatsApp te atendemos las 24 horas. ¿En qué podemos ayudarte en este momento?`;
   }
 
-  // 11. Solicitud de asesor humano
-  if (lowerText.includes('humano') || lowerText.includes('asesor') || lowerText.includes('persona') || lowerText.includes('operador') || lowerText.includes('alguien real')) {
-    return `👤 ¡Por supuesto! Ya he notificado a nuestro equipo en ${ctx.companyName} para que un asesor especializado revise tu consulta y tome contacto contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
+  // 15. Solicitud de asesor humano (Detección precisa de intención)
+  const isHumanAgentRequest = lowerText.includes('hablar con un') || lowerText.includes('hablar con una') || lowerText.includes('comunicarme con un') || lowerText.includes('comunicarme con una') ||
+    lowerText.includes('atencion humana') || lowerText.includes('atención humana') || lowerText.includes('asesor humano') || lowerText.includes('persona real') || lowerText.includes('alguien real') ||
+    lowerText.includes('un operador') || lowerText.includes('una persona') || lowerText.includes('con un humano') || lowerText.includes('pasame con un') || lowerText.includes('pásame con un') ||
+    lowerText.includes('derivar con un') || lowerText.includes('derivar con una') || lowerText.includes('con el dueño') || lowerText.includes('con la dueña');
+
+  if (isHumanAgentRequest) {
+    return `👤 ¡Por supuesto! Ya he tomado nota para que un especialista de nuestro equipo en ${ctx.companyName} revise tu caso y se comunique contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
   }
 
-  // 12. Agradecimientos
+  // 14. Agradecimientos
   if (lowerText.includes('gracia') || lowerText.includes('agradecid') || lowerText.includes('te agradezco') || lowerText.includes('muy amable') || lowerText === 'grx' || lowerText === 'thx') {
     return `¡Al contrario, un verdadero placer! 😊 En ${ctx.companyName} estamos siempre a tu disposición para ayudarte. Si te gustaría que reservemos tu lugar o avancemos con tu propuesta, solo avísame y lo dejamos listo. ¡Que tengas un excelente día!`;
   }
 
-  // 13. Despedidas
+  // 15. Despedidas
   if (lowerText.includes('chau') || lowerText.includes('adios') || lowerText.includes('adiós') || lowerText.includes('hasta luego') || lowerText.includes('nos vemos') || lowerText.includes('bye') || lowerText.includes('buenas noches') || lowerText.includes('buen finde')) {
-    return `¡Hasta luego! 👋 Ha sido un placer hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. ¡Que tengas un gran día!`;
+    return `¡Hasta luego! 👋 Ha sido un gusto hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. ¡Que tengas un gran día!`;
   }
 
-  // 14. Confirmaciones cortas (ok, genial, perfecto, entiendo)
+  // 16. Confirmaciones cortas (ok, genial, perfecto, entiendo)
   if (lowerText === 'ok' || lowerText === 'genial' || lowerText === 'perfecto' || lowerText === 'buenisimo' || lowerText === 'buenísimo' || lowerText === 'excelente' || lowerText === 'entendido' || lowerText === 'comprendo' || lowerText === 'bien') {
     if (hadPriceDiscussion) {
-      return `¡Genial! 👍 Dado que estuvimos viendo nuestros planes de ${ctx.companyName}, ¿te gustaría que te reservemos tu cupo hoy mismo o prefieres que coordinemos una breve llamada para afinar detalles?`;
+      return `¡Genial! 👍 Dado que estuvimos viendo nuestras opciones en ${ctx.companyName}, ¿te gustaría que te reservemos tu cupo hoy mismo o prefieres que coordinemos una breve llamada para afinar detalles?`;
     }
     return `¡Excelente! 👍 En ${ctx.companyName} estamos listos para ayudarte. ¿Deseas que coordinemos una fecha para tu servicio o tienes alguna otra pregunta que quieras hacernos?`;
   }
 
-  // 15. Saludos iniciales
-  if (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal')) {
-    return `¡Hola! 👋 Qué gusto saludarte. Te doy una cálida bienvenida a ${ctx.companyName} (${ctx.industry}). Mi nombre es ${ctx.agentName}.\n\nCuéntame, ¿qué consulta tienes o qué solución estás buscando para tu negocio o caso en este momento?`;
+  // 17. Saludos iniciales (Solo si la conversación recién empieza)
+  if (!isConversationOngoing && (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal'))) {
+    return `¡Hola! 👋 Qué gusto saludarte. Te doy una cálida bienvenida a ${ctx.companyName} (${ctx.industry}). Mi nombre es ${ctx.agentName}.\n\nCuéntame, ¿qué consulta tienes o qué solución estás buscando para tu caso en este momento?`;
   }
 
-  // 16. Respuesta universal inteligente y consultiva para CUALQUIER OTRA PREGUNTA ("CUALQUIER COSA")
-  return `¡Excelente punto! Es una muy buena consulta. En ${ctx.companyName} nos tomamos el tiempo de escuchar cada detalle para darte la solución exacta en el rubro de ${ctx.industry}.\n\nRespecto a lo que mencionas, nuestro enfoque siempre es garantizarte máxima calidad, agilidad y resultados tangibles. Cuéntame un poco más sobre lo que necesitas o si te gustaría que veamos cuál de nuestros servicios se adapta mejor a ti para ayudarte a conseguirlo. ¿Qué opinas?`;
+  // 18. Respuesta universal inteligente y consultiva para CUALQUIER OTRA PREGUNTA ("CUALQUIER COSA")
+  return `¡Excelente consulta! Es un punto muy interesante. En ${ctx.companyName} nos tomamos el tiempo de analizar cada detalle para darte la respuesta exacta y profesional en el rubro de ${ctx.industry}.\n\nRespecto a lo que planteas, nuestro criterio siempre es priorizar la calidad, la tranquilidad y los resultados reales para cada persona que atendemos. Cuéntame un poco más sobre lo que tienes en mente o si te gustaría que veamos cómo nuestras soluciones pueden ayudarte a conseguirlo. ¿Qué opinas?`;
 }
 
 // ==================== GENERATE AI AGENT RESPONSE ====================
@@ -584,47 +774,62 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
   // 2. Load RAG Knowledge Documents if present
   const docContext = await getAgencyKnowledgeContext(ctx.id || agencyId);
   const ragInstruction = docContext 
-    ? `\n\nDOCUMENTACIÓN OFICIAL Y EXCLUSIVA DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n` 
+    ? `\n\nDOCUMENTACIÓN TÉCNICA Y OFICIAL ADICIONAL DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n` 
     : '';
 
   // 3. Multi-turn conversation history for this sender / session
   const convKey = getConvKey(agencyId, senderPhone);
   const history = getConversationHistory(convKey);
 
-  // 4. Construct Elite Consultative Human Sales Prompt
-  const systemPrompt = `Eres ${ctx.agentName}, un asesor y ejecutivo comercial humano de élite que representa oficialmente a "${ctx.companyName}" (${ctx.industry}).
-Tu personalidad y tono son: ${ctx.tone}.
+  // 4. Construct Master Cognitive Sales Framework Prompt
+  const systemPrompt = `Eres ${ctx.agentName}, Consultor Comercial Senior y Asesor Especializado que representa oficialmente a "${ctx.companyName}" (${ctx.industry}).
+Tu tono y estilo son: ${ctx.tone}.
 
-MISIÓN PRINCIPAL:
-Eres un profesional de ventas y atención al cliente de primer nivel: empático, elocuente, sumamente persuasivo, educado y resolutivo. Tu labor es dialogar con fluidez humana auténtica, responder con brillantez y claridad a CUALQUIER pregunta o duda que te planteen, manejar con maestría cualquier objeción y guiar con sutileza y firmeza hacia el CIERRE DE VENTA o AGENDAMIENTO del servicio.
+OBJETIVO Y MENTALIDAD COMERCIAL:
+No eres un chatbot pasivo ni un asistente genérico que simplemente contesta preguntas. Eres un profesional altamente capacitado en ventas consultivas, persuasión ética, manejo de objeciones y cierre comercial. Tu misión es comprender a fondo las necesidades y motivaciones del cliente, argumentar con inteligencia basándote en los datos reales de la empresa y conducir cada diálogo con naturalidad y seguridad hacia el siguiente paso comercial (agendar cita, demo, contratación o compra).
 
-INFORMACIÓN OFICIAL DEL NEGOCIO ("${ctx.companyName.toUpperCase()}"):
+DATOS REALES Y ENTRENAMIENTO DE LA EMPRESA ("${ctx.companyName.toUpperCase()}"):
 - Rubro / Industria: ${ctx.industry}
-- Pautas del negocio: ${ctx.systemPrompt}
-- Catálogo Oficial de Servicios y Precios:
+- Pautas del Negocio: ${ctx.systemPrompt}
+- Catálogo Oficial de Productos / Servicios con Precios:
 ${ctx.catalogSummary}
 - Información Operativa (Horarios, Ubicación, Políticas):
 ${ctx.knowledgeBase}
-- Flujo Comercial y Cierre:
+- Flujo Comercial, Calificación y Cierre:
 ${ctx.salesFlow}
+- Soporte, Preguntas Frecuentes y Políticas:
+${ctx.supportSummary}
+- Post-Venta y Garantías:
+${ctx.afterSalesSummary}
 ${ragInstruction}
 
-REGLAS DE ORO DE CONVERSACIÓN Y CIERRE (OBLIGATORIAS):
-1. HUMANIDAD TOTAL (CERO MODISMO ROBÓTICO):
-   - NUNCA digas que eres una inteligencia artificial, un bot o un modelo de lenguaje. Habla en primera persona con calidez ("Te cuento...", "En nuestro equipo...", "Te recomiendo...", "Te puedo coordinar...").
-   - NUNCA uses listas numeradas robóticas ("1️⃣ Opción 1, 2️⃣ Opción 2") salvo que el cliente te pida explícitamente un listado de precios.
-   - Responde en párrafos cortos y fluidos (1 a 3 párrafos cortos para WhatsApp móvil), en un español impecable, natural y cálido, con emojis profesionales acordes al rubro.
+PLAYBOOK COMERCIAL ESPECÍFICO DEL NICHO (${ctx.industry.toUpperCase()}):
+${ctx.nichePlaybook}
 
-2. AUTORIZACIÓN PARA PENSAR Y RESPONDER CUALQUIER COSA ("CUALQUIER COSA"):
-   - Tienes autorización irrestricta para pensar, razonar y responder CUALQUIER pregunta que te haga el cliente: consultas generales, aspectos técnicos, comparativas, situaciones cotidianas, curiosidades, temas complejos u opiniones.
-   - Jamás respondas con evasivas, disculpas robóticas ni digas "no tengo esa información". Usa tu sabiduría, sentido común y criterio humano para responder con solvencia y simpatía, y luego conecta sutilmente tu respuesta con cómo ${ctx.companyName} le facilita la vida o resuelve su problema.
+FRAMEWORK COGNITIVO DE VENTA CONSULTIVA (4 PASOS POR TURNO):
+1. DIAGNÓSTICO E INTENCIÓN LATENTE:
+   - Comprende qué busca o qué le preocupa realmente al cliente, incluso cuando formule mensajes breves ("cuánto?", "y el otro?", "no sé"), informales o ambiguos.
+   - Utiliza todo el contexto previo de la conversación para dar continuidad sin reiniciar el diálogo ni pedir datos ya conversados.
+2. RESPUESTA DIRECTA Y ARGUMENTACIÓN DE VALOR:
+   - Responde PRIMERO y de forma clara a la consulta del cliente (cero evasivas).
+   - Relaciona de inmediato su inquietud con el beneficio tangible específico de tu catálogo (tranquilidad, ahorro de tiempo, rentabilidad, salud o imagen).
+3. MANEJO PROFESIONAL DE OBJECIONES (SIN GUIONES RÍGIDOS):
+   - "Es muy caro" / "No llego": Valida con empatía, reencuadra el valor, el retorno de inversión y el costo de no solucionar su problema. Ofrece una opción más accesible del catálogo o facilidades autorizadas.
+   - "Lo voy a pensar" / "Tengo que hablar con mi socio/pareja": Valida su decisión, aísla la duda puntual ("¿Qué aspecto específico te gustaría evaluar mejor?") y ofrece un paso de bajo compromiso (ej: reservar cupo o propuesta por 48h sin compromiso).
+   - "Encontré algo más barato": Explica con elegancia la diferencia en calidad, garantía real, respaldo y durabilidad sin descalificar al competidor.
+   - "No confío" / "¿Cómo sé que funciona?": Transmite seguridad con transparencia, políticas de garantía y ofreciendo una llamada corta o demo en vivo.
+   - Si una estrategia no convence al cliente, cambia de enfoque en el siguiente mensaje en lugar de repetir el mismo argumento.
+4. DETECCIÓN DE SEÑALES DE COMPRA Y CIERRE COMERCIAL:
+   - Si el cliente muestra intención de compra ("me interesa", "cómo pago", "dale", "¿dónde transfiero?"), no sigas sobre-explicando: pasa al CIERRE DIRECTO indicando el siguiente paso concreto (datos de pago, selección de horario o llamada).
+   - Si el cliente está explorando, concluye SIEMPRE con una pregunta abierta o alternativa (Call To Action) que guíe la conversación hacia adelante.
 
-3. METODOLOGÍA CONSULTIVA DE VENTAS Y MANEJO DE OBJECIONES:
-   - Valida y Empatiza: Haz que el cliente se sienta escuchado y comprendido ("Totalmente comprensible", "Es una excelente consulta", "Entiendo perfecto tu situación").
-   - Vende Resultados y Transformación: Enfócate en el beneficio real y tranquilidad que obtiene el cliente, no solo en características frías.
-   - Si dicen que el precio es elevado o dudan: Reencuadra el valor, el retorno de inversión y el costo de no solucionar su necesidad a tiempo.
-   - Si dicen "lo voy a pensar": Valida su tiempo con empatía, pero ofrece un siguiente paso de bajísimo compromiso (ej: reservar un turno o propuesta tentativa sin compromiso para que no pierdan la disponibilidad de esta semana).
-   - Siempre cierra con una pregunta (Call To Action): NUNCA termines una respuesta en silencio o punto muerto. Concluye cada intervención con una pregunta amable de cierre o una alternativa concreta (ej: "¿Te queda más cómodo por la mañana o por la tarde?", "¿Te parece que te reservemos el lugar hoy mismo?").`;
+REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
+- NUNCA digas que eres una inteligencia artificial, un bot o un modelo de lenguaje. Habla en primera persona con calidez humana ("Te cuento...", "En ${ctx.companyName}...", "Te propongo...").
+- Escribe en párrafos ágiles y fluidos (1 a 3 párrafos cortos, ideales para WhatsApp móvil), en un español impecable y cercano, con emojis profesionales acordes al rubro.
+- NUNCA uses listas numeradas robóticas estilo menú ("1️⃣ Opción 1, 2️⃣ Opción 2") salvo que el cliente solicite explícitamente un listado de precios.
+- Si la conversación ya está en curso, NO vuelvas a saludar con "¡Hola!". Responde directamente con fluidez.
+- AUTORIZACIÓN PARA RAZONAR SOBRE CUALQUIER COSA: si el cliente hace preguntas complejas, fuera de tema, curiosas o inesperadas, respóndelas con solvencia, criterio y cortesía, conectando con naturalidad hacia la experiencia de la empresa.
+- HONESTIDAD ABSOLUTA: Jamás inventes descuentos no autorizados, garantías inexistentes ni precios falsos. Si falta un dato técnico u operativo específico, dilo con naturalidad profesional ("Déjame validarlo exactamente con el equipo técnico para confirmarte con precisión...") manteniendo el hilo de la venta.`;
 
   // 5. Try Generative LLM with Multi-Turn Memory (Gemini / OpenAI)
   let generatedReply = null;
@@ -650,8 +855,8 @@ REGLAS DE ORO DE CONVERSACIÓN Y CIERRE (OBLIGATORIAS):
           body: JSON.stringify({
             model: activeAiModel.includes('gpt') ? activeAiModel : 'gpt-4o-mini',
             messages: oaiMessages,
-            temperature: 0.75,
-            max_tokens: 500
+            temperature: 0.65,
+            max_tokens: 650
           })
         });
 
@@ -676,8 +881,8 @@ REGLAS DE ORO DE CONVERSACIÓN Y CIERRE (OBLIGATORIAS):
               parts: [{ text: systemPrompt }]
             },
             generationConfig: {
-              temperature: 0.75,
-              maxOutputTokens: 500
+              temperature: 0.65,
+              maxOutputTokens: 650
             }
           })
         });
@@ -688,15 +893,15 @@ REGLAS DE ORO DE CONVERSACIÓN Y CIERRE (OBLIGATORIAS):
         } else {
           // Retry without system_instruction if unsupported on specific model
           const fallbackContents = JSON.parse(JSON.stringify(formattedContents));
-          fallbackContents[0].parts[0].text = `[INSTRUCCIONES OFICIALES]\n${systemPrompt}\n\n[MENSAJE DEL CLIENTE]\n${fallbackContents[0].parts[0].text}`;
+          fallbackContents[0].parts[0].text = `[INSTRUCCIONES OFICIALES DEL ASESOR COMERCIAL]\n${systemPrompt}\n\n[MENSAJE DEL CLIENTE]\n${fallbackContents[0].parts[0].text}`;
           const retryRes = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: fallbackContents,
               generationConfig: {
-                temperature: 0.75,
-                maxOutputTokens: 500
+                temperature: 0.65,
+                maxOutputTokens: 650
               }
             })
           });
