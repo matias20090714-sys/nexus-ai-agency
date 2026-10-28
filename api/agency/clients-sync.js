@@ -19,57 +19,56 @@ module.exports = async (req, res) => {
       const payload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
       const { agencyId, clients } = payload;
       const agId = agencyId || 'agency_master_1';
+      const cleanClients = (Array.isArray(clients) ? clients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
 
-      if (Array.isArray(clients)) {
-        let memory = {};
-        try {
-          if (fs.existsSync(COMPANIES_FILE)) {
-            memory = JSON.parse(fs.readFileSync(COMPANIES_FILE, 'utf8'));
-          }
-        } catch (e) {}
-
-        memory[agId] = clients;
-
-        try {
-          fs.writeFileSync(COMPANIES_FILE, JSON.stringify(memory, null, 2));
-        } catch (e) {
-          console.error('Error writing companies_agents.json:', e.message);
+      let memory = {};
+      try {
+        if (fs.existsSync(COMPANIES_FILE)) {
+          memory = JSON.parse(fs.readFileSync(COMPANIES_FILE, 'utf8'));
         }
+      } catch (e) {}
 
-        if (db) {
-          for (const c of clients) {
-            try {
-              await db.query(
-                `INSERT INTO clients (id, agency_id, name, industry, phone, notes)
-                 VALUES ($1, $2, $3, $4, $5, $6)
-                 ON CONFLICT (id) DO UPDATE SET 
-                   name = EXCLUDED.name,
-                   industry = EXCLUDED.industry,
-                   phone = EXCLUDED.phone,
-                   notes = EXCLUDED.notes`,
-                [
-                  c.id, 
-                  agId, 
-                  c.name, 
-                  c.industry || 'Servicios', 
-                  c.phone || null, 
-                  JSON.stringify({ 
-                    agentName: c.agentName, 
-                    systemPrompt: c.systemPrompt, 
-                    knowledgeBase: c.knowledgeBase, 
-                    catalog: c.catalog, 
-                    salesFlow: c.salesFlow,
-                    supportFlow: c.supportFlow,
-                    afterSalesFlow: c.afterSalesFlow 
-                  })
-                ]
-              );
-            } catch (cErr) {}
-          }
+      memory[agId] = cleanClients;
+
+      try {
+        fs.writeFileSync(COMPANIES_FILE, JSON.stringify(memory, null, 2));
+      } catch (e) {
+        console.error('Error writing companies_agents.json:', e.message);
+      }
+
+      if (db) {
+        for (const c of cleanClients) {
+          try {
+            await db.query(
+              `INSERT INTO clients (id, agency_id, name, industry, phone, notes)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               ON CONFLICT (id) DO UPDATE SET 
+                 name = EXCLUDED.name,
+                 industry = EXCLUDED.industry,
+                 phone = EXCLUDED.phone,
+                 notes = EXCLUDED.notes`,
+              [
+                c.id, 
+                agId, 
+                c.name, 
+                c.industry || 'Servicios', 
+                c.phone || null, 
+                JSON.stringify({ 
+                  agentName: c.agentName, 
+                  systemPrompt: c.systemPrompt, 
+                  knowledgeBase: c.knowledgeBase, 
+                  catalog: c.catalog, 
+                  salesFlow: c.salesFlow,
+                  supportFlow: c.supportFlow,
+                  afterSalesFlow: c.afterSalesFlow 
+                })
+              ]
+            );
+          } catch (cErr) {}
         }
       }
 
-      return res.status(200).json({ success: true, count: Array.isArray(clients) ? clients.length : 0 });
+      return res.status(200).json({ success: true, count: cleanClients.length });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -84,7 +83,8 @@ module.exports = async (req, res) => {
           memory = JSON.parse(fs.readFileSync(COMPANIES_FILE, 'utf8'));
         }
       } catch (e) {}
-      const clients = memory[agencyId] || memory['agency_master_1'] || [];
+      const rawClients = memory[agencyId] || memory['agency_master_1'] || [];
+      const clients = (Array.isArray(rawClients) ? rawClients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
       return res.status(200).json({ success: true, clients });
     } catch (err) {
       return res.status(500).json({ success: false, error: err.message });

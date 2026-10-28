@@ -277,9 +277,15 @@ function saveAiConfig(apiKey, model) {
 function loadCompaniesFromDisk() {
   try {
     if (fs.existsSync(COMPANIES_FILE)) {
-      memoryCompanies = JSON.parse(fs.readFileSync(COMPANIES_FILE, 'utf8'));
+      const raw = JSON.parse(fs.readFileSync(COMPANIES_FILE, 'utf8'));
+      memoryCompanies = {};
+      for (const [k, v] of Object.entries(raw || {})) {
+        if (Array.isArray(v)) {
+          memoryCompanies[k] = v.filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
+        }
+      }
       const total = Object.values(memoryCompanies).reduce((acc, arr) => acc + (Array.isArray(arr) ? arr.length : 0), 0);
-      console.log(`[AI Engine] ${total} empresas y agentes por nicho cargados desde disco.`);
+      console.log(`[AI Engine] ${total} empresas y agentes creados por usuarios cargados desde disco.`);
     }
   } catch (e) {
     console.error('Error cargando companies_agents.json:', e.message);
@@ -323,18 +329,29 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     matched = allCompanies[0];
   }
 
-  // Default fallback if no custom company is registered yet
+  // Default fallback if no custom company is registered yet (Uses customized agency portal data if available)
   if (!matched) {
+    const portal = (agencyId && memoryPortals[agencyId]) || memoryPortals['agency_master_1'] || {};
+    const agencyName = portal.agency?.name || 'NEXUS AI Agency';
+    let plansSummary = '';
+    if (Array.isArray(portal.plans) && portal.plans.length > 0) {
+      plansSummary = portal.plans.map(p => 
+        `• ${p.name}: $${p.price} ${p.currency || 'USD'}/${p.period || p.billingPeriod || 'mes'} (${(p.features || []).slice(0, 3).join(', ')})`
+      ).join('\n');
+    } else {
+      plansSummary = '• Plan Starter: $290 USD/mes (Agente de WhatsApp 24/7 entrenado a medida)\n• Plan Growth Pro: $490 USD/mes (Agente + Calendar + Cotizador + CRM)\n• Plan Enterprise: $890 USD/mes (Multi-agentes corporativos con integraciones avanzadas)';
+    }
+
     return {
       id: 'default_agency',
-      companyName: 'NEXUS AI Agency',
-      industry: 'Soluciones de Inteligencia Artificial & Automatización',
-      agentName: 'Asistente Virtual IA',
-      tone: 'profesional_calido',
-      systemPrompt: 'Eres el asistente virtual con IA oficial de la empresa. Atiende consultas, explica servicios y precios con calidez e invita a agendar una cita o llamada estratégica.',
-      catalogSummary: '• Plan Starter: $290 USD/mes (Agente de WhatsApp 24/7 entrenado a medida)\n• Plan Growth Pro: $490 USD/mes (Agente + Calendar + Cotizador + CRM)\n• Plan Enterprise: $890 USD/mes (Multi-agentes corporativos con integraciones avanzadas)',
-      knowledgeBase: 'Horario: Atención 24/7 por WhatsApp. Oficinas: Atención remota para clientes de todo el mundo.',
-      salesFlow: 'Califica la necesidad del cliente y ofrece coordinar una breve demo de 15 minutos.'
+      companyName: agencyName,
+      industry: 'Soluciones de Inteligencia Artificial & Automatización Comercial',
+      agentName: `Asesor Comercial de ${agencyName}`,
+      tone: 'profesional_calido_y_persuasivo',
+      systemPrompt: `Eres el asesor y consultor comercial de ${agencyName}. Dialoga con empatía humana, explica los servicios con elocuencia, responde cualquier duda que te hagan y orienta la conversación hacia coordinar una breve llamada estratégica o contratar el servicio.`,
+      catalogSummary: plansSummary,
+      knowledgeBase: 'Horario: Atención 24/7 por WhatsApp. Modalidad: Servicios remotos llave en mano con soporte continuo para empresas de todo el mundo.',
+      salesFlow: 'Califica la empresa y necesidad del cliente, responde todas sus dudas y coordina una demo de 15 minutos o activación del plan.'
     };
   }
 
@@ -370,16 +387,190 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     industry: matched.industry || 'Servicios Especializados',
     agentName: matched.agentName || `Asistente de ${matched.name}`,
     tone: matched.tone || 'profesional_calido',
-    systemPrompt: matched.systemPrompt || `Eres el asistente virtual oficial de ${matched.name}. Atiende con amabilidad y orienta a resolver consultas y agendar turnos o ventas.`,
+    systemPrompt: matched.systemPrompt || `Eres el asesor y asistente comercial oficial de ${matched.name}. Atiende con amabilidad y calidez humana, resuelve cualquier duda y orienta a cerrar ventas o turnos.`,
     catalogSummary: catalogSummary,
     knowledgeBase: matched.knowledgeBase || `Atención de Lunes a Sábados. Consultas y reservas por WhatsApp.`,
     salesFlow: salesFlowStr
   };
 }
 
+// ==================== MULTI-TURN CONVERSATIONAL MEMORY ====================
+const conversationHistories = new Map();
+const MAX_CONV_TURNS = 16;
+const CONV_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function getConvKey(agencyId, senderPhone) {
+  const cleanAg = (agencyId || 'master').toString().replace(/[^a-zA-Z0-9_-]/g, '');
+  const cleanPhone = (senderPhone || 'visitor').toString().replace(/[^a-zA-Z0-9_-]/g, '');
+  return `${cleanAg}_${cleanPhone}`;
+}
+
+function getConversationHistory(convKey) {
+  const entry = conversationHistories.get(convKey);
+  if (!entry) return [];
+  if (Date.now() - entry.lastUpdated > CONV_TTL_MS) {
+    conversationHistories.delete(convKey);
+    return [];
+  }
+  return entry.history || [];
+}
+
+function appendToConversationHistory(convKey, role, text) {
+  if (!text) return;
+  let entry = conversationHistories.get(convKey);
+  if (!entry) {
+    entry = { history: [], lastUpdated: Date.now() };
+    conversationHistories.set(convKey, entry);
+  }
+  entry.lastUpdated = Date.now();
+  entry.history.push({ role, text: String(text).trim(), timestamp: Date.now() });
+  if (entry.history.length > MAX_CONV_TURNS) {
+    entry.history = entry.history.slice(-MAX_CONV_TURNS);
+  }
+}
+
+function clearConversationHistory(convKey) {
+  conversationHistories.delete(convKey);
+}
+
+function buildGeminiContents(history, currentMessage) {
+  const contents = [];
+  let lastRole = null;
+  for (const h of history) {
+    const geminiRole = h.role === 'assistant' ? 'model' : 'user';
+    if (geminiRole === lastRole) {
+      if (contents.length > 0) {
+        contents[contents.length - 1].parts[0].text += '\n' + h.text;
+      }
+    } else {
+      contents.push({ role: geminiRole, parts: [{ text: h.text }] });
+      lastRole = geminiRole;
+    }
+  }
+
+  if (lastRole === 'user' && contents.length > 0) {
+    contents[contents.length - 1].parts[0].text += '\n' + currentMessage;
+  } else {
+    contents.push({ role: 'user', parts: [{ text: currentMessage }] });
+  }
+
+  if (contents.length > 0 && contents[0].role === 'model') {
+    contents.shift();
+  }
+
+  return contents;
+}
+
+// ==================== CONSULTATIVE SALES REASONING ENGINE ====================
+function generateContextualSalesReply(lowerText, rawText, history, ctx, docContext) {
+  const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
+  const lastUserMsg = history.filter(h => h.role === 'user').slice(-2, -1)[0]?.text || '';
+  const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan'));
+
+  // 1. Si hay documentación RAG oficial y pregunta por algún dato del documento
+  if (docContext && (lowerText.includes('precio') || lowerText.includes('catalogo') || lowerText.includes('catálogo') || lowerText.includes('servicio') || lowerText.includes('costo') || lowerText.includes('cuanto') || lowerText.includes('cuánto'))) {
+    return `¡Con gusto! Aquí tienes la información detallada de ${ctx.companyName}:\n\n${docContext.slice(0, 480)}...\n\n¿Te gustaría coordinar una cotización a medida o prefieres agendar un turno para avanzar?`;
+  }
+
+  // 2. Intención de compra / Cierre / Acuerdo (me interesa, dale, quiero contratar, cómo pago, lo quiero)
+  const isAgreementOrClose = lowerText.includes('me interesa') || lowerText.includes('quiero contratar') || lowerText.includes('como contrato') || lowerText.includes('cómo contrato') ||
+    lowerText.includes('como pago') || lowerText.includes('cómo pago') || lowerText.includes('donde pago') || lowerText.includes('dónde pago') || lowerText.includes('donde transfiero') ||
+    lowerText.includes('dónde transfiero') || lowerText.includes('empecemos') || lowerText.includes('lo quiero') || lowerText.includes('de una') || lowerText.includes('vamos con') ||
+    lowerText.includes('acepto') || lowerText === 'dale' || lowerText.startsWith('dale ') || lowerText === 'si' || lowerText === 'sí' || lowerText === 'ok dale' || lowerText === 'listo dale';
+
+  if (isAgreementOrClose) {
+    return `¡Excelente decisión! 🚀 Nos entusiasma muchísimo trabajar contigo y darte la mejor experiencia en ${ctx.companyName}.\n\nPara dejar todo confirmado y avanzar de inmediato: ¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales?`;
+  }
+
+  // 3. Manejo de objeción de precio (es caro, no llego, rebaja, descuento, presupuesto)
+  const isPriceObjection = lowerText.includes('caro') || lowerText.includes('cara') || lowerText.includes('no tengo plata') || lowerText.includes('no tengo dinero') ||
+    lowerText.includes('no llego') || lowerText.includes('descuento') || lowerText.includes('rebaja') || lowerText.includes('muy costoso') || lowerText.includes('fuera de presupuesto') ||
+    lowerText.includes('algo mas barato') || lowerText.includes('algo más barato');
+
+  if (isPriceObjection) {
+    return `Te entiendo perfectamente, cuidar la inversión es una prioridad inteligente. En ${ctx.companyName} nuestros valores están pensados para que el retorno y la tranquilidad que recibes superen con creces lo abonado, sin sorpresas ni costos ocultos.\n\nAdemás, podemos ver facilidades o planes acordes a tu etapa actual. Cuéntame, ¿cuál de nuestras soluciones es la que más necesitas resolver hoy para ver cómo podemos adaptarla a ti?`;
+  }
+
+  // 4. Indecisión / Pensarlo (lo voy a pensar, déjame ver, después te aviso, tengo que consultarlo)
+  const isHesitation = lowerText.includes('lo voy a pensar') || lowerText.includes('lo tengo que pensar') || lowerText.includes('dejame ver') || lowerText.includes('déjame ver') ||
+    lowerText.includes('despues te aviso') || lowerText.includes('después te aviso') || lowerText.includes('despues te escribo') || lowerText.includes('después te escribo') ||
+    lowerText.includes('tengo que hablar') || lowerText.includes('tengo que consultar') || lowerText.includes('con mi socio') || lowerText.includes('con mi pareja') || lowerText.includes('con mi esposa');
+
+  if (isHesitation) {
+    return `¡Totalmente comprensible! Es una decisión clave y es fundamental que la tomes con total seguridad. Para que tengas toda la información sobre la mesa: ¿Hay alguna duda puntual sobre la implementación o los resultados que te gustaría que aclaremos?\n\nSi te parece bien, puedo guardarte la disponibilidad o propuesta de esta semana sin ningún compromiso para que no pierdas el cupo mientras lo evalúas. ¿Qué opinas?`;
+  }
+
+  // 5. Confianza y Garantías (es seguro, tienen garantía, cómo sé que funciona, por qué confiar)
+  const isTrustQuestion = lowerText.includes('es seguro') || lowerText.includes('garantia') || lowerText.includes('garantía') || lowerText.includes('confiable') ||
+    lowerText.includes('como se que funciona') || lowerText.includes('cómo sé que funciona') || lowerText.includes('por que confiar') || lowerText.includes('por qué confiar') ||
+    lowerText.includes('estafa') || lowerText.includes('referencias');
+
+  if (isTrustQuestion) {
+    return `Es una consulta sumamente válida y nos alegra que la hagas. En ${ctx.companyName} la transparencia y el compromiso con cada cliente son la base de todo: brindamos acompañamiento paso a paso, comunicación constante y total respaldo en cada servicio.\n\n¿Te gustaría coordinar una breve llamada o demo de 10 minutos para conocernos en vivo, ver casos prácticos y despejar cualquier duda antes de avanzar?`;
+  }
+
+  // 6. Precios y Catálogo oficial
+  if (lowerText.includes('precio') || lowerText.includes('precios') || lowerText.includes('costo') || lowerText.includes('costos') || lowerText.includes('cuanto') || lowerText.includes('cuánto') || lowerText.includes('tarifa') || lowerText.includes('tarifas') || lowerText.includes('planes') || lowerText.includes('cotiza') || lowerText.includes('presupuesto')) {
+    return `¡Con gusto! Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estas alternativas se ajusta mejor a lo que estás buscando hoy?`;
+  }
+
+  // 7. Agendamiento de Turnos o Citas
+  if (lowerText.includes('turno') || lowerText.includes('turnos') || lowerText.includes('cita') || lowerText.includes('citas') || lowerText.includes('agendar') || lowerText.includes('reunion') || lowerText.includes('reunión') || lowerText.includes('llamada') || lowerText.includes('reserva') || lowerText.includes('reservar') || lowerText.includes('disponibilidad')) {
+    return `📅 ¡Por supuesto! Para coordinar tu cita en ${ctx.companyName}, indícanos por favor qué día te queda más cómodo (de lunes a sábados) y si prefieres un horario por la mañana o por la tarde. ¿Cuál te va mejor?`;
+  }
+
+  // 8. Servicios y qué hacen
+  if (lowerText.includes('servicio') || lowerText.includes('servicios') || lowerText.includes('ofrecen') || lowerText.includes('que hacen') || lowerText.includes('qué hacen') || lowerText.includes('como funciona') || lowerText.includes('cómo funciona')) {
+    return `⭐ En ${ctx.companyName} somos especialistas en ${ctx.industry}. Brindamos soluciones orientadas a darte los mejores resultados con atención personalizada:\n\n${ctx.catalogSummary}\n\n¿Te gustaría que te asesoremos sobre cómo resolver tu caso particular o deseas conocer más sobre alguno de nuestros planes?`;
+  }
+
+  // 9. Ubicación y Oficinas
+  if (lowerText.includes('donde estan') || lowerText.includes('dónde están') || lowerText.includes('donde quedan') || lowerText.includes('dónde quedan') || lowerText.includes('direccion') || lowerText.includes('dirección') || lowerText.includes('ubicacion') || lowerText.includes('ubicación') || lowerText.includes('como llego') || lowerText.includes('cómo llego')) {
+    return `📍 Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Te gustaría coordinar una visita presencial o prefieres que gestionemos todo directamente por WhatsApp?`;
+  }
+
+  // 10. Horarios de atención
+  if (lowerText.includes('horario') || lowerText.includes('horarios') || lowerText.includes('a que hora') || lowerText.includes('a qué hora') || lowerText.includes('atienden hoy') || lowerText.includes('estan abiertos') || lowerText.includes('están abiertos')) {
+    return `🕒 Horarios de atención de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nRecuerda que por este chat de WhatsApp te atendemos las 24 horas. ¿En qué podemos ayudarte en este momento?`;
+  }
+
+  // 11. Solicitud de asesor humano
+  if (lowerText.includes('humano') || lowerText.includes('asesor') || lowerText.includes('persona') || lowerText.includes('operador') || lowerText.includes('alguien real')) {
+    return `👤 ¡Por supuesto! Ya he notificado a nuestro equipo en ${ctx.companyName} para que un asesor especializado revise tu consulta y tome contacto contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
+  }
+
+  // 12. Agradecimientos
+  if (lowerText.includes('gracia') || lowerText.includes('agradecid') || lowerText.includes('te agradezco') || lowerText.includes('muy amable') || lowerText === 'grx' || lowerText === 'thx') {
+    return `¡Al contrario, un verdadero placer! 😊 En ${ctx.companyName} estamos siempre a tu disposición para ayudarte. Si te gustaría que reservemos tu lugar o avancemos con tu propuesta, solo avísame y lo dejamos listo. ¡Que tengas un excelente día!`;
+  }
+
+  // 13. Despedidas
+  if (lowerText.includes('chau') || lowerText.includes('adios') || lowerText.includes('adiós') || lowerText.includes('hasta luego') || lowerText.includes('nos vemos') || lowerText.includes('bye') || lowerText.includes('buenas noches') || lowerText.includes('buen finde')) {
+    return `¡Hasta luego! 👋 Ha sido un placer hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. ¡Que tengas un gran día!`;
+  }
+
+  // 14. Confirmaciones cortas (ok, genial, perfecto, entiendo)
+  if (lowerText === 'ok' || lowerText === 'genial' || lowerText === 'perfecto' || lowerText === 'buenisimo' || lowerText === 'buenísimo' || lowerText === 'excelente' || lowerText === 'entendido' || lowerText === 'comprendo' || lowerText === 'bien') {
+    if (hadPriceDiscussion) {
+      return `¡Genial! 👍 Dado que estuvimos viendo nuestros planes de ${ctx.companyName}, ¿te gustaría que te reservemos tu cupo hoy mismo o prefieres que coordinemos una breve llamada para afinar detalles?`;
+    }
+    return `¡Excelente! 👍 En ${ctx.companyName} estamos listos para ayudarte. ¿Deseas que coordinemos una fecha para tu servicio o tienes alguna otra pregunta que quieras hacernos?`;
+  }
+
+  // 15. Saludos iniciales
+  if (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal')) {
+    return `¡Hola! 👋 Qué gusto saludarte. Te doy una cálida bienvenida a ${ctx.companyName} (${ctx.industry}). Mi nombre es ${ctx.agentName}.\n\nCuéntame, ¿qué consulta tienes o qué solución estás buscando para tu negocio o caso en este momento?`;
+  }
+
+  // 16. Respuesta universal inteligente y consultiva para CUALQUIER OTRA PREGUNTA ("CUALQUIER COSA")
+  return `¡Excelente punto! Es una muy buena consulta. En ${ctx.companyName} nos tomamos el tiempo de escuchar cada detalle para darte la solución exacta en el rubro de ${ctx.industry}.\n\nRespecto a lo que mencionas, nuestro enfoque siempre es garantizarte máxima calidad, agilidad y resultados tangibles. Cuéntame un poco más sobre lo que necesitas o si te gustaría que veamos cuál de nuestros servicios se adapta mejor a ti para ayudarte a conseguirlo. ¿Qué opinas?`;
+}
+
+// ==================== GENERATE AI AGENT RESPONSE ====================
 async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId = '', maybeAgencyId = '') {
-  const text = (userText || '').toLowerCase().trim();
+  const text = (userText || '').trim();
   if (!text) return null;
+  const lowerText = text.toLowerCase();
 
   let sessionId = sessionOrAgencyId;
   let agencyId = maybeAgencyId || sessionOrAgencyId || 'agency_master_1';
@@ -393,41 +584,63 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
   // 2. Load RAG Knowledge Documents if present
   const docContext = await getAgencyKnowledgeContext(ctx.id || agencyId);
   const ragInstruction = docContext 
-    ? `\n\nDOCUMENTACIÓN OFICIAL DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n` 
+    ? `\n\nDOCUMENTACIÓN OFICIAL Y EXCLUSIVA DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n` 
     : '';
 
-  // 3. Call Real Generative LLM if API Key is configured
-  if (customAiKey) {
-    try {
-      const prompt = `Eres ${ctx.agentName}, el asistente virtual con Inteligencia Artificial oficial de ${ctx.companyName} (${ctx.industry}).
+  // 3. Multi-turn conversation history for this sender / session
+  const convKey = getConvKey(agencyId, senderPhone);
+  const history = getConversationHistory(convKey);
+
+  // 4. Construct Elite Consultative Human Sales Prompt
+  const systemPrompt = `Eres ${ctx.agentName}, un asesor y ejecutivo comercial humano de élite que representa oficialmente a "${ctx.companyName}" (${ctx.industry}).
 Tu personalidad y tono son: ${ctx.tone}.
 
-INSTRUCCIONES Y REGLAS DE ATENCIÓN DE ${ctx.companyName.toUpperCase()}:
-${ctx.systemPrompt}
+MISIÓN PRINCIPAL:
+Eres un profesional de ventas y atención al cliente de primer nivel: empático, elocuente, sumamente persuasivo, educado y resolutivo. Tu labor es dialogar con fluidez humana auténtica, responder con brillantez y claridad a CUALQUIER pregunta o duda que te planteen, manejar con maestría cualquier objeción y guiar con sutileza y firmeza hacia el CIERRE DE VENTA o AGENDAMIENTO del servicio.
 
-CATÁLOGO OFICIAL DE SERVICIOS Y PRECIOS:
+INFORMACIÓN OFICIAL DEL NEGOCIO ("${ctx.companyName.toUpperCase()}"):
+- Rubro / Industria: ${ctx.industry}
+- Pautas del negocio: ${ctx.systemPrompt}
+- Catálogo Oficial de Servicios y Precios:
 ${ctx.catalogSummary}
-
-INFORMACIÓN DEL NEGOCIO (HORARIOS, UBICACIÓN, POLÍTICAS):
+- Información Operativa (Horarios, Ubicación, Políticas):
 ${ctx.knowledgeBase}
-
-PAUTAS DE VENTAS Y AGENDAMIENTO:
+- Flujo Comercial y Cierre:
 ${ctx.salesFlow}
 ${ragInstruction}
-MENSAJE DEL CLIENTE (+${senderPhone}): "${userText}"
 
-REGLAS DE RESPUESTA:
-- Responde estrictamente adoptando la identidad de ${ctx.companyName} en el rubro de ${ctx.industry}.
-- Si el cliente pregunta por servicios o precios, cítale los ítems y precios exactos de su catálogo.
-- Si el cliente pide turno o cita, solicítale el día y horario preferido según la información del negocio.
-- Si el cliente agradece, responde con amabilidad manteniendo la calidez del negocio.
-- Si el cliente se despide, deséale un excelente día.
-- Responde siempre en español, de forma concisa (máximo 2 a 3 párrafos cortos para WhatsApp móvil), usando emojis profesionales acordes al rubro.
+REGLAS DE ORO DE CONVERSACIÓN Y CIERRE (OBLIGATORIAS):
+1. HUMANIDAD TOTAL (CERO MODISMO ROBÓTICO):
+   - NUNCA digas que eres una inteligencia artificial, un bot o un modelo de lenguaje. Habla en primera persona con calidez ("Te cuento...", "En nuestro equipo...", "Te recomiendo...", "Te puedo coordinar...").
+   - NUNCA uses listas numeradas robóticas ("1️⃣ Opción 1, 2️⃣ Opción 2") salvo que el cliente te pida explícitamente un listado de precios.
+   - Responde en párrafos cortos y fluidos (1 a 3 párrafos cortos para WhatsApp móvil), en un español impecable, natural y cálido, con emojis profesionales acordes al rubro.
 
-Respuesta:`;
-      
-      // OpenAI API Support (keys starting with sk-)
+2. AUTORIZACIÓN PARA PENSAR Y RESPONDER CUALQUIER COSA ("CUALQUIER COSA"):
+   - Tienes autorización irrestricta para pensar, razonar y responder CUALQUIER pregunta que te haga el cliente: consultas generales, aspectos técnicos, comparativas, situaciones cotidianas, curiosidades, temas complejos u opiniones.
+   - Jamás respondas con evasivas, disculpas robóticas ni digas "no tengo esa información". Usa tu sabiduría, sentido común y criterio humano para responder con solvencia y simpatía, y luego conecta sutilmente tu respuesta con cómo ${ctx.companyName} le facilita la vida o resuelve su problema.
+
+3. METODOLOGÍA CONSULTIVA DE VENTAS Y MANEJO DE OBJECIONES:
+   - Valida y Empatiza: Haz que el cliente se sienta escuchado y comprendido ("Totalmente comprensible", "Es una excelente consulta", "Entiendo perfecto tu situación").
+   - Vende Resultados y Transformación: Enfócate en el beneficio real y tranquilidad que obtiene el cliente, no solo en características frías.
+   - Si dicen que el precio es elevado o dudan: Reencuadra el valor, el retorno de inversión y el costo de no solucionar su necesidad a tiempo.
+   - Si dicen "lo voy a pensar": Valida su tiempo con empatía, pero ofrece un siguiente paso de bajísimo compromiso (ej: reservar un turno o propuesta tentativa sin compromiso para que no pierdan la disponibilidad de esta semana).
+   - Siempre cierra con una pregunta (Call To Action): NUNCA termines una respuesta en silencio o punto muerto. Concluye cada intervención con una pregunta amable de cierre o una alternativa concreta (ej: "¿Te queda más cómodo por la mañana o por la tarde?", "¿Te parece que te reservemos el lugar hoy mismo?").`;
+
+  // 5. Try Generative LLM with Multi-Turn Memory (Gemini / OpenAI)
+  let generatedReply = null;
+  if (customAiKey) {
+    try {
+      // 5.A OpenAI API
       if (customAiKey.startsWith('sk-')) {
+        const oaiMessages = [
+          { role: 'system', content: systemPrompt },
+          ...history.map(h => ({
+            role: h.role === 'assistant' ? 'assistant' : 'user',
+            content: h.text
+          })),
+          { role: 'user', content: userText }
+        ];
+
         const oaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -436,118 +649,83 @@ Respuesta:`;
           },
           body: JSON.stringify({
             model: activeAiModel.includes('gpt') ? activeAiModel : 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: `Eres ${ctx.agentName}, asistente virtual de ${ctx.companyName} (${ctx.industry}). Responde siempre en español, con calidez, usando emojis profesionales, conciso y orientado a solucionar y vender.` },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 450
+            messages: oaiMessages,
+            temperature: 0.75,
+            max_tokens: 500
           })
         });
+
         if (oaiRes.ok) {
           const oaiData = await oaiRes.json();
-          const reply = oaiData.choices?.[0]?.message?.content;
-          if (reply) return reply.trim();
+          generatedReply = oaiData.choices?.[0]?.message?.content;
         } else {
-          const errData = await oaiRes.text();
-          console.error('[OpenAI API Error]', oaiRes.status, errData);
+          console.error('[OpenAI API Error]', oaiRes.status, await oaiRes.text());
         }
       } else {
-        // Google Gemini API Support (default model gemini-1.5-flash or gemini-2.0-flash)
+        // 5.B Google Gemini API with Multi-Turn
         const geminiModel = activeAiModel.includes('gemini') ? activeAiModel : 'gemini-1.5-flash';
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${customAiKey}`;
-        const response = await fetch(url, {
+        const formattedContents = buildGeminiContents(history, userText);
+
+        let gRes = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            contents: formattedContents,
+            system_instruction: {
+              parts: [{ text: systemPrompt }]
+            },
             generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 450
+              temperature: 0.75,
+              maxOutputTokens: 500
             }
           })
         });
-        if (response.ok) {
-          const json = await response.json();
-          const candidate = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (candidate) return candidate.trim();
+
+        if (gRes.ok) {
+          const json = await gRes.json();
+          generatedReply = json?.candidates?.[0]?.content?.parts?.[0]?.text;
         } else {
-          const errData = await response.text();
-          console.error('[Gemini API Error]', response.status, errData);
+          // Retry without system_instruction if unsupported on specific model
+          const fallbackContents = JSON.parse(JSON.stringify(formattedContents));
+          fallbackContents[0].parts[0].text = `[INSTRUCCIONES OFICIALES]\n${systemPrompt}\n\n[MENSAJE DEL CLIENTE]\n${fallbackContents[0].parts[0].text}`;
+          const retryRes = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: fallbackContents,
+              generationConfig: {
+                temperature: 0.75,
+                maxOutputTokens: 500
+              }
+            })
+          });
+          if (retryRes.ok) {
+            const json = await retryRes.json();
+            generatedReply = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          } else {
+            console.error('[Gemini API Error]', retryRes.status, await retryRes.text());
+          }
         }
       }
-    } catch (err) {
-      console.log('LLM API call fallback to contextual heuristics:', err.message);
+    } catch (llmErr) {
+      console.warn('[LLM Call Note] Fallback to conversational sales heuristics:', llmErr.message);
     }
   }
 
-  // 4. High-converting smart contextual heuristics fallback (TAILORED TO THIS COMPANY & NICHE)
-  if (docContext && (text.includes('precio') || text.includes('catalogo') || text.includes('servicio') || text.includes('costo') || text.includes('cuanto'))) {
-    return `¡Hola! Aquí tienes la información oficial de ${ctx.companyName}:\n\n${docContext.slice(0, 450)}...\n\n¿Te gustaría coordinar una cotización personalizada o agendar un turno?`;
+  // If LLM returned a valid response, record history and return
+  if (generatedReply && generatedReply.trim()) {
+    const finalReply = generatedReply.trim();
+    appendToConversationHistory(convKey, 'user', userText);
+    appendToConversationHistory(convKey, 'assistant', finalReply);
+    return finalReply;
   }
 
-  // Agradecimientos (gracias, muchas gracias, etc.)
-  if (text.includes('gracia') || text.includes('graciela') || text.includes('agradecid') || text.includes('te agradezco') || text.includes('muy amable') || text === 'grx' || text === 'thx') {
-    return `¡De nada! 😊 En ${ctx.companyName} es un placer ayudarte. Si tienes cualquier otra pregunta sobre nuestros servicios de ${ctx.industry} o deseas agendar una cita, aquí estoy a tu disposición. ¡Que tengas un excelente día!`;
-  }
-
-  // Despedidas (chau, adiós, nos vemos, etc.)
-  if (text.includes('chau') || text.includes('adios') || text.includes('adiós') || text.includes('hasta luego') || text.includes('nos vemos') || text.includes('bye') || text.includes('hasta pronto') || text.includes('buenas noches') || text.includes('buen finde')) {
-    return `¡Hasta luego! 👋 Que tengas un excelente día. Si en algún momento deseas retomar la consulta en ${ctx.companyName}, ver servicios o coordinar una visita, solo escríbenos por aquí. ¡Estamos a tu disposición 24/7!`;
-  }
-
-  // Confirmaciones y asentimientos (ok, dale, perfecto, genial, listo)
-  if (text === 'ok' || text === 'dale' || text === 'perfecto' || text === 'genial' || text === 'buenisimo' || text === 'buenísimo' || text === 'excelente' || text === 'listo' || text === 'de una' || text === 'bien' || text.startsWith('ok ') || text.includes('entendido') || text.includes('comprendo')) {
-    return `¡Excelente! 👍 ¿Te gustaría que te preparemos una propuesta personalizada para ${ctx.companyName} o prefieres coordinar un turno/cita en nuestro calendario?`;
-  }
-
-  // Conversación casual e identidad (cómo estás, quién eres, qué haces)
-  if (text.includes('como estas') || text.includes('cómo estás') || text.includes('que tal') || text.includes('qué tal') || text.includes('todo bien') || text.includes('quien eres') || text.includes('quién eres') || text.includes('quien sos') || text.includes('quién sos') || text.includes('que haces') || text.includes('qué haces') || text.includes('como funciona') || text.includes('cómo funciona')) {
-    return `¡Todo excelente por aquí! 🚀 Soy ${ctx.agentName}, el asistente virtual de ${ctx.companyName} (${ctx.industry}), disponible 24/7 para responder tus consultas al instante, informarte de nuestros servicios y coordinar turnos. ¿En qué podemos ayudarte hoy?`;
-  }
-
-  // Ubicación y oficinas (dónde están, dirección, etc.)
-  if (text.includes('donde estan') || text.includes('dónde están') || text.includes('donde quedan') || text.includes('dónde quedan') || text.includes('direccion') || text.includes('dirección') || text.includes('ubicacion') || text.includes('ubicación') || text.includes('de donde son') || text.includes('de dónde son')) {
-    return `📍 Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Deseas coordinar un turno o visita presencial?`;
-  }
-
-  // Horarios de atención
-  if (text.includes('horario') || text.includes('a que hora') || text.includes('a qué hora') || text.includes('atienden hoy') || text.includes('estan abiertos') || text.includes('están abiertos')) {
-    return `🕒 Horarios de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nNuestro canal de WhatsApp con IA atiende consultas las 24 horas del día.`;
-  }
-
-  // Saludos iniciales
-  if (text.includes('hola') || text.includes('buenos') || text.includes('buenas') || text.includes('info') || text.includes('saludos') || text === 'buen dia' || text === 'buen día') {
-    return `¡Hola! 👋 Gracias por comunicarte con ${ctx.companyName} (${ctx.industry}). Soy ${ctx.agentName}, tu asistente 24/7.\n\n¿En qué podemos ayudarte hoy?\n1️⃣ Consultar catálogo de servicios y precios\n2️⃣ Agendar una cita o turno\n3️⃣ Solicitar una cotización personalizada\n4️⃣ Hablar con un especialista humano`;
-  }
-
-  // Servicios y catálogo de la empresa
-  if (text.includes('servicio') || text.includes('catalogo') || text.includes('catálogo') || text.includes('ofrecen') || text.includes('solucion') || text.includes('solución') || text.includes('producto')) {
-    return `⭐ Servicios oficiales de ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Te gustaría coordinar un turno o solicitar más detalles sobre alguno en particular?`;
-  }
-
-  // Precios y planes de la empresa
-  if (text.includes('precio') || text.includes('costo') || text.includes('cuanto') || text.includes('cuánto') || text.includes('plan') || text.includes('tarifa') || text === '1') {
-    return `💵 ¡Con gusto! Aquí tienes nuestros precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Te gustaría que te reservemos un turno o te preparemos una propuesta personalizada?`;
-  }
-
-  // Turnos y reuniones
-  if (text.includes('turno') || text.includes('cita') || text.includes('reunion') || text.includes('reunión') || text.includes('demo') || text.includes('agendar') || text.includes('llamada') || text === '2') {
-    return `📅 ¡Con gusto! Para coordinar tu turno en ${ctx.companyName}, indícanos qué día y horario te queda más cómodo (o déjanos tu correo) y nuestro sistema lo reservará de inmediato.`;
-  }
-
-  // Cotizaciones y presupuestos
-  if (text.includes('cotiza') || text.includes('presupuesto') || text.includes('propuesta') || text === '3') {
-    return `📄 ¡Por supuesto! En ${ctx.companyName} podemos generarte una cotización oficial con desglose de ítems. ¿Cuál es tu nombre y qué solución o servicio necesitas?`;
-  }
-
-  // Asesor humano
-  if (text.includes('humano') || text.includes('asesor') || text.includes('persona') || text.includes('operador') || text === '4') {
-    return `👤 Entendido. He notificado a uno de nuestros especialistas de ${ctx.companyName} para que revise tu consulta y te responda a la brevedad por este mismo chat. ¡Muchas gracias por tu paciencia!`;
-  }
-
-  // Fallback conversacional cálido de la empresa
-  return `¡Hola! 👋 He recibido tu mensaje en ${ctx.companyName}. Como asistente virtual de ${ctx.industry}, estoy disponible 24/7.\n\n¿Te gustaría conocer nuestros servicios y precios, reservar un turno, o prefieres hablar directamente con un asesor humano?`;
+  // 6. High-Converting Consultative Sales Heuristics Engine (Understands Multi-Turn Context & Human Intent)
+  const reply = generateContextualSalesReply(lowerText, userText, history, ctx, docContext);
+  appendToConversationHistory(convKey, 'user', userText);
+  appendToConversationHistory(convKey, 'assistant', reply);
+  return reply;
 }
 
 // Meta Cloud API Fallback
@@ -917,46 +1095,46 @@ const server = http.createServer(async (req, res) => {
       try {
         const { agencyId, clients } = JSON.parse(body || '{}');
         const agId = agencyId || 'agency_master_1';
-        if (Array.isArray(clients)) {
-          memoryCompanies[agId] = clients;
-          saveCompaniesToDisk();
+        const cleanClients = (Array.isArray(clients) ? clients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
 
-          // Also persist to Neon PostgreSQL clients table if available
-          if (db) {
-            for (const c of clients) {
-              try {
-                await db.query(
-                  `INSERT INTO clients (id, agency_id, name, industry, phone, notes)
-                   VALUES ($1, $2, $3, $4, $5, $6)
-                   ON CONFLICT (id) DO UPDATE SET 
-                     name = EXCLUDED.name,
-                     industry = EXCLUDED.industry,
-                     phone = EXCLUDED.phone,
-                     notes = EXCLUDED.notes`,
-                  [
-                    c.id, 
-                    agId, 
-                    c.name, 
-                    c.industry || 'Servicios', 
-                    c.phone || null, 
-                    JSON.stringify({ 
-                      agentName: c.agentName, 
-                      systemPrompt: c.systemPrompt, 
-                      knowledgeBase: c.knowledgeBase, 
-                      catalog: c.catalog, 
-                      salesFlow: c.salesFlow,
-                      supportFlow: c.supportFlow,
-                      afterSalesFlow: c.afterSalesFlow 
-                    })
-                  ]
-                );
-              } catch (cErr) {}
-            }
+        memoryCompanies[agId] = cleanClients;
+        saveCompaniesToDisk();
+
+        // Also persist to Neon PostgreSQL clients table if available
+        if (db) {
+          for (const c of cleanClients) {
+            try {
+              await db.query(
+                `INSERT INTO clients (id, agency_id, name, industry, phone, notes)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (id) DO UPDATE SET 
+                   name = EXCLUDED.name,
+                   industry = EXCLUDED.industry,
+                   phone = EXCLUDED.phone,
+                   notes = EXCLUDED.notes`,
+                [
+                  c.id, 
+                  agId, 
+                  c.name, 
+                  c.industry || 'Servicios', 
+                  c.phone || null, 
+                  JSON.stringify({ 
+                    agentName: c.agentName, 
+                    systemPrompt: c.systemPrompt, 
+                    knowledgeBase: c.knowledgeBase, 
+                    catalog: c.catalog, 
+                    salesFlow: c.salesFlow,
+                    supportFlow: c.supportFlow,
+                    afterSalesFlow: c.afterSalesFlow 
+                  })
+                ]
+              );
+            } catch (cErr) {}
           }
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, count: Array.isArray(clients) ? clients.length : 0 }));
+        res.end(JSON.stringify({ success: true, count: cleanClients.length }));
       } catch (err) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: err.message }));
@@ -967,21 +1145,32 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/api/agency/clients/sync' && req.method === 'GET') {
     const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
-    const clients = memoryCompanies[agId] || memoryCompanies['agency_master_1'] || [];
+    const rawClients = memoryCompanies[agId] || memoryCompanies['agency_master_1'] || [];
+    const clients = (Array.isArray(rawClients) ? rawClients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, clients }));
     return;
   }
 
-  // 7.2 Test Chat with Specific Trained Agent / Niche
+  // 7.2 Test Chat with Specific Trained Agent / Niche (Multi-Turn Conversational Simulator)
   if (pathname === '/api/agents/test-chat' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { message, clientId, agencyId } = JSON.parse(body || '{}');
-        const ctx = await getAgentCompanyContext(clientId, agencyId);
-        const reply = await generateAiAgentResponse(message || 'Hola', '5491100000000', clientId, agencyId);
+        const { message, clientId, agencyId, chatSessionId, reset } = JSON.parse(body || '{}');
+        const agId = agencyId || 'agency_master_1';
+        const sessionKey = chatSessionId || `sim_${clientId || 'hq'}`;
+
+        if (reset) {
+          clearConversationHistory(getConvKey(agId, sessionKey));
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, reset: true, message: 'Historial de simulación reiniciado con éxito.' }));
+          return;
+        }
+
+        const ctx = await getAgentCompanyContext(clientId, agId);
+        const reply = await generateAiAgentResponse(message || 'Hola', sessionKey, clientId, agId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,

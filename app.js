@@ -48,10 +48,32 @@ if (!currentAgencyId) {
 }
 if (!currentAgencyId) currentAgencyId = 'agency_master_1';
 
-// Isolated Data Getters for the Active Agency
+// Isolated Data Getters for the Active Agency (Only User-Created Companies)
+function purgeSimulationClients(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
+}
+
+// Clean any cached legacy simulation demo clients from localStorage on startup
+try {
+  ['nexus_clients_agency_master_1', 'nexus_agency_clients'].forEach(key => {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        localStorage.setItem(key, JSON.stringify(purgeSimulationClients(parsed)));
+      }
+    }
+  });
+} catch(e) {}
+
 function getAgencyClients() {
-  const data = localStorage.getItem(`nexus_clients_${currentAgencyId}`);
-  return data ? JSON.parse(data) : [];
+  let clients = [];
+  try {
+    const data = localStorage.getItem(`nexus_clients_${currentAgencyId}`) || localStorage.getItem('nexus_agency_clients');
+    if (data) clients = JSON.parse(data);
+  } catch (e) {}
+  return purgeSimulationClients(clients);
 }
 
 async function syncAgencyClientsWithServer(clients) {
@@ -60,7 +82,7 @@ async function syncAgencyClientsWithServer(clients) {
     await fetch('/api/agency/clients/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agencyId, clients })
+      body: JSON.stringify({ agencyId, clients: purgeSimulationClients(clients) })
     });
   } catch (e) {
     console.warn('Sync clients note:', e.message);
@@ -73,10 +95,11 @@ async function loadAgencyClientsFromServer() {
     const res = await fetch(`/api/agency/clients/sync?agencyId=${agencyId}`);
     if (!res.ok) return;
     const data = await res.json();
-    if (data.success && Array.isArray(data.clients) && data.clients.length > 0) {
+    if (data.success && Array.isArray(data.clients)) {
+      const validClients = purgeSimulationClients(data.clients);
       const local = getAgencyClients();
-      if (local.length === 0) {
-        agencyClients = data.clients;
+      if (local.length === 0 && validClients.length > 0) {
+        agencyClients = validClients;
         localStorage.setItem(`nexus_clients_${currentAgencyId}`, JSON.stringify(agencyClients));
         localStorage.setItem('nexus_agency_clients', JSON.stringify(agencyClients));
         if (typeof renderClientsList === 'function') renderClientsList();
@@ -1363,22 +1386,53 @@ function testGoogleCalendarLink() {
   showToast('Abriendo plantilla de evento en Google Calendar...', 'info');
 }
 
+let testChatSessionId = null;
+
+function resetTestAgentChat() {
+  testChatSessionId = 'sim_' + (activeClientId || 'hq') + '_' + Date.now();
+  const agencyId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
+  fetch('/api/agents/test-chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agencyId, clientId: activeClientId, chatSessionId: testChatSessionId, reset: true })
+  }).catch(() => {});
+
+  const client = agencyClients.find(c => c.id === activeClientId);
+  const companyName = client ? client.name : 'NEXUS AI Agency HQ';
+  const industry = client ? client.industry : 'Agencia de IA & Automatización';
+  const agentName = client ? (client.agentName || `Asistente de ${companyName}`) : 'Asistente Virtual IA';
+
+  const chatBody = document.getElementById('testAgentChatBody');
+  if (chatBody) {
+    chatBody.innerHTML = `
+      <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
+        👋 ¡Hola! Soy ${escapeHtml(agentName)}, asesor comercial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o duda que tengas.
+      </div>
+    `;
+  }
+  showToast('Historial y memoria conversacional reiniciados', 'info');
+}
+
 function testAgentLiveDialog() {
   const client = agencyClients.find(c => c.id === activeClientId);
   const companyName = client ? client.name : 'NEXUS AI Agency HQ';
   const industry = client ? client.industry : 'Agencia de IA & Automatización';
   const agentName = client ? (client.agentName || `Asistente de ${companyName}`) : 'Asistente Virtual IA';
 
+  if (!testChatSessionId) {
+    testChatSessionId = 'sim_' + (activeClientId || 'hq') + '_' + Date.now();
+  }
+
   const titleEl = document.getElementById('testModalAgentTitle');
   const subEl = document.getElementById('testModalAgentSubtitle');
   if (titleEl) titleEl.innerText = `${agentName} • ${companyName}`;
-  if (subEl) subEl.innerText = `🟢 Nicho: ${industry} | Motor Gemini Activo`;
+  if (subEl) subEl.innerText = `🟢 Nicho: ${industry} | Memoria Multi-Turno Activa`;
 
   const chatBody = document.getElementById('testAgentChatBody');
-  if (chatBody) {
+  if (chatBody && (!chatBody.innerHTML || chatBody.children.length <= 1)) {
     chatBody.innerHTML = `
       <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
-        👋 ¡Hola! Soy el asistente virtual oficial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
+        👋 ¡Hola! Soy ${escapeHtml(agentName)}, asesor comercial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
       </div>
     `;
   }
@@ -1422,19 +1476,24 @@ async function sendTestChatMessage(customText) {
   typingDiv.style.padding = '8px 12px';
   typingDiv.style.borderRadius = '12px';
   typingDiv.style.fontSize = '12.5px';
-  typingDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color:#34d399;"></i> Analizando consulta con IA...';
+  typingDiv.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="color:#34d399;"></i> Razonando respuesta con IA...';
   chatBody.appendChild(typingDiv);
   chatBody.scrollTop = chatBody.scrollHeight;
 
   try {
     const agencyId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
+    if (!testChatSessionId) {
+      testChatSessionId = 'sim_' + (activeClientId || 'hq') + '_' + Date.now();
+    }
+
     const res = await fetch('/api/agents/test-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: text,
         clientId: activeClientId,
-        agencyId
+        agencyId,
+        chatSessionId: testChatSessionId
       })
     });
     const data = await res.json();
