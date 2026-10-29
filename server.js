@@ -1846,10 +1846,23 @@ const server = http.createServer(async (req, res) => {
     try {
       const identifier = urlObj.searchParams.get('id') || urlObj.searchParams.get('slug') || urlObj.searchParams.get('agency') || 'agency_master_1';
       const allPortals = loadPortalsFromDisk();
-      const localEntry = allPortals[identifier] || allPortals['agency_master_1'] || Object.values(allPortals)[0];
+
+      // Strict matching: only match entry if it belongs to this identifier or its slug
+      let localEntry = allPortals[identifier];
+      if (!localEntry) {
+        const found = Object.values(allPortals).find(entry => 
+          entry?.agency?.id === identifier || 
+          (entry?.agency?.slug && entry.agency.slug.toLowerCase() === identifier.toLowerCase())
+        );
+        if (found) localEntry = found;
+      }
+      if (!localEntry && (identifier === 'agency_master_1' || identifier === 'nexus-ai')) {
+        localEntry = allPortals['agency_master_1'];
+      }
 
       let agencyData = null;
       let returnPlans = [];
+      let isDefaultTemplate = false;
 
       try {
         const agencyRes = await db.query(
@@ -1894,28 +1907,54 @@ const server = http.createServer(async (req, res) => {
       // Fetch plans from DB if possible
       try {
         const plansRes = await db.query(
-          `SELECT id, name, price, currency, period, category, features, payment_link, is_featured FROM plans WHERE agency_id = $1 ORDER BY price ASC`,
+          `SELECT id, name, price, currency, period, category, features, payment_link, is_featured FROM plans WHERE agency_id = $1 ORDER BY created_at ASC, id ASC`,
           [agencyData.id]
         );
         if (plansRes?.rows && plansRes.rows.length > 0) {
-          returnPlans = plansRes.rows;
+          returnPlans = plansRes.rows.map(r => {
+            const cleanId = r.id.startsWith(`${agencyData.id}_`) ? r.id.substring(`${agencyData.id}_`.length) : r.id;
+            let feat = r.features;
+            if (typeof feat === 'string') {
+              try { feat = JSON.parse(feat); } catch (e) { feat = feat.split('\n').filter(Boolean); }
+            }
+            return {
+              id: cleanId,
+              dbId: r.id,
+              name: r.name,
+              price: parseFloat(r.price).toString().replace(/\.00$/, ''),
+              currency: r.currency || 'USD',
+              period: r.period || 'mes',
+              billingPeriod: r.period || 'mes',
+              category: r.category || 'Solución IA',
+              features: Array.isArray(feat) ? feat : [],
+              paymentLink: r.payment_link || '',
+              payment_link: r.payment_link || '',
+              isFeatured: !!r.is_featured,
+              is_featured: !!r.is_featured
+            };
+          });
         }
       } catch (e) {}
 
-      // If DB had no plans, check if local disk has custom saved plans!
+      // If DB had no plans, check if local disk has custom saved plans for THIS agency!
       if (returnPlans.length === 0 && localEntry?.plans && Array.isArray(localEntry.plans) && localEntry.plans.length > 0) {
-        returnPlans = localEntry.plans;
+        returnPlans = localEntry.plans.map(p => ({
+          ...p,
+          price: String(p.price || '0').replace(/\.00$/, '')
+        }));
       }
 
       // Fallback default plans only if absolutely no custom plans were ever created
       if (returnPlans.length === 0) {
+        isDefaultTemplate = true;
         returnPlans = [
           {
             id: 'plan_starter',
             name: 'Plan Starter IA',
-            price: '290.00',
+            price: '290',
             currency: 'USD',
             period: 'mes',
+            billingPeriod: 'mes',
             category: 'Negocios & Comercios Locales',
             features: [
               '1 Agente de WhatsApp 24/7 entrenado a medida',
@@ -1924,15 +1963,18 @@ const server = http.createServer(async (req, res) => {
               'Derivación a WhatsApp personal ante emergencias',
               'Mantenimiento mensual e IA incluida'
             ],
+            paymentLink: '',
             payment_link: '',
+            isFeatured: false,
             is_featured: false
           },
           {
             id: 'plan_pro',
             name: 'Plan Growth Pro Multi-Flujo',
-            price: '690.00',
+            price: '690',
             currency: 'USD',
             period: 'mes',
+            billingPeriod: 'mes',
             category: '★ DESTACADO | Clínicas, Inmobiliarias & Empresas',
             features: [
               'Todo lo incluido en Starter',
@@ -1942,7 +1984,9 @@ const server = http.createServer(async (req, res) => {
               'Encuestas NPS y Reseñas en Google Maps 5★',
               'CRM Kanban y Pipeline de Leads en tiempo real'
             ],
+            paymentLink: '',
             payment_link: '',
+            isFeatured: true,
             is_featured: true
           }
         ];
@@ -1965,7 +2009,8 @@ const server = http.createServer(async (req, res) => {
           portalSubtitle: agencyData.portal_subtitle,
           portalConfig: agencyData.portal_config || {}
         },
-        plans: returnPlans
+        plans: returnPlans,
+        isDefaultTemplate: isDefaultTemplate
       }));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
@@ -2108,7 +2153,11 @@ const server = http.createServer(async (req, res) => {
 
             for (let i = 0; i < plans.length; i++) {
               const plan = plans[i];
-              const pId = plan.id && !plan.id.startsWith('temp_') ? plan.id : `plan_${Date.now()}_${i}`;
+              // Ensure pId is uniquely scoped to this agency so it never collides with plans_pkey
+              const rawId = plan.id && !plan.id.startsWith('temp_') ? plan.id : `plan_${i}_${Date.now()}`;
+              const cleanBaseId = rawId.replace(new RegExp(`^${realAgencyId}_`), '');
+              const pId = `${realAgencyId}_${cleanBaseId}`;
+
               const featuresList = Array.isArray(plan.features)
                 ? plan.features
                 : (typeof plan.features === 'string' ? plan.features.split('\n').map(x => x.trim()).filter(Boolean) : []);
@@ -2124,7 +2173,7 @@ const server = http.createServer(async (req, res) => {
                   parseFloat(plan.price) || 0,
                   plan.currency || 'USD',
                   plan.period || plan.billingPeriod || 'mes',
-                  plan.category || 'General',
+                  plan.category || 'Solución IA',
                   featuresJson,
                   plan.paymentLink || plan.payment_link || '',
                   !!(plan.isFeatured || plan.is_featured)

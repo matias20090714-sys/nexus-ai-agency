@@ -275,16 +275,30 @@ function checkPublicPortalRoute() {
           // Store profile in memory/localStorage for checkout modal
           let reg = getAgenciesRegistry();
           let existing = reg.find(a => a.id === ag.id);
+
+          const isGenericDefaultServer = !!data.isDefaultTemplate || (
+            Array.isArray(data.plans) && data.plans.length === 2 &&
+            String(data.plans[0].price).startsWith('290') &&
+            String(data.plans[1].price).startsWith('690')
+          );
+
+          const hasLocalCustomPlans = existing && existing.plans && Array.isArray(existing.plans) && existing.plans.length > 0 &&
+            (existing.plans.some(p => String(p.price) !== '290' && String(p.price) !== '690') || existing.plans.length !== 2);
+
+          const activePlans = (hasLocalCustomPlans && isGenericDefaultServer)
+            ? existing.plans
+            : ((Array.isArray(data.plans) && data.plans.length > 0) ? data.plans : (existing?.plans || []));
+
           if (existing) {
             Object.assign(existing, ag);
-            existing.plans = data.plans;
+            existing.plans = activePlans;
           } else {
-            reg.push({ ...ag, plans: data.plans });
+            reg.push({ ...ag, plans: activePlans });
           }
           saveAgenciesRegistry(reg);
 
           // Render live pricing plans
-          renderPortalPricing(data.plans);
+          renderPortalPricing(activePlans);
         } else {
           renderPortalPricing();
         }
@@ -342,8 +356,11 @@ function loadAgencyWorkspace(agencyId) {
   if (wlBrand) wlBrand.value = profile.name;
 
   // Update Playbook & Pricing personalized elements
-  const starterPrice = profile.priceStarter || '290';
-  const proPrice = profile.pricePro || '690';
+  const currentPlans = getAgencyPlans(profile);
+  const starterPrice = (currentPlans && currentPlans[0]?.price) || profile.priceStarter || '290';
+  const proPrice = (currentPlans && currentPlans[1]?.price) || profile.pricePro || '690';
+  profile.priceStarter = starterPrice;
+  profile.pricePro = proPrice;
   
   const pbOwner = document.getElementById('pbOwnerName');
   const pbAgency = document.getElementById('pbAgencyName');
@@ -435,9 +452,11 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
         if (ag.portalConfig) { profile.portalConfig = ag.portalConfig; }
 
         if (data.plans && data.plans.length > 0) {
-          const isGenericDefaultServer = data.plans.length === 2 &&
-            data.plans[0].id === 'plan_starter' && String(data.plans[0].price).startsWith('290') &&
-            data.plans[1].id === 'plan_pro' && String(data.plans[1].price).startsWith('690');
+          const isGenericDefaultServer = !!data.isDefaultTemplate || (
+            data.plans.length === 2 &&
+            String(data.plans[0].price).startsWith('290') &&
+            String(data.plans[1].price).startsWith('690')
+          );
 
           const hasUserCustomPlans = profile.plans && Array.isArray(profile.plans) && profile.plans.length > 0 &&
             (profile.plans.some(p => String(p.price) !== '290' && String(p.price) !== '690') || profile.plans.length !== 2);
@@ -451,6 +470,9 @@ Además, no tenemos contratos de permanencia forzada. Podemos tener el sistema i
               isFeatured: !!(p.is_featured || p.isFeatured)
             }));
             changed = true;
+          } else if (hasUserCustomPlans && isGenericDefaultServer) {
+            // Local workspace has customized prices, but server had defaults. Sync up to server!
+            syncPortalConfigToDatabase();
           }
         }
         if (changed) saveAgencyProfile(profile);
@@ -2625,14 +2647,20 @@ function getAgencyPlans(profile) {
   return def;
 }
 
-function saveAgencyPlans(plans) {
+function saveAgencyPlans(plans, syncDb = true) {
   const profile = getAgencyProfile();
   if (!profile) return;
   profile.plans = plans;
+  if (Array.isArray(plans) && plans.length > 0) {
+    if (plans[0]?.price) profile.priceStarter = String(plans[0].price).replace(/\.00$/, '');
+    if (plans[1]?.price) profile.pricePro = String(plans[1].price).replace(/\.00$/, '');
+  }
   saveAgencyProfile(profile);
   renderAgencyPlansAdmin();
   renderPortalPricing();
-  syncPortalConfigToDatabase();
+  if (syncDb) {
+    syncPortalConfigToDatabase();
+  }
 }
 
 function renderAgencyPlansAdmin() {
@@ -2702,14 +2730,23 @@ function renderAgencyPlansAdmin() {
   }).join('');
 }
 
+let inlinePriceSyncTimer = null;
 function updatePlanPriceInline(planId, newPrice) {
   const profile = getAgencyProfile();
   if (!profile || !profile.plans) return;
   const p = profile.plans.find(x => x.id === planId);
   if (p) {
-    p.price = String(newPrice || '0').trim().replace(/\.00$/, '');
+    const cleanPrice = String(newPrice || '0').trim().replace(/\.00$/, '');
+    p.price = cleanPrice;
+    if (profile.plans[0]?.id === planId) profile.priceStarter = cleanPrice;
+    if (profile.plans[1]?.id === planId) profile.pricePro = cleanPrice;
     saveAgencyProfile(profile);
     renderPortalPricing();
+
+    clearTimeout(inlinePriceSyncTimer);
+    inlinePriceSyncTimer = setTimeout(() => {
+      syncPortalConfigToDatabase();
+    }, 600);
   }
 }
 
@@ -3344,8 +3381,28 @@ async function hydrateUserAgencyWorkspace(agencyId, user = null) {
       existing.portalSubtitle = ag.portalSubtitle !== undefined ? ag.portalSubtitle : existing.portalSubtitle;
       existing.portalConfig = ag.portalConfig || existing.portalConfig || {};
       if (Array.isArray(data.plans) && data.plans.length > 0) {
-        existing.plans = data.plans;
-        saveAgencyPlans(data.plans);
+        const isGenericDefaultServer = !!data.isDefaultTemplate || (
+          data.plans.length === 2 &&
+          String(data.plans[0].price).startsWith('290') &&
+          String(data.plans[1].price).startsWith('690')
+        );
+
+        const hasLocalCustomPlans = existing.plans && Array.isArray(existing.plans) && existing.plans.length > 0 &&
+          (existing.plans.some(p => String(p.price) !== '290' && String(p.price) !== '690') || existing.plans.length !== 2);
+
+        if (!hasLocalCustomPlans || !isGenericDefaultServer) {
+          existing.plans = data.plans.map(p => ({
+            ...p,
+            price: String(p.price || '0').replace(/\.00$/, ''),
+            billingPeriod: p.period || p.billingPeriod || 'mes',
+            paymentLink: p.payment_link || p.paymentLink || '',
+            isFeatured: !!(p.is_featured || p.isFeatured)
+          }));
+          saveAgencyPlans(existing.plans, false);
+        } else if (hasLocalCustomPlans && isGenericDefaultServer) {
+          // Keep user's custom prices and push to server
+          syncPortalConfigToDatabase();
+        }
       }
       saveAgencyProfile(existing);
     }
