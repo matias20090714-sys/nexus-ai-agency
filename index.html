@@ -630,12 +630,16 @@
                 <select id="customSimIndustrySelect" class="form-control" style="width: auto; min-width: 190px; font-size: 13px;">
                   <option value="Clínica Médica / Odontológica">🏥 Clínica / Odontología</option>
                   <option value="Inmobiliaria & Desarrollos">🏢 Inmobiliaria / Bienes Raíces</option>
+                  <option value="Estudio Jurídico / Contable">⚖️ Estudio Jurídico / Contable</option>
+                  <option value="Hotelería, Cabañas & Turismo">🏨 Hotelería / Cabañas / Turismo</option>
+                  <option value="Educación, Academia & Cursos">🎓 Academia / Educación / Cursos</option>
+                  <option value="Construcción, Arquitectura & Piscinas">🏗️ Construcción / Arquitectura / Reformas</option>
                   <option value="Centro de Estética & Belleza">✨ Estética / Barbería / Spa</option>
-                  <option value="Estudio Jurídico / Contable">⚖️ Estudio Jurídico / B2B</option>
-                  <option value="Restaurante & Gastronomía">🍽️ Restaurante / Gastronomía</option>
                   <option value="Concesionaria & Automotriz">🚗 Automotriz / Concesionaria</option>
+                  <option value="Restaurante & Gastronomía">🍽️ Restaurante / Gastronomía</option>
                   <option value="Gimnasio & Fitness">🏋️ Gimnasio / Centro Fitness</option>
                   <option value="E-Commerce & Tienda Online">🛍️ E-Commerce / Mayorista</option>
+                  <option value="Consultoría & Software B2B">💼 Consultoría & Empresas B2B</option>
                 </select>
                 <button class="btn btn-primary btn-sm" onclick="applyCustomLandingSimulator()" style="padding: 10px 16px; font-weight: 800; white-space: nowrap;">
                   <i class="fa-solid fa-wand-magic-sparkles"></i> Personalizar Demo Ahora
@@ -1190,15 +1194,19 @@
                   <div class="form-group">
                     <label class="form-label">Plantilla de Rubro (Cargar base recomendada)</label>
                     <select id="blueprintSelector" class="form-control" onchange="loadBlueprintPrompt(this.value)">
-                      <option value="">-- Seleccionar Plantilla de Rubro --</option>
-                      <option value="salud_clinicas">🏥 Salud & Clínicas Odontológicas</option>
-                      <option value="inmobiliarias">🏢 Bienes Raíces & Inmobiliarias</option>
-                      <option value="belleza_barberias">✂️ Belleza & Barberías</option>
-                      <option value="gastronomia">🍽️ Restaurantes & Gastronomía</option>
-                      <option value="servicios_b2b">⚖️ Empresas & Servicios B2B / Consultoría</option>
-                      <option value="ecommerce_retail">🛍️ E-Commerce & Retail</option>
-                      <option value="fitness_gym">🏋️ Gimnasios & Centros de Fitness</option>
-                      <option value="automotriz">🚗 Talleres Mecánicos & Automotriz</option>
+                      <option value="">-- Seleccionar Plantilla de Rubro (12 Especialidades) --</option>
+                      <option value="salud_clinicas">🏥 Salud, Clínicas & Odontología (Triaje Clínico)</option>
+                      <option value="inmobiliarias">🏢 Bienes Raíces & Inmobiliarias (Consultor Patrimonial)</option>
+                      <option value="legal_contable">⚖️ Estudios Jurídicos, Contables & Notarías (Admisión Legal)</option>
+                      <option value="hoteleria_turismo">🏨 Hotelería, Cabañas & Turismo (Concierge de Reservas)</option>
+                      <option value="educacion_academias">🎓 Educación, Academias & Cursos High-Ticket (Admisiones)</option>
+                      <option value="construccion_reformas">🏗️ Construcción, Arquitectura, Piscinas & Reformas (Obra)</option>
+                      <option value="belleza_barberias">✂️ Belleza, Estética & Barberías (Asesor de Imagen)</option>
+                      <option value="gastronomia">🍽️ Restaurantes & Gastronomía (Concierge Gourmet)</option>
+                      <option value="servicios_b2b">💼 Empresas, Software & Consultoría B2B (Director Comercial)</option>
+                      <option value="ecommerce_retail">🛍️ E-Commerce & Tiendas Retail (Personal Shopper)</option>
+                      <option value="fitness_gym">🏋️ Gimnasios & Centros de Fitness (Coach de Membresías)</option>
+                      <option value="automotriz">🚗 Talleres Mecánicos & Concesionarias (Recepción Técnica)</option>
                     </select>
                   </div>
 

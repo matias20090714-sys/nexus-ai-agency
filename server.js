@@ -342,77 +342,196 @@ function saveCompaniesToDisk() {
   }
 }
 
-// ==================== NICHE SALES PLAYBOOKS ====================
-function getNicheSalesPlaybook(industry = '') {
+// ==================== NICHE SALES PLAYBOOKS & DOMAIN INTELLIGENCE ====================
+function getIndustryDomainIntelligence(industry = '', companyName = 'nuestra empresa') {
   const ind = (industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  if (ind.includes('salud') || ind.includes('clinic') || ind.includes('dental') || ind.includes('odontolog') || ind.includes('medic') || ind.includes('estetica med')) {
-    return `• ESPECIALIDAD CLÍNICA & SALUD:
-  - Enfoque: Transmite máxima empatía clínica, profesionalismo médico y tranquilidad. El paciente busca confianza, no sentir dolor y resolver su salud o estética.
-  - Manejo de objeción de precio: Enfatiza que prevenir a tiempo evita procedimientos invasivos y mucho más costosos en el futuro. Destaca facilidades de pago o cobertura.
-  - Manejo de temor / dolor: Asegura que se emplean técnicas de vanguardia, anestesia tópica o protocolos indoloros de mínima invasión.
-  - Objetivo comercial: Agendar una consulta inicial de evaluación y diagnóstico clínico presencial.`;
+  if (ind.includes('salud') || ind.includes('clinic') || ind.includes('dental') || ind.includes('odontolog') || ind.includes('medic') || ind.includes('estetica med') || ind.includes('psicolog') || ind.includes('kinesiolog')) {
+    return {
+      roleTitle: 'Coordinador Clínico Senior y Asesor de Admisión de Pacientes',
+      clientTerm: 'paciente',
+      triageQuestion: 'Para brindarte la orientación clínica correcta: ¿presentas alguna molestia o dolor agudo en este momento, o buscas una valoración preventiva / estética?',
+      valueJustification: 'Todos nuestros tratamientos incluyen valoración diagnóstica previa por especialistas matriculados y protocolos mínimamente invasivos de máxima bioseguridad.',
+      closingCapturePrompt: 'Para reservarte el turno prioritario en agenda, indícame por favor:\n1. *Tu Nombre y Apellido*\n2. *Si asistes de forma particular o con cobertura/obra social*\n3. *Si prefieres turno por la mañana o por la tarde*',
+      ethicalNote: 'Recuerda que el plan terapéutico definitivo es determinado presencialmente por el especialista.'
+    };
   }
 
-  if (ind.includes('inmobili') || ind.includes('propiedad') || ind.includes('bienes raic') || ind.includes('real estate') || ind.includes('inmueble')) {
-    return `• ESPECIALIDAD INMOBILIARIA & BIENES RAÍCES:
-  - Enfoque: Asesoramiento patrimonial de alta confianza. Comprar o alquilar una propiedad es una de las decisiones financieras y de vida más importantes.
-  - Manejo de objeción de precio: Argumenta el valor por metro cuadrado, plusvalía de la zona, potencial de revalorización y opciones de financiación o planes de cuotas.
-  - Manejo de indecisión ("lo voy a pensar"): Recuerda con sutileza que las mejores propiedades o unidades con alta demanda suelen señarse rápidamente, y que coordinar una visita no implica ningún compromiso.
-  - Objetivo comercial: Calificar presupuesto/zona preferida y coordinar una visita presencial exclusiva a la propiedad o videollamada de presentación.`;
+  if (ind.includes('juridic') || ind.includes('abogad') || ind.includes('legal') || ind.includes('contabl') || ind.includes('contador') || ind.includes('notar') || ind.includes('escriban') || ind.includes('estudio')) {
+    return {
+      roleTitle: 'Coordinador de Admisión Legal y Paralegal Senior',
+      clientTerm: 'representado / cliente',
+      triageQuestion: 'Bajo estricto secreto profesional: ¿tu consulta corresponde al área laboral, civil/comercial, societaria o tributaria, y has recibido alguna notificación o intimación con plazo de vencimiento activo?',
+      valueJustification: 'Nuestro estudio brinda patrocinio técnico especializado, análisis documental previo y estrategia procesal clara desde la primera consulta.',
+      closingCapturePrompt: 'Para agendar tu consulta con el socio especialista del área, por favor confírmame:\n1. *Tu Nombre completo*\n2. *Breve resumen del asunto o si tienes un plazo urgente*\n3. *Si prefieres reunión presencial en el estudio o por videollamada (Meet)*',
+      ethicalNote: 'Toda la información compartida en este canal se encuentra amparada por estricto secreto profesional.'
+    };
   }
 
-  if (ind.includes('belleza') || ind.includes('barber') || ind.includes('peluquer') || ind.includes('spa') || ind.includes('estetica') || ind.includes('unad') || ind.includes('unas') || ind.includes('salon')) {
-    return `• ESPECIALIDAD BELLEZA, ESTÉTICA & BARBERÍAS:
-  - Enfoque: Transformación de imagen, autoestima, higiene certificada y productos de gama alta. El cliente busca consentirse y verse impecable.
-  - Manejo de objeción de precio: Resalta la calidad de los productos utilizados (evitan daños capilares o en la piel) y la durabilidad del resultado.
-  - Manejo de tiempos: Destaca la puntualidad en los turnos para que no pierda tiempo esperando.
-  - Objetivo comercial: Reservar un turno exclusivo en la agenda semanal antes de que se agoten los horarios más solicitados.`;
+  if (ind.includes('inmobili') || ind.includes('propiedad') || ind.includes('bienes raic') || ind.includes('real estate') || ind.includes('inmueble') || ind.includes('desarroll')) {
+    return {
+      roleTitle: 'Consultor Patrimonial Senior y Asesor Inmobiliario',
+      clientTerm: 'inversor / comprador',
+      triageQuestion: 'Para seleccionar únicamente las unidades que encajen con tu búsqueda: ¿estás evaluando la propiedad para vivienda propia familiar o como inversión patrimonial con renta, y en qué zona priorizas ubicarte?',
+      valueJustification: 'Seleccionamos activos con títulos perfectos, alta plusvalía por metro cuadrado y excelente proyección de renta en dólares.',
+      closingCapturePrompt: 'Para coordinar tu visita privada a la propiedad con nuestro broker, indícame:\n1. *Tu Nombre y Apellido*\n2. *Si operas con capital al contado, permuta o financiación*\n3. *Qué día y franja horaria te resulta más cómoda para visitarla*',
+      ethicalNote: ''
+    };
   }
 
-  if (ind.includes('software') || ind.includes('b2b') || ind.includes('agencia') || ind.includes('consultor') || ind.includes('marketing') || ind.includes('automatiz') || ind.includes('sistema') || ind.includes('tecnolog')) {
-    return `• ESPECIALIDAD SERVICIOS B2B, AUTOMATIZACIÓN & CONSULTORÍA:
-  - Enfoque: Retorno de inversión (ROI), horas operativas ahorradas, aumento de tasa de conversión y eliminación de pérdida silenciosa de clientes por demoras.
-  - Manejo de objeción de precio: Compara la inversión mensual contra el costo de contratar empleados adicionales o el valor financiero de los clientes que pierden al no responder 24/7. Rescatar apenas 1 o 2 clientes paga el 100% del servicio.
-  - Manejo de "tengo que hablarlo con mi socio": Ofrece preparar una propuesta ejecutiva clara con números de impacto o coordinar una llamada de 15 minutos con ambos socios para responder dudas técnicas.
-  - Objetivo comercial: Agendar una demo estratégica de 15 minutos o coordinar la activación inmediata del plan seleccionado.`;
+  if (ind.includes('hotel') || ind.includes('caban') || ind.includes('turism') || ind.includes('resort') || ind.includes('alojamient') || ind.includes('hoster') || ind.includes('posada')) {
+    return {
+      roleTitle: 'Concierge Senior de Reservas y Hospitalidad VIP',
+      clientTerm: 'huésped',
+      triageQuestion: 'Para verificar disponibilidad en tiempo real y ofrecerte nuestra mejor tarifa directa: ¿para qué fechas de Check-In y Check-Out planeas tu estadía y cuántos huéspedes (adultos/menores) viajarían?',
+      valueJustification: 'Reservando por nuestro canal directo oficial accedes a tarifa preferencial sin comisiones de portales, desayuno artesanal incluido y acceso completo a nuestras instalaciones.',
+      closingCapturePrompt: 'Para bloquear tu unidad ahora mismo y congelar la tarifa, indícame:\n1. *Nombre completo del titular de la reserva*\n2. *Fechas exactas de ingreso y salida*\n3. *Si prefieres abonar la seña por transferencia o tarjeta*',
+      ethicalNote: ''
+    };
+  }
+
+  if (ind.includes('educac') || ind.includes('academi') || ind.includes('curso') || ind.includes('instituto') || ind.includes('universid') || ind.includes('capacitac') || ind.includes('escuela') || ind.includes('coaching')) {
+    return {
+      roleTitle: 'Asesor de Admisiones Académicas y Desarrollo Profesional',
+      clientTerm: 'alumno / profesional',
+      triageQuestion: 'Para recomendarte el programa exacto según tu perfil: ¿estás dando tus primeros pasos desde cero o ya cuentas con experiencia y buscas certificarte a nivel avanzado?',
+      valueJustification: 'Nuestros programas combinan práctica real, mentoría en vivo, acceso al campus 24/7 y certificación oficial verificable para impulsar tu perfil laboral.',
+      closingCapturePrompt: 'Para reservar tu vacante con el beneficio de esta camada, por favor indícame:\n1. *Tu Nombre completo*\n2. *Tu correo electrónico para el alta en el campus*\n3. *Si prefieres abonar al contado con descuento o en cuotas*',
+      ethicalNote: ''
+    };
+  }
+
+  if (ind.includes('construc') || ind.includes('arquitec') || ind.includes('reforma') || ind.includes('piscin') || ind.includes('obra') || ind.includes('ingenier') || ind.includes('abertura') || ind.includes('amoblamient')) {
+    return {
+      roleTitle: 'Coordinador Técnico de Presupuestos y Proyectos de Obra',
+      clientTerm: 'comitente / propietario',
+      triageQuestion: 'Para elaborarte un cómputo y presupuesto técnico preciso: ¿qué tipo de obra o instalación proyectas realizar, de cuántos metros cuadrados aproximados hablamos y en qué localidad se encuentra?',
+      valueJustification: 'Trabajamos bajo contrato llave en mano con presupuesto cerrado sin sobrecostos sorpresa, personal asegurado y garantía estructural por escrito.',
+      closingCapturePrompt: 'Para agendar la visita de relevamiento técnico o enviarte la cotización formal, indícame:\n1. *Tu Nombre*\n2. *Localidad / barrio de la obra y medidas aproximadas*\n3. *Qué día te queda cómodo para la visita técnica o llamada con el ingeniero*',
+      ethicalNote: ''
+    };
+  }
+
+  if (ind.includes('auto') || ind.includes('concesionar') || ind.includes('taller') || ind.includes('mecanic') || ind.includes('vehicul') || ind.includes('moto') || ind.includes('lubricentr') || ind.includes('neumatic')) {
+    return {
+      roleTitle: 'Jefe de Recepción Técnica y Asesor Automotriz',
+      clientTerm: 'propietario / conductor',
+      triageQuestion: 'Para darte el diagnóstico y presupuesto exacto según manual de fábrica: ¿qué marca, modelo y año es tu vehículo, y qué síntoma o mantenimiento necesitas realizar?',
+      valueJustification: 'Utilizamos repuestos homologados de primera línea, diagnóstico computarizado y entregamos garantía escrita de 6 meses en cada trabajo.',
+      closingCapturePrompt: 'Para asignarte tu box de ingreso en el taller sin esperas, confírmame:\n1. *Tu Nombre*\n2. *Marca, modelo y patente del vehículo*\n3. *Si prefieres dejarlo a primera hora (08:30 hs) o por la tarde*',
+      ethicalNote: ''
+    };
+  }
+
+  if (ind.includes('belleza') || ind.includes('barber') || ind.includes('peluquer') || ind.includes('spa') || ind.includes('estetica') || ind.includes('unas') || ind.includes('salon')) {
+    return {
+      roleTitle: 'Asesor de Imagen Senior y Coordinador de Agenda',
+      clientTerm: 'cliente',
+      triageQuestion: 'Para asignarte el tiempo y profesional ideal: ¿qué servicio o cambio de imagen tienes en mente hoy y para qué día de la semana buscabas tu turno?',
+      valueJustification: 'Trabajamos exclusivamente con productos importados de primera línea que cuidan tu salud capilar/dérmica y turnos puntuales sin esperas.',
+      closingCapturePrompt: 'Para dejar reservado tu espacio exclusivo en agenda, indícame:\n1. *Tu Nombre*\n2. *El servicio elegido*\n3. *Si te queda más cómodo venir por la mañana o por la tarde*',
+      ethicalNote: ''
+    };
   }
 
   if (ind.includes('restauran') || ind.includes('gastronom') || ind.includes('bar') || ind.includes('bistro') || ind.includes('catering') || ind.includes('comida') || ind.includes('cafe')) {
-    return `• ESPECIALIDAD GASTRONOMÍA & EVENTOS:
-  - Enfoque: Experiencia sensorial, sabor de alta calidad, frescura de ingredientes, calidez de servicio y ambiente ideal.
-  - Manejo de dudas sobre menú o alergias: Ofrece opciones adaptables y resalta la calidad y frescura de la cocina.
-  - Manejo de disponibilidad: Advierte amablemente que los fines de semana y horarios pico suelen llenarse con anticipación.
-  - Objetivo comercial: Confirmar la reserva de mesa VIP o coordinar los detalles del pedido/evento con horario y cantidad de personas.`;
-  }
-
-  if (ind.includes('retail') || ind.includes('ecommerce') || ind.includes('tienda') || ind.includes('ropa') || ind.includes('calzado') || ind.includes('moda') || ind.includes('indumentar')) {
-    return `• ESPECIALIDAD E-COMMERCE & RETAIL:
-  - Enfoque: Calidad y confección de prendas/artículos, asesoramiento exacto de talles, garantía total de cambio y envíos rápidos y seguros.
-  - Manejo de objeción de talles/calce: Explica la política de cambio sin complicaciones y guía al cliente con las medidas exactas.
-  - Manejo de confianza en pago/envío: Brinda links de pago oficiales protegidos y número de seguimiento para el envío a domicilio.
-  - Objetivo comercial: Facilitar el enlace directo de compra o coordinar los datos de despacho antes de que se agote el stock disponible.`;
+    return {
+      roleTitle: 'Concierge Gastronómico y Anfitrión de Reservas',
+      clientTerm: 'comensal',
+      triageQuestion: '¡Un placer atenderte! ¿Te gustaría reservar una mesa especial en nuestro salón/terraza, o prefieres realizar un pedido para envío a domicilio / take-away?',
+      valueJustification: 'Elaboramos cada plato en el momento con materias primas frescas seleccionadas y contamos con opciones aptas para celíacos (sin TACC) y vegetarianas.',
+      closingCapturePrompt: 'Para dejar confirmada tu mesa prioritaria, indícame por favor:\n1. *Nombre de la reserva*\n2. *Cantidad de comensales y horario estimado*\n3. *Si prefieres sector salón interior o terraza*',
+      ethicalNote: ''
+    };
   }
 
   if (ind.includes('fitness') || ind.includes('gym') || ind.includes('gimnasio') || ind.includes('crossfit') || ind.includes('entrenam') || ind.includes('yoga') || ind.includes('pilates')) {
-    return `• ESPECIALIDAD FITNESS, GYM & ENTRENAMIENTO:
-  - Enfoque: Resultados tangibles de salud, vitalidad, pérdida de grasa o ganancia muscular. Motivación, disciplina guiada y acompañamiento profesional.
-  - Manejo de objeción "no tengo tiempo": Propone rutinas efectivas y concentradas de 45 minutos que se adaptan a su agenda.
-  - Manejo de "no sé si voy a ser constante": Enfatiza el acompañamiento de los instructores y la medición periódica de progresos para mantener la motivación alta.
-  - Objetivo comercial: Agendar un pase libre de prueba o coordinar la primera sesión de diagnóstico con un entrenador.`;
+    return {
+      roleTitle: 'Coach de Bienestar y Asesor de Membresías',
+      clientTerm: 'socio / atleta',
+      triageQuestion: 'Para recomendarte el plan de entrenamiento ideal: ¿cuál es tu objetivo principal hoy (bajar de peso, ganar masa muscular, salud o rendimiento) y cuántos días por semana te gustaría entrenar?',
+      valueJustification: 'Contamos con seguimiento personalizado de profesores en sala, equipamiento biomecánico de última generación y horarios amplios de 06:30 a 22:30 hs.',
+      closingCapturePrompt: 'Para activarte tu membresía o tu Pase de Prueba VIP sin cargo, indícame:\n1. *Tu Nombre completo*\n2. *Qué día te gustaría venir a tu primera sesión*\n3. *En qué horario aproximado te esperamos*',
+      ethicalNote: ''
+    };
   }
 
-  if (ind.includes('auto') || ind.includes('concesionar') || ind.includes('taller') || ind.includes('mecanic') || ind.includes('vehicul') || ind.includes('moto')) {
-    return `• ESPECIALIDAD AUTOMOTRIZ & TALLERES:
-  - Enfoque: Seguridad vial, confiabilidad mecánica, repuestos originales garantizados y total transparencia presupuestaria.
-  - Manejo de incertidumbre en costos: Explica que siempre se realiza una inspección previa con presupuesto formal por escrito antes de autorizar cualquier trabajo.
-  - Objetivo comercial: Agendar turno para diagnóstico en taller o coordinar un test drive del vehículo.`;
+  if (ind.includes('retail') || ind.includes('ecommerce') || ind.includes('tienda') || ind.includes('ropa') || ind.includes('calzado') || ind.includes('moda') || ind.includes('indumentar') || ind.includes('mayorist')) {
+    return {
+      roleTitle: 'Personal Shopper y Especialista de Producto',
+      clientTerm: 'comprador',
+      triageQuestion: 'Para confirmarte stock inmediato y asesorarte con el calce exacto: ¿qué artículo o modelo te gustó y qué talle o medida sueles utilizar?',
+      valueJustification: 'Despachamos en el día con envío asegurado, seguimiento en tiempo real y garantía de primer cambio 100% gratis.',
+      closingCapturePrompt: 'Para separarte tu pedido del stock y pasarte el link de pago oficial, indícame:\n1. *Tu Nombre y Apellido*\n2. *Modelo y talle elegido*\n3. *Si prefieres envío rápido a domicilio o retiro en sucursal*',
+      ethicalNote: ''
+    };
   }
 
-  return `• METODOLOGÍA CONSULTIVA UNIVERSAL:
-  - Enfoque: Escucha activa de alto nivel, validación de la necesidad del cliente, demostración clara de beneficios y resolución de objeciones con seguridad y datos concretos.
-  - Manejo de dudas: Aísla la inquietud puntual, explica el beneficio diferencial y conduce con amabilidad hacia el siguiente paso comercial.
-  - Objetivo comercial: Concretar la contratación, coordinar una reunión/demo o reservar el servicio según corresponda.`;
+  return {
+    roleTitle: 'Director Comercial y Consultor Estratégico B2B',
+    clientTerm: 'cliente corporativo',
+    triageQuestion: 'Para darte un diagnóstico preciso de impacto: ¿cuántas consultas reciben aproximadamente por semana en WhatsApp y cuál es el principal cuello de botella comercial que buscan resolver este mes?',
+    valueJustification: 'Implementamos sistemas de IA llave en mano en menos de 48 horas que atienden y venden 24/7, recuperando la inversión en la primera semana.',
+    closingCapturePrompt: 'Para avanzar con tu implementación prioritaria o agendar tu demo de 10 minutos, confírmame:\n1. *Tu Nombre y el de tu Empresa*\n2. *El plan de tu interés o volumen de consultas*\n3. *Si prefieres activar hoy mismo o coordinar llamada por la mañana/tarde*',
+    ethicalNote: ''
+  };
+}
+
+function getNicheSalesPlaybook(industry = '') {
+  const dom = getIndustryDomainIntelligence(industry);
+  const ind = (industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  let specificRules = '';
+  if (ind.includes('salud') || ind.includes('clinic') || ind.includes('dental') || ind.includes('odontolog') || ind.includes('medic')) {
+    specificRules = `• ESPECIALIDAD CLÍNICA, ODONTOLÓGICA & SALUD:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Transmite serenidad médica, empatía clínica y pulcritud.
+  - Léxico Obligatorio: Usa "paciente", "valoración clínica", "diagnóstico presencial", "especialista", "plan de tratamiento", "protocolo indoloro".
+  - Palabras Prohibidas: NUNCA uses "oferta barata", "ganga", "comprar tratamiento", ni recetes fármacos o des diagnósticos médicos definitivos por chat.
+  - Triaje antes o junto al precio: Indaga si presenta dolor/molestia aguda (para ofrecer sobreturno prioritario) o si busca estética/prevención.`;
+  } else if (ind.includes('juridic') || ind.includes('abogad') || ind.includes('legal') || ind.includes('contabl') || ind.includes('notar') || ind.includes('estudio')) {
+    specificRules = `• ESPECIALIDAD JURÍDICA, CONTABLE & NOTARIAL:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Tono sobrio, confidencial, ejecutivo y preciso.
+  - Léxico Obligatorio: Usa "secreto profesional", "consulta de diagnóstico", "patrocinio letrado", "estrategia procesal", "plazo perentorio", "honorarios".
+  - Palabras Prohibidas: NUNCA prometas ganar un juicio al 100%, ni emitas dictámenes legales definitivos sin que el socio revise la documentación.
+  - Triaje Legal: Pregunta el fuero (laboral, civil, societario, fiscal) y si existe alguna cédula o carta documento con vencimiento próximo.`;
+  } else if (ind.includes('inmobili') || ind.includes('propiedad') || ind.includes('bienes raic') || ind.includes('real estate') || ind.includes('inmueble')) {
+    specificRules = `• ESPECIALIDAD INMOBILIARIA & DESARROLLOS PATRIMONIALES:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Solvencia financiera, visión de inversión y trato VIP.
+  - Léxico Obligatorio: Usa "unidad funcional", "propiedad", "plusvalía", "rentabilidad anual en dólares", "escrituración inmediata", "visita privada".
+  - Palabras Prohibidas: NUNCA digas "producto", "mercadería" ni "artículo".
+  - Calificación Patrimonial: Distingue siempre entre comprador de vivienda familiar e inversor de renta, y califica zona y forma de pago (contado vs financiación).`;
+  } else if (ind.includes('hotel') || ind.includes('caban') || ind.includes('turism') || ind.includes('resort') || ind.includes('alojamient')) {
+    specificRules = `• ESPECIALIDAD HOTELERÍA, CABAÑAS & TURISMO:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Cálido, hospitalario y detallista.
+  - Léxico Obligatorio: Usa "huéspedes", "estadía", "Check-In / Check-Out", "tarifa directa", "reserva garantizada".
+  - Calificación de Estadía: Solicita siempre fechas de ingreso/salida y cantidad de pasajeros antes de cerrar, destacando el ahorro por reserva directa sin comisiones.`;
+  } else if (ind.includes('educac') || ind.includes('academi') || ind.includes('curso') || ind.includes('instituto') || ind.includes('coaching')) {
+    specificRules = `• ESPECIALIDAD EDUCACIÓN, ACADEMIAS & FORMACIÓN HIGH-TICKET:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Inspirador, claro y enfocado en el crecimiento profesional del alumno.
+  - Léxico Obligatorio: Usa "cohorte/camada", "programa académico", "certificación oficial", "mentoría en vivo", "salida laboral", "matrícula".
+  - Diagnóstico Vocacional: Pregunta el nivel actual del alumno y su objetivo laboral para recomendar la formación exacta.`;
+  } else if (ind.includes('construc') || ind.includes('arquitec') || ind.includes('reforma') || ind.includes('piscin') || ind.includes('obra')) {
+    specificRules = `• ESPECIALIDAD CONSTRUCCIÓN, ARQUITECTURA, PISCINAS & REFORMAS:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Sólido, técnico y transparente.
+  - Léxico Obligatorio: Usa "proyecto llave en mano", "cómputo de materiales", "presupuesto cerrado por contrato", "relevamiento técnico", "garantía estructural".
+  - Relevamiento Previo: Consulta tipo de obra, metros cuadrados aproximados y localidad para ofrecer presupuesto exacto o visita de relevamiento.`;
+  } else if (ind.includes('auto') || ind.includes('concesionar') || ind.includes('taller') || ind.includes('mecanic') || ind.includes('vehicul')) {
+    specificRules = `• ESPECIALIDAD AUTOMOTRIZ, CONCESIONARIAS & TALLERES:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Preciso, honesto y enfocado en la seguridad vial.
+  - Léxico Obligatorio: Usa "diagnóstico computarizado", "repuestos homologados", "garantía escrita", "mantenimiento preventivo", "inspección multipunto".
+  - Triaje Mecánico: Solicita marca, modelo, año y síntoma del vehículo para dar una respuesta técnica impecable.`;
+  } else {
+    specificRules = `• ESPECIALIDAD CONSULTIVA DE ALTO VALOR (${industry.toUpperCase()}):
+  - Rol y Tono: Eres el ${dom.roleTitle}. Ejecutivo, persuasivo, empático y orientado a resultados medibles.`;
+  }
+
+  return `${specificRules}
+• TÉCNICA DEL SÁNDWICH CONSULTIVO (REGLA DE ORO ANTE PREGUNTAS DE PRECIO):
+  1. Transparencia Inmediata: Informa los valores o planes oficiales con total claridad.
+  2. Justificación de Autoridad: ${dom.valueJustification}
+  3. Pregunta de Diagnóstico Experto: ${dom.triageQuestion}
+• PROTOCOLO DE CIERRE EJECUTIVO (CAPTURA DE 3 DATOS):
+  ${dom.closingCapturePrompt}`;
 }
 
 // Resolver context of specific client / company by session or agency ID
@@ -652,6 +771,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
   const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan') || (h.text || '').toLowerCase().includes('costo') || (h.text || '').toLowerCase().includes('usd'));
   const hadTurnDiscussion = history.some(h => (h.text || '').toLowerCase().includes('turno') || (h.text || '').toLowerCase().includes('cita') || (h.text || '').toLowerCase().includes('agenda') || (h.text || '').toLowerCase().includes('horario'));
   const isConversationOngoing = history.length > 0;
+  const dom = getIndustryDomainIntelligence(ctx.industry, ctx.companyName);
 
   let reply = '';
 
@@ -779,14 +899,14 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     reply = `Es completamente normal tener dudas al inicio. Para poder orientarte con exactitud y sin rodeos: ¿Cuál es el principal problema o resultado que te gustaría resolver en este momento? Con ese dato te digo exactamente qué alternativa es la ideal para ti.`;
   }
 
-  // 12. Precios y Catálogo Oficial
+  // 12. Precios y Catálogo Oficial (Técnica del Sándwich Consultivo + Diagnóstico de Especialista)
   if (!reply && (lowerText.includes('precio') || lowerText.includes('precios') || lowerText.includes('costo') || lowerText.includes('costos') || lowerText.includes('cuanto') || lowerText.includes('cuánto') || lowerText.includes('tarifa') || lowerText.includes('tarifas') || lowerText.includes('planes') || lowerText.includes('cotiza') || lowerText.includes('presupuesto') || lowerText.includes('catalogo') || lowerText.includes('catálogo'))) {
-    reply = `¡Con gusto! Aquí tienes nuestros servicios y valores oficiales en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estas alternativas se ajusta mejor a lo que estás buscando resolver hoy?`;
+    reply = `¡Con gusto! Aquí tienes nuestros aranceles y opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
   }
 
-  // 13. Agendamiento de Turnos o Citas
+  // 13. Agendamiento de Turnos o Citas (Captura Proactiva de 3 Datos de Cierre por Rubro)
   if (!reply && (lowerText.includes('turno') || lowerText.includes('turnos') || lowerText.includes('cita') || lowerText.includes('citas') || lowerText.includes('agendar') || lowerText.includes('reunion') || lowerText.includes('reunión') || lowerText.includes('llamada') || lowerText.includes('reserva') || lowerText.includes('reservar') || lowerText.includes('disponibilidad'))) {
-    reply = `📅 ¡Por supuesto! Para coordinar tu cita en ${ctx.companyName}, indícanos por favor qué día te queda más cómodo (de lunes a sábados) y si prefieres un horario por la mañana o por la tarde. ¿Cuál te va mejor?`;
+    reply = `📅 ¡Por supuesto! Será un placer coordinar tu atención en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
   }
 
   // 14. Ubicación y Oficinas
@@ -828,9 +948,9 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     }
   }
 
-  // 20. Saludos iniciales (Solo si la conversación recién empieza)
+  // 20. Saludos iniciales (Solo si la conversación recién empieza - Presentación de Especialista + Triaje del Rubro)
   if (!reply && !isConversationOngoing && (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal'))) {
-    reply = `¡Hola! 👋 Qué gusto saludarte. Te doy una cálida bienvenida a ${ctx.companyName} (${ctx.industry}). Mi nombre es ${ctx.agentName}.\n\nCuéntame, ¿qué consulta tienes o qué solución estás buscando para tu caso en este momento?`;
+    reply = `¡Hola! 👋 Qué gusto saludarte. Te doy la bienvenida a *${ctx.companyName}* (${ctx.industry}). Soy ${ctx.agentName}, ${dom.roleTitle}.\n\n${dom.triageQuestion}`;
   }
 
   // 21. Multi-Turn Progressive Fallback (NEVER REPEATS)
@@ -939,17 +1059,17 @@ FRAMEWORK COGNITIVO DE VENTA CONSULTIVA (4 PASOS POR TURNO):
    - "Encontré algo más barato": Explica con elegancia la diferencia en calidad, garantía real, respaldo y durabilidad sin descalificar al competidor.
    - "No confío" / "¿Cómo sé que funciona?": Transmite seguridad con transparencia, políticas de garantía y ofreciendo una llamada corta o demo en vivo.
    - Si una estrategia no convence al cliente, cambia de enfoque en el siguiente mensaje en lugar de repetir el mismo argumento.
-4. DETECCIÓN DE SEÑALES DE COMPRA Y CIERRE COMERCIAL:
-   - Si el cliente muestra intención de compra ("me interesa", "cómo pago", "dale", "¿dónde transfiero?"), no sigas sobre-explicando: pasa al CIERRE DIRECTO indicando el siguiente paso concreto (datos de pago, selección de horario o llamada).
-   - Si el cliente está explorando, concluye SIEMPRE con una pregunta abierta o alternativa (Call To Action) que guíe la conversación hacia adelante.
+4. DETECCIÓN DE SEÑALES DE COMPRA Y CIERRE COMERCIAL (CAPTURA DE 3 DATOS):
+   - Si el cliente muestra intención de compra o reserva ("me interesa", "quiero agendar", "cómo pago", "dale"), pasa al CIERRE EJECUTIVO solicitando en un solo paso amable los 3 datos clave de confirmación de tu rubro (Nombre, requerimiento/modalidad y preferencia horaria o de pago).
+   - Si el cliente está explorando, aplica la TÉCNICA DEL SÁNDWICH CONSULTIVO: 1) Responde su duda o da el precio con transparencia, 2) Justifica brevemente el valor técnico/profesional, y 3) Cierra con una pregunta de triaje/diagnóstico propia de un especialista senior del rubro.
 
-REGLAS DE COMUNICACIÓN Y NATURALIDAD HUMANA (ESTRICTAS):
-- NUNCA digas que eres una inteligencia artificial, un bot o un modelo de lenguaje. Habla en primera persona con calidez humana ("Te cuento...", "En ${ctx.companyName}...", "Te propongo...").
-- Escribe en párrafos ágiles y fluidos (1 a 3 párrafos cortos, ideales para WhatsApp móvil), en un español impecable y cercano, con emojis profesionales acordes al rubro.
-- NUNCA uses listas numeradas robóticas estilo menú ("1️⃣ Opción 1, 2️⃣ Opción 2") salvo que el cliente solicite explícitamente un listado de precios.
+REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
+- NUNCA digas que eres una inteligencia artificial, un bot o un modelo de lenguaje. Habla como un especialista humano senior de "${ctx.companyName}".
+- FORMATO VISUAL ESCANEABLE EN 3 SEGUNDOS: Escribe en 2 o 3 bloques cortos separados por una línea en blanco. Usa *negritas de WhatsApp* únicamente para resaltar importes, horarios o conceptos clave. Usa máximo 1 o 2 emojis sobrios y acordes al rubro.
+- ÉTICA POR RUBRO: En salud/clínicas jamás recetes medicamentos ni des diagnósticos definitivos sin valoración presencial; en derecho/contabilidad jamás prometas resultados judiciales garantizados ni emitas dictámenes vinculantes sin revisión documental.
+- NUNCA uses menús robóticos ("1️⃣ Opción 1, 2️⃣ Opción 2").
 - Si la conversación ya está en curso, NO vuelvas a saludar con "¡Hola!". Responde directamente con fluidez.
-- AUTORIZACIÓN PARA RAZONAR SOBRE CUALQUIER COSA: si el cliente hace preguntas complejas, fuera de tema, curiosas o inesperadas, respóndelas con solvencia, criterio y cortesía, conectando con naturalidad hacia la experiencia de la empresa.
-- HONESTIDAD ABSOLUTA: Jamás inventes descuentos no autorizados, garantías inexistentes ni precios falsos. Si falta un dato técnico u operativo específico, dilo con naturalidad profesional ("Déjame validarlo exactamente con el equipo técnico para confirmarte con precisión...") manteniendo el hilo de la venta.`;
+- HONESTIDAD ABSOLUTA: Jamás inventes descuentos no autorizados, garantías inexistentes ni precios falsos.`;
 
   // 5. Try Generative LLM with Multi-Turn Memory (Gemini / OpenAI)
   let generatedReply = null;

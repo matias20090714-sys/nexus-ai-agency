@@ -932,11 +932,38 @@ function loadBlueprintPrompt(blueprintId) {
   if (!bp) return;
 
   const client = agencyClients.find(c => c.id === activeClientId);
-  const companyName = client ? client.name : 'la empresa';
+  const companyName = client ? client.name : 'nuestra firma';
 
-  document.getElementById('agentEditorPrompt').value = bp.defaultSystemPrompt.replace(/la clínica|la empresa|el salón/g, companyName);
-  
+  const nameInput = document.getElementById('agentEditorName');
+  if (nameInput) nameInput.value = bp.name;
+
+  const promptInput = document.getElementById('agentEditorPrompt');
+  if (promptInput) {
+    promptInput.value = bp.defaultSystemPrompt.replace(/la clínica|la empresa|el salón|la firma|el Estudio|el complejo\/hotel|la institución|la empresa constructora\/estudio/gi, companyName);
+  }
+
+  // Always populate all multi-flow inputs on screen
+  if (bp.salesFlow) {
+    if (document.getElementById('salesFlowQualification')) document.getElementById('salesFlowQualification').value = bp.salesFlow.qualification || '';
+    if (document.getElementById('salesFlowBudget')) document.getElementById('salesFlowBudget').value = bp.salesFlow.budget || '';
+    if (document.getElementById('salesFlowObjections')) document.getElementById('salesFlowObjections').value = bp.salesFlow.objections || '';
+    if (document.getElementById('salesFlowClosing')) document.getElementById('salesFlowClosing').value = bp.salesFlow.closing || '';
+  }
+  if (bp.supportFlow) {
+    if (document.getElementById('supportFlowFaqs')) document.getElementById('supportFlowFaqs').value = bp.supportFlow.faqs || '';
+    if (document.getElementById('supportFlowEmergency')) document.getElementById('supportFlowEmergency').value = bp.supportFlow.emergency || '';
+  }
+  if (bp.afterSalesFlow) {
+    if (document.getElementById('aftersalesDelay')) document.getElementById('aftersalesDelay').value = bp.afterSalesFlow.surveyDelayHours || 24;
+    if (document.getElementById('aftersalesMessage')) document.getElementById('aftersalesMessage').value = bp.afterSalesFlow.message || '';
+    if (document.getElementById('aftersalesGoogleUrl')) document.getElementById('aftersalesGoogleUrl').value = bp.afterSalesFlow.googleReviewUrl || '';
+    if (document.getElementById('aftersalesGooglePrompt')) document.getElementById('aftersalesGooglePrompt').value = bp.afterSalesFlow.googleReviewPrompt || '';
+    if (document.getElementById('aftersalesLoyalty')) document.getElementById('aftersalesLoyalty').value = bp.afterSalesFlow.loyaltyDiscount || '';
+  }
+
   if (client) {
+    client.industry = bp.category;
+    client.agentName = bp.name;
     client.catalog = JSON.parse(JSON.stringify(bp.defaultCatalog));
     client.salesFlow = JSON.parse(JSON.stringify(bp.salesFlow));
     client.supportFlow = JSON.parse(JSON.stringify(bp.supportFlow));
@@ -945,7 +972,7 @@ function loadBlueprintPrompt(blueprintId) {
     loadActiveAgentForClient();
   }
 
-  showToast(`Plantilla '${bp.name}' y catálogo de ${bp.category} cargados con éxito`, 'success');
+  showToast(`✨ Especialidad '${bp.name}' (${bp.category}) cargada con protocolos profesionales`, 'success');
 }
 
 function saveActiveAgentConfig() {
