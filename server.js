@@ -55,6 +55,51 @@ const MIME_TYPES = {
 // Active Baileys sessions store
 const activeSessions = {};
 
+// Human Takeover (Pausa Humana Anti-Choque por Conversación)
+const pausedHumanChats = new Map(); // key: `${sessionId}_${cleanPhone}` -> { pausedUntil, reason }
+const aiOutgoingCooldowns = new Map(); // key: cleanPhone -> timestamp (prevents AI's own messages from triggering human takeover)
+
+function cleanPhoneNumberKey(phone) {
+  return String(phone || '').replace(/\D/g, '');
+}
+
+function isChatPausedForHuman(sessionId, phone) {
+  const clean = cleanPhoneNumberKey(phone);
+  if (!clean) return false;
+  const key = `${sessionId || 'agency_master_1'}_${clean}`;
+  const globalKey = `global_${clean}`;
+  const entry = pausedHumanChats.get(key) || pausedHumanChats.get(globalKey);
+  if (!entry) return false;
+  if (Date.now() > entry.pausedUntil) {
+    pausedHumanChats.delete(key);
+    pausedHumanChats.delete(globalKey);
+    return false;
+  }
+  return entry;
+}
+
+function setChatHumanTakeover(sessionId, phone, paused = true, durationMinutes = 120, reason = 'Intervención manual del dueño/operador') {
+  const clean = cleanPhoneNumberKey(phone);
+  if (!clean) return null;
+  const key = `${sessionId || 'agency_master_1'}_${clean}`;
+  const globalKey = `global_${clean}`;
+  if (!paused) {
+    pausedHumanChats.delete(key);
+    pausedHumanChats.delete(globalKey);
+    return { phone: clean, paused: false };
+  }
+  const info = {
+    phone: clean,
+    sessionId: sessionId || 'agency_master_1',
+    paused: true,
+    pausedUntil: Date.now() + durationMinutes * 60 * 1000,
+    reason
+  };
+  pausedHumanChats.set(key, info);
+  pausedHumanChats.set(globalKey, info);
+  return info;
+}
+
 // Ensure sessions storage directory exists
 const SESSIONS_DIR = path.join(__dirname, 'sessions');
 if (!fs.existsSync(SESSIONS_DIR)) {
@@ -199,47 +244,64 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type === 'notify') {
       for (const msg of messages) {
+        const senderJid = msg.key?.remoteJid;
+        if (!senderJid || senderJid.includes('@g.us') || senderJid.includes('status@broadcast')) continue;
+        const senderNumber = senderJid.split('@')[0];
+
+        // Automatic Human Takeover Detection: If the business owner sends a manual message from their phone
+        if (msg.key.fromMe && msg.message) {
+          const aiCooldownUntil = aiOutgoingCooldowns.get(senderNumber) || 0;
+          if (Date.now() > aiCooldownUntil) {
+            setChatHumanTakeover(sessionId, senderNumber, true, 120, 'Mensaje manual enviado desde el teléfono del dueño');
+            console.log(`[Baileys - ${sessionId}] ⏸️ Pausa Humana Anti-Choque activada automáticamente (2h) para +${senderNumber} tras respuesta manual del humano.`);
+          }
+          continue;
+        }
+
         if (!msg.key.fromMe && msg.message) {
-          const senderJid = msg.key.remoteJid;
-          // Avoid replying to status broadcast or groups
-          if (senderJid && !senderJid.includes('@g.us') && !senderJid.includes('status@broadcast')) {
-            const senderNumber = senderJid.split('@')[0];
-            const pushName = msg.pushName || `Lead +${senderNumber}`;
-            let textBody = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+          const pushName = msg.pushName || `Lead +${senderNumber}`;
+          let textBody = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
 
-            // Support Multimodal Incoming Messages (Images/Receipts, Voice Notes, Documents)
-            if (!textBody && msg.message.imageMessage) {
-              const caption = msg.message.imageMessage.caption || '';
-              textBody = caption
-                ? `[Imagen/Comprobante enviado con nota: "${caption}"]`
-                : 'Hola, te acabo de enviar una imagen / comprobante por aquí. ¿Me confirmas si lo recibiste?';
-            } else if (!textBody && msg.message.audioMessage) {
-              textBody = 'Hola, te acabo de enviar una nota de voz con mi consulta. ¿Me comentas cómo trabajan y cuáles son los pasos?';
-            } else if (!textBody && msg.message.documentMessage) {
-              const docTitle = msg.message.documentMessage.fileName || 'documento';
-              textBody = `Hola, te acabo de adjuntar el archivo "${docTitle}". ¿Me confirmas recepción y próximos pasos?`;
-            }
+          // Support Multimodal Incoming Messages (Images/Receipts, Voice Notes, Documents)
+          if (!textBody && msg.message.imageMessage) {
+            const caption = msg.message.imageMessage.caption || '';
+            textBody = caption
+              ? `[Imagen/Comprobante enviado con nota: "${caption}"]`
+              : 'Hola, te acabo de enviar una imagen / comprobante por aquí. ¿Me confirmas si lo recibiste?';
+          } else if (!textBody && msg.message.audioMessage) {
+            textBody = 'Hola, te acabo de enviar una nota de voz con mi consulta. ¿Me comentas cómo trabajan y cuáles son los pasos?';
+          } else if (!textBody && msg.message.documentMessage) {
+            const docTitle = msg.message.documentMessage.fileName || 'documento';
+            textBody = `Hola, te acabo de adjuntar el archivo "${docTitle}". ¿Me confirmas recepción y próximos pasos?`;
+          }
 
-            console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber}: "${textBody}"`);
+          console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber}: "${textBody}"`);
 
-            if (textBody && textBody.trim()) {
-              try {
-                const agId = sessionId.replace('agency_', '').replace('client_', '') || 'agency_master_1';
-                // Feature 5: Check and Alert Owner for High-Intent Lead
-                checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
-                // Feature 6: Register/Update Anti-Ghosting Follow-up Sequence (2h / 24h / 72h)
-                registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60)).catch(() => {});
+          if (textBody && textBody.trim()) {
+            try {
+              const agId = sessionId.replace('agency_', '').replace('client_', '') || 'agency_master_1';
+              // Feature 5: Check and Alert Owner for High-Intent Lead
+              checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
+              // Feature 6: Register/Update Anti-Ghosting Follow-up Sequence (2h / 24h / 72h)
+              registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60)).catch(() => {});
 
-                // Simulate human delay (1.2s)
-                await new Promise(r => setTimeout(r, 1200));
-                const aiReply = await generateAiAgentResponse(textBody, senderNumber, sessionId, agId);
-                if (aiReply && sock) {
-                  await sock.sendMessage(senderJid, { text: aiReply });
-                  console.log(`[Baileys - ${sessionId}] 🤖 IA respondió a +${senderNumber}: "${aiReply.slice(0, 40)}..."`);
-                }
-              } catch (replyErr) {
-                console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
+              // Check Human Takeover / Pausa Humana before AI replies
+              const pauseState = isChatPausedForHuman(sessionId, senderNumber);
+              if (pauseState) {
+                console.log(`[Baileys - ${sessionId}] ⏸️ IA en Pausa Humana para +${senderNumber} (no responde para no interrumpir al humano).`);
+                continue;
               }
+
+              // Simulate human delay (1.2s)
+              await new Promise(r => setTimeout(r, 1200));
+              const aiReply = await generateAiAgentResponse(textBody, senderNumber, sessionId, agId);
+              if (aiReply && sock) {
+                aiOutgoingCooldowns.set(senderNumber, Date.now() + 8000);
+                await sock.sendMessage(senderJid, { text: aiReply });
+                console.log(`[Baileys - ${sessionId}] 🤖 IA respondió a +${senderNumber}: "${aiReply.slice(0, 40)}..."`);
+              }
+            } catch (replyErr) {
+              console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
             }
           }
         }
@@ -1640,6 +1702,55 @@ const server = http.createServer(async (req, res) => {
           industry: ctx.industry,
           agentName: ctx.agentName
         }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // 7.3 Human Takeover (Pausa Humana Anti-Choque por Conversación)
+  if (pathname === '/api/wa-session/human-takeover' && req.method === 'GET') {
+    const sessionId = urlObj.searchParams.get('sessionId') || 'agency_master_1';
+    const phone = urlObj.searchParams.get('phone') || '';
+    if (phone) {
+      const info = isChatPausedForHuman(sessionId, phone);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, paused: !!info, details: info || null }));
+      return;
+    }
+    const activeList = [];
+    for (const [k, val] of pausedHumanChats.entries()) {
+      if (k.startsWith('global_') && Date.now() <= val.pausedUntil) {
+        activeList.push(val);
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, pausedChats: activeList }));
+    return;
+  }
+
+  if (pathname === '/api/wa-session/human-takeover' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const { sessionId, phone, paused, durationMinutes } = JSON.parse(body || '{}');
+        if (!phone) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Número de teléfono requerido.' }));
+          return;
+        }
+        const info = setChatHumanTakeover(
+          sessionId || 'agency_master_1',
+          phone,
+          paused !== false,
+          Number(durationMinutes) || 120,
+          'Control manual activado desde Bandeja de Entrada'
+        );
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, paused: !!info?.paused, details: info }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: err.message }));

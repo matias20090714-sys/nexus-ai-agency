@@ -158,8 +158,8 @@
         <div class="wa-status-card">
           <div class="status-dot-pulse"></div>
           <div>
-            <div class="wa-status-text">Meta WhatsApp Cloud API</div>
-            <div class="wa-status-sub" id="sidebarPhoneDisplay">Phone ID: 1342311562300304</div>
+            <div class="wa-status-text">Motor WhatsApp Multi-Sesión IA</div>
+            <div class="wa-status-sub" id="sidebarPhoneDisplay">Baileys QR + Gemini 3.1 Activo</div>
           </div>
         </div>
       </div>
@@ -1185,6 +1185,9 @@
               <button class="subtab-btn" id="subtabBtn-multimodal" onclick="switchAgentSubtab('multimodal')">
                 <i class="fa-solid fa-eye" style="color: #38bdf8;"></i> 9. Visión Pagos & Voz IA
               </button>
+              <button class="subtab-btn" id="subtabBtn-widget" onclick="switchAgentSubtab('widget')">
+                <i class="fa-solid fa-code" style="color: #34d399;"></i> 10. Widget Web ($150 Upsell)
+              </button>
             </div>
 
             <!-- SUBTAB 1: IDENTIDAD & BASE DE CONOCIMIENTO -->
@@ -1490,9 +1493,14 @@
                       </strong>
                       <span style="font-size: 12px; color: var(--text-muted);">Gestiona las citas agendadas por la IA o agenda manualmente:</span>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openModalNewAppointment()">
-                      <i class="fa-solid fa-plus"></i> + Agendar Cita Manual
-                    </button>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                      <button class="btn btn-secondary btn-sm" onclick="exportAppointmentsToCsv()">
+                        <i class="fa-solid fa-file-csv" style="color: #34d399;"></i> Exportar Citas (CSV/Excel)
+                      </button>
+                      <button class="btn btn-primary btn-sm" onclick="openModalNewAppointment()">
+                        <i class="fa-solid fa-plus"></i> + Agendar Cita Manual
+                      </button>
+                    </div>
                   </div>
 
                   <div style="overflow-x: auto; background: rgba(10, 13, 28, 0.6); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
@@ -1716,6 +1724,74 @@
 
                   <div id="voiceSynthOutputBox" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12.5px; color: #a7f3d0; line-height: 1.5;">
                     🎙️ Presiona <strong>"Generar y Escuchar Nota de Voz IA"</strong> para sintetizar el audio comercial en vivo.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUBTAB 10: GENERADOR DE WIDGET WEB FLOTANTE IA ($150 USD UPSELL) -->
+            <div id="subtabView-widget" class="subtab-view-content">
+              <div style="background: rgba(10, 13, 28, 0.78); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-lg); padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+                  <div>
+                    <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-window-restore" style="color: #34d399;"></i> Generador de Widget Flotante IA para Sitios Web de Clientes
+                    </strong>
+                    <span style="font-size: 12.5px; color: var(--text-muted);">Ofrece este complemento como un <strong>Upsell de $150 USD extra</strong> en la instalación. Genera el código en 1 clic para pegar en WordPress, Shopify, Tiendanube o HTML.</span>
+                  </div>
+                  <button class="btn btn-emerald btn-sm" onclick="copyClientWebWidgetCode()">
+                    <i class="fa-solid fa-copy"></i> Copiar Código &lt;script&gt; Listo para Instalar
+                  </button>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                  <!-- Left Column: Customization Inputs -->
+                  <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px;">
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 12px;">Nombre de la Empresa / Asistente en la Burbuja</label>
+                      <input type="text" id="widgetCompanyName" class="form-control" value="Atención IA 24/7" oninput="generateClientWebWidgetCode()" style="font-size: 12.5px;">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 12px;">Número de WhatsApp Destino (con cód. de país)</label>
+                      <input type="text" id="widgetWhatsappPhone" class="form-control" placeholder="Ej: 5491148923310" oninput="generateClientWebWidgetCode()" style="font-size: 12.5px;">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label" style="font-size: 12px;">Mensaje de Bienvenida Flotante</label>
+                      <input type="text" id="widgetWelcomeText" class="form-control" value="👋 ¡Hola! Estoy en línea 24/7. ¿En qué te asesoro hoy?" oninput="generateClientWebWidgetCode()" style="font-size: 12.5px;">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                      <div class="form-group">
+                        <label class="form-label" style="font-size: 12px;">Color de Marca</label>
+                        <input type="color" id="widgetBrandColor" class="form-control" value="#10b981" oninput="generateClientWebWidgetCode()" style="height: 38px; padding: 4px;">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label" style="font-size: 12px;">Posición en Pantalla</label>
+                        <select id="widgetPosition" class="form-control" onchange="generateClientWebWidgetCode()" style="font-size: 12.5px;">
+                          <option value="right">Abajo a la Derecha</option>
+                          <option value="left">Abajo a la Izquierda</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Right Column: Live Visual Preview & Generated Code -->
+                  <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="background: rgba(15, 23, 42, 0.9); border: 1px dashed rgba(52, 211, 153, 0.4); border-radius: var(--radius-md); padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                      <div>
+                        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #34d399; font-weight: 800;">Vista Previa en Vivo</div>
+                        <div id="widgetLivePreviewBubble" style="margin-top: 8px; background: white; color: #0f172a; padding: 10px 14px; border-radius: 14px 14px 4px 14px; font-size: 12.5px; font-weight: 600; box-shadow: 0 8px 20px rgba(0,0,0,0.35);">
+                          👋 ¡Hola! Estoy en línea 24/7. ¿En qué te asesoro hoy?
+                        </div>
+                      </div>
+                      <div id="widgetLivePreviewBtn" style="width: 54px; height: 54px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 8px 20px rgba(16,185,129,0.45); flex-shrink: 0;">
+                        <i class="fa-brands fa-whatsapp"></i>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="form-label" style="font-size: 11.5px; color: #94a3b8;">Código HTML/JS Autónomo (Pegar antes de &lt;/body&gt; en la web del cliente):</label>
+                      <textarea id="widgetCodeOutput" class="form-control" rows="6" readonly style="font-family: monospace; font-size: 11px; background: #090d16; color: #34d399; border-color: rgba(52,211,153,0.3);"></textarea>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2044,7 +2120,10 @@
                     </div>
                   </div>
                 </div>
-                <div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button class="btn btn-secondary btn-sm" id="btnToggleHumanTakeover" onclick="toggleHumanTakeoverForActiveLead()" title="Pausar respuestas automáticas de la IA durante 2 horas para atender tú manualmente sin interrupciones">
+                    <i class="fa-solid fa-user-shield" style="color: #fbbf24;"></i> <span id="lblHumanTakeoverBtn">Pausar IA (Control Humano)</span>
+                  </button>
                   <button class="btn btn-emerald btn-sm" onclick="openSendRealWaModal()">
                     <i class="fa-brands fa-whatsapp"></i> Enviar Mensaje Real
                   </button>
@@ -2078,7 +2157,7 @@
               <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
                 <div><span style="color: var(--text-muted);">Nombre:</span> <strong id="inboxDetailName" style="color: white;">--</strong></div>
                 <div><span style="color: var(--text-muted);">Teléfono:</span> <strong id="inboxDetailPhone" style="color: white;">--</strong></div>
-                <div><span style="color: var(--text-muted);">Canal:</span> <span class="brand-badge">WhatsApp Cloud API</span></div>
+                <div><span style="color: var(--text-muted);">Estado IA:</span> <span class="brand-badge" id="inboxDetailAiStateBadge" style="background: rgba(16,185,129,0.2); color: #34d399;">🤖 IA Activa 24/7</span></div>
                 <div><span style="color: var(--text-muted);">Empresa Asignada:</span> <strong id="inboxDetailCompany" style="color: #818cf8;">--</strong></div>
               </div>
             </div>
@@ -2098,9 +2177,14 @@
                   Seguimiento de leads reales capturados a través de las líneas de WhatsApp.
                 </div>
               </div>
-              <button class="btn btn-primary btn-sm" onclick="openNewLeadModal()">
-                <i class="fa-solid fa-plus"></i> Registrar Lead Manual
-              </button>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="exportLeadsToCsv()">
+                  <i class="fa-solid fa-file-csv" style="color: #34d399;"></i> Exportar Leads (CSV/Excel)
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="openNewLeadModal()">
+                  <i class="fa-solid fa-plus"></i> Registrar Lead Manual
+                </button>
+              </div>
             </div>
 
             <div class="kanban-board" id="realKanbanContainer">

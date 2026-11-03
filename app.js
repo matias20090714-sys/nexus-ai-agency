@@ -774,6 +774,18 @@ function switchAgentSubtab(subtabId) {
     loadLiveAppointments();
   } else if (subtabId === 'followup') {
     loadFollowUpSequences();
+  } else if (subtabId === 'widget') {
+    const client = agencyClients.find(c => c.id === activeClientId);
+    const profile = getAgencyProfile();
+    const wName = document.getElementById('widgetCompanyName');
+    const wPhone = document.getElementById('widgetWhatsappPhone');
+    if (wName && (!wName.value || wName.value === 'Atención IA 24/7')) {
+      wName.value = client ? client.name : (profile?.name || 'Atención IA 24/7');
+    }
+    if (wPhone && !wPhone.value) {
+      wPhone.value = (client && client.phone) ? client.phone : (profile?.billingPhone || '5491148923310');
+    }
+    generateClientWebWidgetCode();
   }
 }
 
@@ -1623,6 +1635,10 @@ function selectRealInboxLead(leadId) {
   document.getElementById('inboxDetailName').innerText = lead.name || 'Cliente WhatsApp';
   document.getElementById('inboxDetailPhone').innerText = lead.phone || '--';
   document.getElementById('inboxDetailCompany').innerText = lead.company || 'Agencia General';
+
+  if (typeof refreshActiveLeadHumanTakeoverState === 'function') {
+    refreshActiveLeadHumanTakeoverState(lead.phone);
+  }
 
   const msgContainer = document.getElementById('realMessagesContainer');
   msgContainer.innerHTML = (lead.history || []).map(msg => `
@@ -4767,7 +4783,202 @@ if (typeof document !== 'undefined') {
     if (params.get('client_portal') === '1') {
       setTimeout(() => toggleClientPortalViewMode(true), 350);
     }
+    setTimeout(generateClientWebWidgetCode, 450);
   });
 }
+
+// ==================== 6. HUMAN TAKEOVER (PAUSA HUMANA ANTI-CHOQUE EN INBOX) ====================
+const localHumanTakeoverState = {};
+
+async function refreshActiveLeadHumanTakeoverState(phone) {
+  if (!phone) return;
+  const clean = String(phone).replace(/\D/g, '');
+  try {
+    const res = await fetch(`/api/wa-session/human-takeover?sessionId=agency_${encodeURIComponent(currentAgencyId || 'agency_master_1')}&phone=${encodeURIComponent(clean)}`);
+    const data = await res.json();
+    if (data && data.success) {
+      localHumanTakeoverState[clean] = !!data.paused;
+    }
+  } catch (e) {}
+  updateHumanTakeoverUiBadge(!!localHumanTakeoverState[clean]);
+}
+
+function updateHumanTakeoverUiBadge(isPaused) {
+  const lblBtn = document.getElementById('lblHumanTakeoverBtn');
+  const btn = document.getElementById('btnToggleHumanTakeover');
+  const stateBadge = document.getElementById('inboxDetailAiStateBadge');
+  const subtitle = document.getElementById('activeInboxSubtitle');
+
+  if (lblBtn) {
+    lblBtn.innerText = isPaused ? '▶️ Reactivar IA en este Chat' : '⏸️ Pausar IA (Control Humano)';
+  }
+  if (btn) {
+    btn.style.borderColor = isPaused ? '#f59e0b' : '';
+    btn.style.background = isPaused ? 'rgba(245, 158, 11, 0.18)' : '';
+  }
+  if (stateBadge) {
+    if (isPaused) {
+      stateBadge.style.background = 'rgba(245, 158, 11, 0.2)';
+      stateBadge.style.color = '#fbbf24';
+      stateBadge.innerText = '⏸️ Pausa Humana (2h)';
+    } else {
+      stateBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+      stateBadge.style.color = '#34d399';
+      stateBadge.innerText = '🤖 IA Activa 24/7';
+    }
+  }
+  if (subtitle) {
+    subtitle.style.color = isPaused ? '#fbbf24' : '#34d399';
+    subtitle.innerText = isPaused
+      ? '⏸️ Control Humano Activo (IA en silencio para este contacto)'
+      : '🤖 Agente IA Activo • Respuesta Automática 24/7';
+  }
+}
+
+async function toggleHumanTakeoverForActiveLead() {
+  const lead = realLeads.find(l => l.id === activeInboxLeadId) || realLeads[0];
+  const phone = lead ? lead.phone : (document.getElementById('inboxDetailPhone')?.innerText || '');
+  const clean = String(phone || '').replace(/\D/g, '');
+  if (!clean || clean.length < 6) {
+    showToast('Selecciona primero un contacto en la Bandeja de Entrada para pausar/reactivar la IA', 'info');
+    return;
+  }
+
+  const nextState = !localHumanTakeoverState[clean];
+  localHumanTakeoverState[clean] = nextState;
+  updateHumanTakeoverUiBadge(nextState);
+
+  try {
+    await fetch('/api/wa-session/human-takeover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: `agency_${currentAgencyId || 'agency_master_1'}`,
+        phone: clean,
+        paused: nextState,
+        durationMinutes: 120
+      })
+    });
+  } catch (e) {}
+
+  if (nextState) {
+    showToast(`⏸️ IA en pausa durante 2h para +${clean}. Puedes chatear manualmente sin que el bot interrumpa.`, 'info');
+  } else {
+    showToast(`🤖 IA reactivada para +${clean}. El agente volverá a responder automáticamente.`, 'success');
+  }
+}
+
+// ==================== 7. CLIENT WEBSITE FLOATING WIDGET GENERATOR ($150 UPSELL) ====================
+function generateClientWebWidgetCode() {
+  const compName = document.getElementById('widgetCompanyName')?.value.trim() || 'Atención IA 24/7';
+  const rawPhone = document.getElementById('widgetWhatsappPhone')?.value.trim() || '5491148923310';
+  const cleanPhone = rawPhone.replace(/\D/g, '') || '5491148923310';
+  const welcomeText = document.getElementById('widgetWelcomeText')?.value.trim() || '👋 ¡Hola! Estoy en línea 24/7. ¿En qué te asesoro hoy?';
+  const brandColor = document.getElementById('widgetBrandColor')?.value || '#10b981';
+  const position = document.getElementById('widgetPosition')?.value || 'right';
+
+  const prevBubble = document.getElementById('widgetLivePreviewBubble');
+  const prevBtn = document.getElementById('widgetLivePreviewBtn');
+  if (prevBubble) prevBubble.innerText = welcomeText;
+  if (prevBtn) prevBtn.style.background = brandColor;
+
+  const posCss = position === 'left' ? 'left:22px;' : 'right:22px;';
+  const snippet = `<!-- Widget Oficial IA 24/7 - ${compName} -->
+<div id="nexus-ai-wa-widget" style="position:fixed;bottom:22px;${posCss}z-index:999999;display:flex;align-items:center;gap:10px;font-family:system-ui,-apple-system,sans-serif;">
+  <div style="background:#ffffff;color:#0f172a;padding:10px 14px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,0.18);font-size:13px;font-weight:600;max-width:230px;border:1px solid rgba(0,0,0,0.06);">
+    <div style="font-size:10px;color:${brandColor};font-weight:800;text-transform:uppercase;margin-bottom:2px;">● ${compName}</div>
+    ${welcomeText}
+  </div>
+  <a href="https://wa.me/${cleanPhone}?text=${encodeURIComponent('Hola, vengo desde su sitio web y quiero hacer una consulta.')}" target="_blank" rel="noopener" style="width:56px;height:56px;border-radius:50%;background:${brandColor};color:#fff;display:flex;align-items:center;justify-content:center;text-decoration:none;box-shadow:0 8px 22px rgba(0,0,0,0.28);font-size:28px;" title="Chatear por WhatsApp">
+    💬
+  </a>
+</div>`;
+
+  const out = document.getElementById('widgetCodeOutput');
+  if (out) out.value = snippet;
+  return snippet;
+}
+
+function copyClientWebWidgetCode() {
+  const code = generateClientWebWidgetCode();
+  navigator.clipboard.writeText(code).catch(() => {});
+  showToast('✅ Código del Widget Web copiado. Pégalo antes de </body> en la web de tu cliente.', 'success');
+}
+
+// ==================== 8. CSV / EXCEL EXPORTERS (LEADS & APPOINTMENTS) ====================
+function exportLeadsToCsv() {
+  const rows = [
+    ['ID', 'Nombre', 'WhatsApp', 'Empresa / Rubro', 'Etapa Pipeline', 'Último Mensaje', 'Fecha']
+  ];
+  const list = (Array.isArray(realLeads) && realLeads.length > 0) ? realLeads : [];
+  if (list.length === 0) {
+    showToast('Aún no hay leads registrados en el Pipeline para exportar', 'info');
+    return;
+  }
+  list.forEach(l => {
+    rows.push([
+      l.id || '',
+      (l.name || 'Cliente').replace(/"/g, '""'),
+      l.phone || '',
+      (l.company || 'General').replace(/"/g, '""'),
+      l.stage || 'Nuevo',
+      (l.lastMessage || '').replace(/"/g, '""').replace(/\r?\n/g, ' '),
+      l.timestamp || new Date().toLocaleDateString()
+    ]);
+  });
+
+  const csvContent = '\uFEFF' + rows.map(r => r.map(field => `"${String(field)}"`).join(',')).join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `leads_agencia_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast(`📥 ${list.length} Leads exportados a CSV/Excel con éxito`, 'success');
+}
+
+async function exportAppointmentsToCsv() {
+  try {
+    const res = await fetch(`/api/appointments/list?agencyId=${encodeURIComponent(currentAgencyId || 'agency_master_1')}`);
+    const data = await res.json();
+    const list = (data && Array.isArray(data.appointments)) ? data.appointments : [];
+    if (list.length === 0) {
+      showToast('No hay citas programadas actualmente para exportar', 'info');
+      return;
+    }
+    const rows = [
+      ['ID', 'Cliente', 'WhatsApp', 'Servicio', 'Fecha y Hora', 'Estado', 'Recordatorio 24h', 'Recordatorio 2h']
+    ];
+    list.forEach(app => {
+      rows.push([
+        app.id || '',
+        (app.contact_name || '').replace(/"/g, '""'),
+        app.contact_phone || '',
+        (app.service_name || 'Turno General').replace(/"/g, '""'),
+        app.appointment_date ? new Date(app.appointment_date).toLocaleString() : '',
+        app.status || 'scheduled',
+        app.reminder_24h_sent ? 'Enviado' : 'Pendiente',
+        app.reminder_2h_sent ? 'Enviado' : 'Pendiente'
+      ]);
+    });
+    const csvContent = '\uFEFF' + rows.map(r => r.map(field => `"${String(field)}"`).join(',')).join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `citas_agendadas_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`📥 ${list.length} Citas exportadas a CSV/Excel con éxito`, 'success');
+  } catch (err) {
+    showToast('Error al exportar citas: ' + err.message, 'error');
+  }
+}
+
 
 
