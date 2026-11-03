@@ -214,6 +214,217 @@ async function initDatabase(connectionString) {
   }
 }
 
+// Safe, non-destructive schema verification for server startup
+const safeEnsureSQL = `
+CREATE TABLE IF NOT EXISTS agencies (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE,
+    brand_color VARCHAR(32) DEFAULT '#6366f1',
+    billing_phone VARCHAR(64),
+    bank_name VARCHAR(128),
+    bank_holder VARCHAR(255),
+    bank_cbu VARCHAR(128),
+    bank_tax_id VARCHAR(64),
+    owner_alert_phone VARCHAR(64),
+    owner_alerts_enabled BOOLEAN DEFAULT TRUE,
+    portal_title TEXT,
+    portal_subtitle TEXT,
+    portal_config JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE agencies ADD COLUMN IF NOT EXISTS owner_alert_phone VARCHAR(64);
+ALTER TABLE agencies ADD COLUMN IF NOT EXISTS owner_alerts_enabled BOOLEAN DEFAULT TRUE;
+
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(32) DEFAULT 'agency_admin',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS plans (
+    id VARCHAR(64) PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    price NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    currency VARCHAR(10) DEFAULT 'USD',
+    period VARCHAR(32) DEFAULT 'mes',
+    category VARCHAR(255),
+    features JSONB DEFAULT '[]'::jsonb,
+    payment_link TEXT,
+    is_featured BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS clients (
+    id VARCHAR(64) PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    industry VARCHAR(128),
+    phone VARCHAR(64),
+    email VARCHAR(255),
+    plan_id VARCHAR(64) REFERENCES plans(id) ON DELETE SET NULL,
+    status VARCHAR(32) DEFAULT 'active',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS leads (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    phone VARCHAR(64),
+    email VARCHAR(255),
+    status VARCHAR(64) DEFAULT 'nuevo',
+    value NUMERIC(10, 2) DEFAULT 0,
+    source VARCHAR(64) DEFAULT 'whatsapp',
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS quotes (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    client_id VARCHAR(64) REFERENCES clients(id) ON DELETE SET NULL,
+    folio VARCHAR(64) NOT NULL,
+    client_name VARCHAR(255),
+    client_phone VARCHAR(64),
+    client_email VARCHAR(255),
+    items JSONB DEFAULT '[]'::jsonb,
+    subtotal NUMERIC(10, 2) DEFAULT 0,
+    discount_pct NUMERIC(5, 2) DEFAULT 0,
+    tax_pct NUMERIC(5, 2) DEFAULT 0,
+    total NUMERIC(10, 2) DEFAULT 0,
+    validity VARCHAR(64) DEFAULT '15 Días',
+    notes TEXT,
+    status VARCHAR(32) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_conversations (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    phone VARCHAR(64) NOT NULL,
+    contact_name VARCHAR(255),
+    last_message TEXT,
+    unread_count INT DEFAULT 0,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agency_id, phone)
+);
+
+CREATE TABLE IF NOT EXISTS whatsapp_messages (
+    id SERIAL PRIMARY KEY,
+    conversation_id INT REFERENCES whatsapp_conversations(id) ON DELETE CASCADE,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    sender VARCHAR(64) NOT NULL,
+    recipient VARCHAR(64) NOT NULL,
+    message_text TEXT NOT NULL,
+    direction VARCHAR(16) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_docs (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    client_id VARCHAR(64),
+    filename VARCHAR(255) NOT NULL,
+    file_type VARCHAR(64),
+    extracted_text TEXT NOT NULL,
+    char_count INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS appointments (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    client_id VARCHAR(64),
+    contact_name VARCHAR(255) NOT NULL,
+    contact_phone VARCHAR(64) NOT NULL,
+    service_name VARCHAR(255) DEFAULT 'Consulta General',
+    appointment_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    status VARCHAR(32) DEFAULT 'confirmed',
+    reminder_24h_sent BOOLEAN DEFAULT FALSE,
+    reminder_2h_sent BOOLEAN DEFAULT FALSE,
+    google_event_id VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS broadcast_campaigns (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    message_template TEXT NOT NULL,
+    total_recipients INT DEFAULT 0,
+    sent_count INT DEFAULT 0,
+    failed_count INT DEFAULT 0,
+    status VARCHAR(32) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS broadcast_recipients (
+    id SERIAL PRIMARY KEY,
+    campaign_id INT REFERENCES broadcast_campaigns(id) ON DELETE CASCADE,
+    phone VARCHAR(64) NOT NULL,
+    contact_name VARCHAR(255),
+    status VARCHAR(32) DEFAULT 'pending',
+    sent_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE IF NOT EXISTS followup_sequences (
+    id SERIAL PRIMARY KEY,
+    agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    contact_phone VARCHAR(64) NOT NULL,
+    contact_name VARCHAR(255),
+    interest_topic VARCHAR(255) DEFAULT 'Automatización IA',
+    last_contact_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    stage INT DEFAULT 0, -- 0: waiting 2h, 1: 2h sent (waiting 24h), 2: 24h sent (waiting 72h), 3: completed
+    status VARCHAR(32) DEFAULT 'active', -- active, replied, completed, paused
+    last_message_sent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agency_id, contact_phone)
+);
+
+INSERT INTO agencies (id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id)
+VALUES (
+    'agency_master_1',
+    'NEXUS AI Agency',
+    'nexus-ai',
+    '#6366f1',
+    '5491148923310',
+    'Santander / Mercado Pago',
+    'NEXUS AI Agency S.A.',
+    '00000031000123456789',
+    '20-39485921-9'
+) ON CONFLICT (id) DO NOTHING;
+`;
+
+async function ensureDatabaseSchema(connectionString) {
+  const defaultNeon = 'postgresql://neondb_owner:npg_KdzIZv8FU1pw@ep-shy-paper-awsq0tf3-pooler.c-12.us-east-1.aws.neon.tech/neondb?sslmode=require';
+  const connStr = connectionString || process.env.DATABASE_URL || defaultNeon;
+  const client = new Client({
+    connectionString: connStr,
+    ssl: { rejectUnauthorized: false }
+  });
+  try {
+    await client.connect();
+    await client.query(safeEnsureSQL);
+    console.log('✅ Esquema de base de datos verificado y actualizado sin pérdida de datos.');
+  } catch (err) {
+    console.warn('⚠️ Aviso al verificar esquema de base de datos:', err.message);
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 // If run from command line
 if (require.main === module) {
   const defaultNeon = 'postgresql://neondb_owner:npg_KdzIZv8FU1pw@ep-shy-paper-awsq0tf3-pooler.c-12.us-east-1.aws.neon.tech/neondb?sslmode=require';
@@ -227,4 +438,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { initDatabase, schemaSQL };
+module.exports = { initDatabase, ensureDatabaseSchema, schemaSQL };

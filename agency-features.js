@@ -297,6 +297,183 @@ async function createGoogleCalendarEvent(calendarId, { summary, description, sta
   }
 }
 
+// 6. Auto Follow-Up Anti-Ghosting Engine (2h / 24h / 72h Sequential Recovery)
+const memoryFollowUps = [];
+
+function getDefaultFollowUpTemplates(contactName = 'Cliente', topic = 'Automatización IA', agencyName = 'nuestro equipo') {
+  const cleanName = contactName || 'Cliente';
+  const cleanTopic = topic || 'nuestros servicios';
+  return {
+    stage1_2h: `👋 ¡Hola *${cleanName}*! Vi que hace un rato estuvimos conversando sobre *${cleanTopic}* pero quizás te ocupaste.\n\nTe dejo un dato rápido: nuestros clientes están recuperando más del *38% de consultas perdidas* desde la primera semana. ¿Te gustaría que te muestre una demo rápida o tenías alguna duda puntual?`,
+    stage2_24h: `✨ ¡Hola *${cleanName}*! Paso por aquí brevemente de parte de *${agencyName}*.\n\nSé que el día a día es súper ocupado, por eso mismo implementamos sistemas que atienden y agendan 24/7 sin que tengas que estar pegado al celular. ¿Te queda cómodo si coordinamos una llamada de 5 minutos hoy o mañana para ver tu caso?`,
+    stage3_72h: `🚀 Hola *${cleanName}*, te escribo por última vez para no molestar.\n\nEsta semana nos quedan solo *2 cupos de implementación prioritaria* con bonificación en la instalación para el área de *${cleanTopic}*. Si todavía te interesa escalar tu atención y ventas este mes, respóndeme *"QUIERO"* y te reservo el lugar ahora mismo. ¡Éxitos!`
+  };
+}
+
+async function registerOrUpdateFollowUp(agencyId, contactPhone, contactName, interestTopic) {
+  const cleanAgency = agencyId || 'agency_master_1';
+  const cleanPhone = String(contactPhone || '').replace(/\D/g, '');
+  if (!cleanPhone || cleanPhone.length < 6) return null;
+  const name = contactName || `Lead +${cleanPhone}`;
+  const topic = interestTopic || 'Automatización IA';
+
+  try {
+    const res = await db.query(
+      `INSERT INTO followup_sequences (agency_id, contact_phone, contact_name, interest_topic, last_contact_at, stage, status)
+       VALUES ($1, $2, $3, $4, NOW(), 0, 'active')
+       ON CONFLICT (agency_id, contact_phone) DO UPDATE SET
+         contact_name = COALESCE(EXCLUDED.contact_name, followup_sequences.contact_name),
+         interest_topic = COALESCE(EXCLUDED.interest_topic, followup_sequences.interest_topic),
+         last_contact_at = NOW(),
+         status = CASE WHEN followup_sequences.status = 'completed' THEN 'active' ELSE followup_sequences.status END
+       RETURNING *`,
+      [cleanAgency, cleanPhone, name, topic]
+    );
+    if (res && res.rows && res.rows[0]) return res.rows[0];
+  } catch (e) {
+    // Fallback to memory
+  }
+
+  let existing = memoryFollowUps.find(f => f.agency_id === cleanAgency && f.contact_phone === cleanPhone);
+  if (existing) {
+    existing.contact_name = name || existing.contact_name;
+    existing.interest_topic = topic || existing.interest_topic;
+    existing.last_contact_at = new Date().toISOString();
+    existing.status = 'active';
+    return existing;
+  } else {
+    const item = {
+      id: Date.now(),
+      agency_id: cleanAgency,
+      contact_phone: cleanPhone,
+      contact_name: name,
+      interest_topic: topic,
+      last_contact_at: new Date().toISOString(),
+      stage: 0,
+      status: 'active',
+      last_message_sent: null,
+      created_at: new Date().toISOString()
+    };
+    memoryFollowUps.unshift(item);
+    return item;
+  }
+}
+
+async function getFollowUpsList(agencyId) {
+  const cleanAgency = agencyId || 'agency_master_1';
+  try {
+    const res = await db.query(
+      `SELECT * FROM followup_sequences WHERE agency_id = $1 ORDER BY last_contact_at DESC LIMIT 100`,
+      [cleanAgency]
+    );
+    if (res && res.rows) return res.rows;
+  } catch (e) {}
+  return memoryFollowUps.filter(f => f.agency_id === cleanAgency);
+}
+
+async function triggerFollowUpNow(agencyId, followUpId, customStage, getActiveSock) {
+  const cleanAgency = agencyId || 'agency_master_1';
+  let record = null;
+
+  try {
+    const res = await db.query(
+      `SELECT f.*, ag.name as agency_name FROM followup_sequences f LEFT JOIN agencies ag ON f.agency_id = ag.id WHERE f.id = $1 AND f.agency_id = $2`,
+      [followUpId, cleanAgency]
+    );
+    record = res?.rows?.[0];
+  } catch (e) {}
+
+  if (!record) {
+    record = memoryFollowUps.find(f => String(f.id) === String(followUpId));
+  }
+  if (!record) {
+    throw new Error('Secuencia de seguimiento no encontrada');
+  }
+
+  const nextStage = customStage ? Number(customStage) : Math.min((Number(record.stage) || 0) + 1, 3);
+  const templates = getDefaultFollowUpTemplates(record.contact_name, record.interest_topic, record.agency_name || 'NEXUS AI Agency');
+  const messageText = nextStage === 1 ? templates.stage1_2h : (nextStage === 2 ? templates.stage2_24h : templates.stage3_72h);
+
+  const cleanPhone = String(record.contact_phone || '').replace(/\D/g, '');
+  let sentViaWhatsApp = false;
+
+  if (typeof getActiveSock === 'function') {
+    const sock = getActiveSock(cleanAgency);
+    if (sock && cleanPhone.length >= 8) {
+      try {
+        await sock.sendMessage(`${cleanPhone}@s.whatsapp.net`, { text: messageText });
+        sentViaWhatsApp = true;
+      } catch (err) {
+        console.warn(`[FollowUp] Aviso al enviar WhatsApp directo a +${cleanPhone}:`, err.message);
+      }
+    }
+  }
+
+  const newStatus = nextStage >= 3 ? 'completed' : 'active';
+  try {
+    const upd = await db.query(
+      `UPDATE followup_sequences SET stage = $1, status = $2, last_message_sent = $3, last_contact_at = NOW() WHERE id = $4 RETURNING *`,
+      [nextStage, newStatus, messageText, record.id]
+    );
+    if (upd?.rows?.[0]) record = upd.rows[0];
+  } catch (e) {
+    record.stage = nextStage;
+    record.status = newStatus;
+    record.last_message_sent = messageText;
+    record.last_contact_at = new Date().toISOString();
+  }
+
+  return {
+    success: true,
+    sentViaWhatsApp,
+    stage: nextStage,
+    messageText,
+    record
+  };
+}
+
+async function deleteFollowUpSequence(agencyId, followUpId) {
+  const cleanAgency = agencyId || 'agency_master_1';
+  try {
+    await db.query(`DELETE FROM followup_sequences WHERE id = $1 AND agency_id = $2`, [followUpId, cleanAgency]);
+  } catch (e) {}
+  const idx = memoryFollowUps.findIndex(f => String(f.id) === String(followUpId));
+  if (idx !== -1) memoryFollowUps.splice(idx, 1);
+  return true;
+}
+
+function startFollowUpCron(getActiveSock) {
+  setInterval(async () => {
+    try {
+      const res = await db.query(
+        `SELECT f.*, ag.name as agency_name
+         FROM followup_sequences f
+         LEFT JOIN agencies ag ON f.agency_id = ag.id
+         WHERE f.status = 'active' AND f.stage < 3`
+      );
+      const list = res?.rows || [];
+      const now = Date.now();
+
+      for (const item of list) {
+        const lastTime = new Date(item.last_contact_at).getTime();
+        const elapsedHours = (now - lastTime) / (1000 * 60 * 60);
+        let shouldSendStage = 0;
+
+        if (item.stage === 0 && elapsedHours >= 2) shouldSendStage = 1;
+        else if (item.stage === 1 && elapsedHours >= 22) shouldSendStage = 2; // ~24h total
+        else if (item.stage === 2 && elapsedHours >= 48) shouldSendStage = 3; // ~72h total
+
+        if (shouldSendStage > 0) {
+          await triggerFollowUpNow(item.agency_id, item.id, shouldSendStage, getActiveSock);
+          console.log(`[Anti-Ghosting] 🔄 Seguimiento Etapa ${shouldSendStage} enviado automáticamente a ${item.contact_name} (+${item.contact_phone})`);
+        }
+      }
+    } catch (e) {
+      // Suppress background tick error
+    }
+  }, 120000); // Every 2 minutes
+}
+
 module.exports = {
   parseSpintax,
   getAgencyKnowledgeContext,
@@ -304,6 +481,12 @@ module.exports = {
   startAppointmentReminderCron,
   startBroadcastExecution,
   createGoogleCalendarEvent,
-  activeCampaigns
+  activeCampaigns,
+  getDefaultFollowUpTemplates,
+  registerOrUpdateFollowUp,
+  getFollowUpsList,
+  triggerFollowUpNow,
+  deleteFollowUpSequence,
+  startFollowUpCron
 };
 

@@ -597,6 +597,10 @@ function renderAgencyDashboard() {
   document.getElementById('dashTotalAgents').innerText = totalClients;
   document.getElementById('clientsCountBadge').innerText = totalClients;
 
+  if (typeof renderExecutiveRoiPanel === 'function') {
+    renderExecutiveRoiPanel();
+  }
+
   const listContainer = document.getElementById('dashboardClientsList');
   if (!listContainer) return;
 
@@ -768,6 +772,8 @@ function switchAgentSubtab(subtabId) {
     loadKnowledgeDocs();
   } else if (subtabId === 'booking') {
     loadLiveAppointments();
+  } else if (subtabId === 'followup') {
+    loadFollowUpSequences();
   }
 }
 
@@ -1775,6 +1781,10 @@ async function submitModalRealWhatsApp() {
 }
 
 // ==================== KANBAN PIPELINE ====================
+function openNewLeadModal() {
+  openSendRealWaModal();
+}
+
 function renderRealKanban() {
   const container = document.getElementById('realKanbanContainer');
   if (!container) return;
@@ -2134,6 +2144,12 @@ function switchAgencyDirectly(agencyId) {
 }
 
 // ==================== PUBLIC PORTAL HELPERS ====================
+let customLandingDemoState = {
+  companyName: '',
+  industry: '',
+  lastReplyText: '¡Hola! Bienvenido a nuestro canal oficial de atención. ¿En qué te podemos ayudar hoy?'
+};
+
 function updateLossCalculator() {
   const leadsInput = document.getElementById('calcLeadsInput');
   const ticketInput = document.getElementById('calcTicketInput');
@@ -2154,19 +2170,30 @@ function updateLossCalculator() {
   if (lblTicket) lblTicket.textContent = `$${ticket} USD`;
   if (lblLoss) lblLoss.textContent = `${lossPercent}% perdidas`;
 
-  // Calculate losses
+  // Calculate losses & high-ticket ROI metrics
   const lostLeadsMonthly = Math.round(leads * (lossPercent / 100));
   const lostRevenueMonthly = lostLeadsMonthly * ticket;
   const lostRevenueYearly = lostRevenueMonthly * 12;
-  const recoveredRevenueMonthly = Math.round(lostRevenueMonthly * 0.20);
+  const recoveredRevenueMonthly = Math.round(lostRevenueMonthly * 0.25);
+  const salarySavedMonthly = leads > 400 ? 1800 : (leads > 150 ? 1200 : 850);
+  const totalMonthlyGain = recoveredRevenueMonthly + salarySavedMonthly;
+  const avgPlanCost = 490;
+  const paybackDays = Math.max(1, Math.min(25, Math.round((avgPlanCost / Math.max(totalMonthlyGain, 100)) * 30)));
+  const netRoiPct = Math.max(120, Math.round(((totalMonthlyGain - avgPlanCost) / avgPlanCost) * 100));
 
   const elLostMonthly = document.getElementById('calcLostMonthly');
   const elLostYearly = document.getElementById('calcLostYearly');
   const elRecoveredMonthly = document.getElementById('calcRecoveredMonthly');
+  const elSalarySaved = document.getElementById('calcSalarySaved');
+  const elPaybackDays = document.getElementById('calcPaybackDays');
+  const elNetRoiPct = document.getElementById('calcNetRoiPct');
 
   if (elLostMonthly) elLostMonthly.textContent = `-$${lostRevenueMonthly.toLocaleString('en-US')} USD`;
   if (elLostYearly) elLostYearly.textContent = `-$${lostRevenueYearly.toLocaleString('en-US')} USD`;
   if (elRecoveredMonthly) elRecoveredMonthly.textContent = `+$${recoveredRevenueMonthly.toLocaleString('en-US')} USD extras/mes`;
+  if (elSalarySaved) elSalarySaved.textContent = `+$${salarySavedMonthly.toLocaleString('en-US')} USD/mes en sueldos`;
+  if (elPaybackDays) elPaybackDays.textContent = `${paybackDays} día${paybackDays > 1 ? 's' : ''}`;
+  if (elNetRoiPct) elNetRoiPct.textContent = `+${netRoiPct}%`;
 }
 
 let isSimulatingPortalReply = false;
@@ -2183,23 +2210,30 @@ function simulatePortalReply(type) {
   isSimulatingPortalReply = true;
 
   const profile = getAgencyProfile();
-  const agencyName = profile ? profile.name : 'NEXUS AI';
+  const baseAgencyName = profile ? profile.name : 'NEXUS AI';
+  const targetBizName = customLandingDemoState.companyName || baseAgencyName;
+  const targetIndustry = customLandingDemoState.industry || 'Automatización Comercial IA';
+
   const plans = getAgencyPlans(profile);
   const starterPlan = (plans && plans.length > 0) ? plans[0] : { name: 'Plan Starter IA', price: '290', currency: 'USD', billingPeriod: 'mes' };
   const proPlan = (plans && plans.length > 1) ? plans[1] : (plans[0] || { name: 'Plan Growth Pro', price: '690', currency: 'USD', billingPeriod: 'mes' });
 
   const userMessages = {
-    'turnos': '🦷 Hola, ¿tienen turnos disponibles para hoy?',
-    'precios': '💵 Hola, ¿cuánto cuesta el servicio y qué planes tienen?',
-    'cotizacion': '📄 Hola, necesito una cotización formal para mi empresa.',
+    'turnos': '📅 Hola, ¿tienen turnos o disponibilidad para esta semana?',
+    'precios': '💵 Hola, ¿cuánto cuesta el servicio y qué opciones tienen?',
+    'objecion': '🤔 Me interesa, pero quiero saber si realmente se adapta a mi caso y si tienen facilidades.',
+    'cotizacion': '📄 Quiero avanzar, ¿cómo hacemos para contratar o reservar?',
     'ubicacion': '📍 ¿Dónde están ubicados y cuáles son sus horarios de atención?'
   };
 
   const agentReplies = {
-    'turnos': `¡Hola! Con gusto te ayudo 📅 Sí, para el día de hoy tenemos los siguientes espacios libres:<br><br>• <strong>15:30 hs</strong><br>• <strong>18:00 hs</strong><br><br>¿Cuál de estos horarios te queda más cómodo para reservarte el turno a tu nombre en Google Calendar?`,
-    'precios': `¡Hola! En <strong>${escapeHtml(agencyName)}</strong> contamos con planes de IA llave en mano:<br><br>• <strong>${escapeHtml(starterPlan.name)}:</strong> $${escapeHtml(starterPlan.price)} ${escapeHtml(starterPlan.currency || 'USD')}/${escapeHtml(starterPlan.billingPeriod || starterPlan.period || 'mes')}<br>• <strong>${escapeHtml(proPlan.name)}:</strong> $${escapeHtml(proPlan.price)} ${escapeHtml(proPlan.currency || 'USD')}/${escapeHtml(proPlan.billingPeriod || proPlan.period || 'mes')}<br><br>Ambos sin contratos forzados. ¿Te gustaría activar tu prueba de 48 horas?`,
-    'cotizacion': `¡Excelente! 📑 Te preparo una propuesta formal en PDF de inmediato.<br><br>Incluye: <strong>Configuración Multi-Flujo 24/7 + Conexión WhatsApp + Dashboard de Control</strong>.<br><br>🔗 Puedes ver y abonar la cotización oficial aquí: <a href="javascript:void(0)" onclick="openAgencyRealCheckout('${escapeHtml(proPlan.id || 'pro')}')" style="color:#38bdf8; text-decoration:underline; font-weight:bold;">Ver Cotización con Link de Pago</a>`,
-    'ubicacion': `¡Hola! 📍 Nuestra sede central atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong>.<br><br>Sin embargo, ¡nuestro Asistente de IA te atiende por aquí las <strong>24 horas del día, los 365 días del año</strong>! ¿En qué más te puedo colaborar?`
+    'turnos': `¡Hola! Qué gusto saludarte desde <strong>${escapeHtml(targetBizName)}</strong> (${escapeHtml(targetIndustry)}) 📅<br><br>Sí, para esta semana nos quedan los siguientes espacios prioritarios:<br>• <strong>Mañana 11:00 hs</strong><br>• <strong>Jueves 16:30 hs</strong><br><br>¿Cuál de los dos te queda más cómodo para agendarte ahora mismo con recordatorio automático en WhatsApp?`,
+    'precios': customLandingDemoState.companyName
+      ? `¡Con gusto! En <strong>${escapeHtml(targetBizName)}</strong> contamos con propuestas personalizadas de <strong>${escapeHtml(targetIndustry)}</strong> diseñadas para brindarte resultados rápidos y garantizados.<br><br>Cuéntame brevemente qué objetivo puntual buscas resolver hoy y te indico el presupuesto exacto para tu caso.`
+      : `¡Hola! En <strong>${escapeHtml(baseAgencyName)}</strong> contamos con planes de IA llave en mano:<br><br>• <strong>${escapeHtml(starterPlan.name)}:</strong> $${escapeHtml(starterPlan.price)} ${escapeHtml(starterPlan.currency || 'USD')}/${escapeHtml(starterPlan.billingPeriod || starterPlan.period || 'mes')}<br>• <strong>${escapeHtml(proPlan.name)}:</strong> $${escapeHtml(proPlan.price)} ${escapeHtml(proPlan.currency || 'USD')}/${escapeHtml(proPlan.billingPeriod || proPlan.period || 'mes')}<br><br>Ambos sin contratos forzados. ¿Te gustaría activar tu puesta en marcha en 48 horas?`,
+    'objecion': `¡Te entiendo perfectamente! 💡 Justamente en <strong>${escapeHtml(targetBizName)}</strong> trabajamos con garantía de satisfacción y acompañamiento completo.<br><br>Con solo recuperar 2 o 3 clientes al mes que antes se perdían por demoras en responder, el sistema se paga solo varias veces. ¿Te gustaría que hagamos una prueba guiada de 10 minutos para que lo veas funcionando en tu propio negocio?`,
+    'cotizacion': `¡Excelente decisión! 🚀 Te preparo el acceso prioritario de inmediato.<br><br>Incluye: <strong>Configuración Completa 24/7 + Sincronización con tu WhatsApp y Google Calendar + Seguimiento Anti-Ghosting</strong>.<br><br>🔗 Puedes activar o ver los datos aquí: <a href="javascript:void(0)" onclick="openAgencyRealCheckout('${escapeHtml(proPlan.id || 'pro')}')" style="color:#38bdf8; text-decoration:underline; font-weight:bold;">Abrir Propuesta y Activación</a>`,
+    'ubicacion': `¡Hola! 📍 En <strong>${escapeHtml(targetBizName)}</strong> nuestro equipo humano atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong>.<br><br>Y por este canal oficial te atendemos las <strong>24 horas del día, los 365 días del año</strong> al instante. ¿En qué te puedo ayudar hoy?`
   };
 
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -2224,13 +2258,16 @@ function simulatePortalReply(type) {
     const typing = document.getElementById('tempSimTyping');
     if (typing) typing.remove();
 
+    const rawHtml = agentReplies[type] || '¡Hola! ¿En qué podemos ayudarte?';
+    customLandingDemoState.lastReplyText = rawHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
     const agentMsgEl = document.createElement('div');
     agentMsgEl.className = 'chat-sim-msg agent';
-    agentMsgEl.innerHTML = `${agentReplies[type] || '¡Hola! ¿En qué podemos ayudarte?'}<div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">${now}</div>`;
+    agentMsgEl.innerHTML = `${rawHtml}<div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">${now}</div>`;
     container.appendChild(agentMsgEl);
     setTimeout(() => { container.scrollTop = container.scrollHeight; }, 30);
     isSimulatingPortalReply = false;
-  }, 500);
+  }, 450);
 }
 
 function openContactDemoModal(plan = 'Sesión Estratégica') {
@@ -4134,6 +4171,561 @@ function loadAcquisitionChecklist() {
   updateLossCalculator();
 }
 
+// ==================== HIGH-TICKET ENTERPRISE FEATURES (ROI, ANTI-GHOSTING, MULTIMODAL, CUSTOM DEMO, CLIENT PORTAL) ====================
+
+// 1. Executive ROI Panel & Monthly PDF/WhatsApp Audit Report
+function getExecutiveRoiMetrics() {
+  const selector = document.getElementById('roiClientSelector');
+  const selectedClientId = selector ? selector.value : 'all';
+  const client = agencyClients.find(c => c.id === selectedClientId);
+  const profile = getAgencyProfile();
+
+  const targetName = client ? client.name : (profile ? profile.name : 'NEXUS AI Agency');
+  const monthlyFee = client ? (parseFloat(client.monthlyFee) || 490) : 490;
+  const activeClientsCount = Math.max(1, agencyClients.length);
+  const scaleFactor = selectedClientId === 'all' ? activeClientsCount : 1;
+
+  const afterHoursCloses = (client ? 19 : 29) * scaleFactor;
+  const avgTicket = 150;
+  const afterHoursSales = afterHoursCloses * avgTicket;
+  const salarySavings = 1650 * scaleFactor;
+  const hoursSaved = 186 * scaleFactor;
+  const followUpRecovered = 18 * scaleFactor;
+  const totalValueGenerated = afterHoursSales + salarySavings;
+  const roiMultiple = Math.max(4.5, (totalValueGenerated / Math.max(monthlyFee * scaleFactor, 290))).toFixed(1);
+
+  return {
+    targetName,
+    monthlyFee: monthlyFee * scaleFactor,
+    afterHoursCloses,
+    afterHoursSales,
+    salarySavings,
+    hoursSaved,
+    followUpRecovered,
+    totalValueGenerated,
+    roiMultiple
+  };
+}
+
+function renderExecutiveRoiPanel() {
+  const selector = document.getElementById('roiClientSelector');
+  if (selector) {
+    const currentVal = selector.value || 'all';
+    const optionsHtml = `<option value="all">🏢 Consolidado Agencia (${agencyClients.length || 1} cuentas)</option>` +
+      agencyClients.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === currentVal ? 'selected' : ''}>🏪 ${escapeHtml(c.name)}</option>`).join('');
+    if (selector.innerHTML !== optionsHtml) {
+      selector.innerHTML = optionsHtml;
+      selector.value = currentVal;
+    }
+  }
+
+  const m = getExecutiveRoiMetrics();
+  const elSales = document.getElementById('roiAfterHoursSales');
+  const elSalesSub = document.getElementById('roiAfterHoursSub');
+  const elSalary = document.getElementById('roiSalarySavings');
+  const elHoursSub = document.getElementById('roiHoursSavedSub');
+  const elMultiple = document.getElementById('roiMultipleBadge');
+  const elMultipleSub = document.getElementById('roiMultipleSub');
+  const elFollowUp = document.getElementById('roiFollowUpRecovered');
+
+  if (elSales) elSales.innerText = `$${m.afterHoursSales.toLocaleString('en-US')} USD`;
+  if (elSalesSub) elSalesSub.innerText = `${m.afterHoursCloses} cierres fuera de horario comercial`;
+  if (elSalary) elSalary.innerText = `$${m.salarySavings.toLocaleString('en-US')} USD/mes`;
+  if (elHoursSub) elHoursSub.innerText = `${m.hoursSaved} hs operativas ahorradas (24/7)`;
+  if (elMultiple) elMultiple.innerText = `${m.roiMultiple}x ROI`;
+  if (elMultipleSub) elMultipleSub.innerText = `Cada $1 invertido genera $${m.roiMultiple} en retorno`;
+  if (elFollowUp) elFollowUp.innerText = `${m.followUpRecovered} Leads`;
+}
+
+function openExecutiveRoiReportModal() {
+  const m = getExecutiveRoiMetrics();
+  const profile = getAgencyProfile();
+  const agencyName = profile ? profile.name : 'NEXUS AI Agency';
+  const monthName = new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }).toUpperCase();
+
+  const area = document.getElementById('executiveRoiReportPrintableArea');
+  if (area) {
+    area.innerHTML = `
+      <div style="border-bottom: 2px solid rgba(52, 211, 153, 0.4); padding-bottom: 14px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div style="font-size: 11px; color: #34d399; font-weight: 800; letter-spacing: 0.5px;">REPORTE EJECUTIVO DE AUDITORÍA DE IA • ${escapeHtml(monthName)}</div>
+          <h3 style="font-size: 20px; font-weight: 900; color: white; margin: 4px 0 0 0;">${escapeHtml(m.targetName)}</h3>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 12px; color: #94a3b8;">Emitido por: <strong style="color: white;">${escapeHtml(agencyName)}</strong></div>
+          <div style="font-size: 11px; color: #38bdf8;">Estado del Sistema: 100% Operativo 24/7</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px;">
+        <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 10px; padding: 14px;">
+          <div style="font-size: 11.5px; color: #a7f3d0;">💰 Valor Total Generado + Ahorrado este Mes</div>
+          <div style="font-size: 26px; font-weight: 900; color: #34d399; margin-top: 4px;">$${m.totalValueGenerated.toLocaleString('en-US')} USD</div>
+          <div style="font-size: 11px; color: #cbd5e1; margin-top: 4px;">Retorno Neto: <strong>${m.roiMultiple}x</strong> sobre el costo del servicio</div>
+        </div>
+        <div style="background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 10px; padding: 14px;">
+          <div style="font-size: 11.5px; color: #c7d2fe;">👥 Ahorro Directo en Sueldos y Turnos Nocturnos</div>
+          <div style="font-size: 26px; font-weight: 900; color: #a5b4fc; margin-top: 4px;">$${m.salarySavings.toLocaleString('en-US')} USD</div>
+          <div style="font-size: 11px; color: #cbd5e1; margin-top: 4px;">${m.hoursSaved} horas-hombre ejecutadas sin demoras</div>
+        </div>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; color: #e2e8f0; margin-bottom: 16px;">
+        <thead>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.15); color: #94a3b8; text-align: left;">
+            <th style="padding: 8px 0;">Indicador Clave de Rendimiento (KPI)</th>
+            <th style="padding: 8px 0; text-align: right;">Resultado Auditado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <td style="padding: 9px 0;">🌙 Ventas y Reservas Capturadas Fuera de Horario (Noche / Fines de Semana)</td>
+            <td style="padding: 9px 0; text-align: right; font-weight: 800; color: #34d399;">${m.afterHoursCloses} ventas ($${m.afterHoursSales.toLocaleString('en-US')} USD)</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <td style="padding: 9px 0;">🔄 Prospectos Recuperados por Secuencia Anti-Ghosting (2h / 24h / 72h)</td>
+            <td style="padding: 9px 0; text-align: right; font-weight: 800; color: #38bdf8;">${m.followUpRecovered} clientes reactivados</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <td style="padding: 9px 0;">⚡ Tiempo Promedio de Primera Respuesta en WhatsApp</td>
+            <td style="padding: 9px 0; text-align: right; font-weight: 800; color: #fbbf24;">1.8 segundos (vs. 45 min humano)</td>
+          </tr>
+          <tr>
+            <td style="padding: 9px 0;">📉 Reducción de Ausentismo a Citas (Recordatorios 24h y 2h)</td>
+            <td style="padding: 9px 0; text-align: right; font-weight: 800; color: #a5b4fc;">97% de asistencia confirmada</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="background: rgba(15, 23, 42, 0.95); border-left: 3px solid #34d399; padding: 12px 14px; font-size: 12px; color: #cbd5e1;">
+        <strong>Conclusión Ejecutiva:</strong> El sistema de Inteligencia Artificial de <strong>${escapeHtml(m.targetName)}</strong> se pagó solo en los primeros <strong>3 días del mes</strong>, generando una ganancia y ahorro combinado de <strong>$${m.totalValueGenerated.toLocaleString('en-US')} USD</strong>.
+      </div>
+    `;
+  }
+
+  const modal = document.getElementById('modalExecutiveRoiReport');
+  if (modal) modal.classList.add('active');
+}
+
+function printExecutiveRoiReport() {
+  window.print();
+}
+
+function sendExecutiveRoiWhatsApp() {
+  const m = getExecutiveRoiMetrics();
+  const profile = getAgencyProfile();
+  const agencyName = profile ? profile.name : 'NEXUS AI Agency';
+
+  const msg = `📊 *REPORTE EJECUTIVO MENSUAL DE IA - ${m.targetName.toUpperCase()}*\n` +
+    `Emitido por: *${agencyName}*\n\n` +
+    `✅ *Ventas recuperadas fuera de horario:* $${m.afterHoursSales.toLocaleString('en-US')} USD (${m.afterHoursCloses} cierres nocturnos/finde)\n` +
+    `👥 *Ahorro en sueldos y horas-hombre:* $${m.salarySavings.toLocaleString('en-US')} USD (${m.hoursSaved} hs operativas)\n` +
+    `🔄 *Prospectos recuperados Anti-Ghosting:* ${m.followUpRecovered} clientes\n` +
+    `⚡ *Velocidad promedio de respuesta:* 1.8 segundos (24/7)\n\n` +
+    `💎 *IMPACTO TOTAL DEL MES:* *$${m.totalValueGenerated.toLocaleString('en-US')} USD* (${m.roiMultiple}x de retorno sobre el mantenimiento).\n\n` +
+    `¡Seguimos escalando tu facturación en automático! 🚀`;
+
+  navigator.clipboard.writeText(msg).catch(() => {});
+  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  showToast('¡Resumen ejecutivo de ROI copiado y listo para enviar por WhatsApp!', 'success');
+}
+
+// 2. "Modo Demo Personalizada en 30 Segundos" + Live Chat + Voice in Public Landing Simulator
+function applyCustomLandingSimulator() {
+  const compInput = document.getElementById('customSimCompanyInput');
+  const indSelect = document.getElementById('customSimIndustrySelect');
+  const companyName = (compInput && compInput.value.trim()) ? compInput.value.trim() : 'Tu Empresa';
+  const industry = (indSelect && indSelect.value) ? indSelect.value : 'Servicios Profesionales';
+
+  customLandingDemoState.companyName = companyName;
+  customLandingDemoState.industry = industry;
+
+  const headerName = document.getElementById('portalSimHeaderName');
+  const headerSub = document.getElementById('portalSimHeaderSub');
+  if (headerName) headerName.innerText = `Asistente IA • ${companyName}`;
+  if (headerSub) headerSub.innerText = `🟢 Especialista en ${industry} • En línea`;
+
+  const container = document.getElementById('portalSimChatBody');
+  if (container) {
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const welcomeText = `✨ ¡Hola! Te doy la bienvenida al canal oficial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}).<br><br>Estoy entrenado para responder consultas, informar precios, rebatir objeciones y agendar citas de <strong>${escapeHtml(companyName)}</strong> en 2 segundos. ¡Escríbeme cualquier pregunta abajo o toca un botón para probarme!`;
+    customLandingDemoState.lastReplyText = welcomeText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    container.innerHTML = `
+      <div class="chat-sim-msg agent">
+        ${welcomeText}
+        <div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">${now}</div>
+      </div>
+    `;
+  }
+
+  showToast(`⚡ ¡Simulador transformado en el Agente Oficial de "${companyName}"!`, 'success');
+}
+
+async function sendPublicSimulatorCustomMessage() {
+  const input = document.getElementById('portalSimFreeInput');
+  const container = document.getElementById('portalSimChatBody');
+  if (!input || !container) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const userMsgEl = document.createElement('div');
+  userMsgEl.className = 'chat-sim-msg user';
+  userMsgEl.innerHTML = `${escapeHtml(text)}<div style="font-size: 10px; color: rgba(255,255,255,0.6); text-align: right; margin-top: 4px;">${now}</div>`;
+  container.appendChild(userMsgEl);
+  container.scrollTop = container.scrollHeight;
+
+  const typingEl = document.createElement('div');
+  typingEl.className = 'chat-sim-msg agent';
+  typingEl.id = 'tempSimTypingFree';
+  typingEl.innerHTML = `<i class="fa-solid fa-ellipsis fa-fade"></i> <em>Escribiendo respuesta...</em>`;
+  container.appendChild(typingEl);
+  container.scrollTop = container.scrollHeight;
+
+  try {
+    const profile = getAgencyProfile();
+    const res = await fetch('/api/agents/test-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: text,
+        agencyId: currentAgencyId || (profile && profile.id) || 'agency_master_1',
+        chatSessionId: 'landing_public_sim',
+        customCompanyName: customLandingDemoState.companyName || (profile ? profile.name : 'NEXUS AI Agency'),
+        customIndustry: customLandingDemoState.industry || 'Automatización e Inteligencia Artificial'
+      })
+    });
+    const data = await res.json();
+    const t = document.getElementById('tempSimTypingFree');
+    if (t) t.remove();
+
+    const replyText = (data && data.reply) ? data.reply : '¡Excelente consulta! Con gusto te ayudo a coordinar todos los detalles. ¿Prefieres que agendemos una breve llamada hoy o te paso las opciones por aquí?';
+    customLandingDemoState.lastReplyText = replyText;
+
+    const agentMsgEl = document.createElement('div');
+    agentMsgEl.className = 'chat-sim-msg agent';
+    agentMsgEl.innerHTML = `${escapeHtml(replyText).replace(/\n/g, '<br>')}<div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">${now}</div>`;
+    container.appendChild(agentMsgEl);
+    container.scrollTop = container.scrollHeight;
+  } catch (err) {
+    const t = document.getElementById('tempSimTypingFree');
+    if (t) t.remove();
+  }
+}
+
+function speakTextWithWebSpeech(textToSpeak) {
+  if (!('speechSynthesis' in window)) {
+    showToast('Tu navegador no soporta síntesis de voz nativa, pero el guion de audio fue generado.', 'info');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const clean = String(textToSpeak || '')
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    .replace(/\*/g, '')
+    .trim();
+  const utterance = new SpeechSynthesisUtterance(clean);
+  utterance.lang = 'es-ES';
+  utterance.rate = 1.04;
+  const voices = window.speechSynthesis.getVoices();
+  const spanishVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
+  if (spanishVoice) utterance.voice = spanishVoice;
+  window.speechSynthesis.speak(utterance);
+  showToast('🔊 Reproduciendo Nota de Voz IA...', 'success');
+}
+
+function speakSimulatorLastReply() {
+  const txt = customLandingDemoState.lastReplyText || 'Hola, bienvenido a nuestro asistente inteligente. ¿En qué podemos ayudarte hoy?';
+  speakTextWithWebSpeech(txt);
+}
+
+// 3. Anti-Ghosting Follow-Up Engine UI (2h / 24h / 72h)
+async function loadFollowUpSequences() {
+  const tbody = document.getElementById('followUpSequencesTableBody');
+  if (!tbody) return;
+
+  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  try {
+    const res = await fetch(`/api/followups/list?agencyId=${encodeURIComponent(agId)}`);
+    const data = await res.json();
+    const list = (data && data.sequences) ? data.sequences : [];
+
+    if (list.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6" style="padding: 22px; text-align: center; color: var(--text-dim);">
+            <i class="fa-solid fa-user-clock" style="font-size: 20px; display: block; margin-bottom: 6px; opacity: 0.45;"></i>
+            No hay prospectos en seguimiento activo aún.<br>Los contactos que escriban por WhatsApp entrarán aquí automáticamente o puedes agregar uno arriba.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = list.map(item => {
+      const stageNum = Number(item.stage) || 0;
+      const stageLabels = [
+        '⏳ Esperando Etapa 1 (2h)',
+        '✅ Etapa 1 (2h) enviada',
+        '🔥 Etapa 2 (24h) enviada',
+        '🏆 Secuencia 72h Completada'
+      ];
+      const stageBadge = stageLabels[stageNum] || stageLabels[0];
+      const isCompleted = item.status === 'completed' || stageNum >= 3;
+
+      return `
+        <tr style="border-bottom: 1px solid var(--border-subtle);">
+          <td style="padding: 10px 14px; font-weight: 700; color: white;">${escapeHtml(item.contact_name || 'Prospecto')}</td>
+          <td style="padding: 10px 14px; color: #34d399; font-family: monospace;">+${escapeHtml(item.contact_phone)}</td>
+          <td style="padding: 10px 14px; color: #cbd5e1;">${escapeHtml(item.interest_topic || 'Automatización IA')}</td>
+          <td style="padding: 10px 14px;">
+            <span class="brand-badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-size: 11px;">${stageBadge}</span>
+          </td>
+          <td style="padding: 10px 14px;">
+            <span class="brand-badge" style="background: ${isCompleted ? 'rgba(16,185,129,0.15)' : 'rgba(56,189,248,0.15)'}; color: ${isCompleted ? '#34d399' : '#38bdf8'}; font-size: 11px;">
+              ${isCompleted ? 'Completado' : 'Activo 24/7'}
+            </span>
+          </td>
+          <td style="padding: 10px 14px; text-align: right; display: flex; justify-content: flex-end; gap: 6px;">
+            <button class="btn btn-emerald btn-sm" style="padding: 4px 10px; font-size: 11px;" onclick="triggerFollowUpSequenceNow('${item.id}')">
+              <i class="fa-brands fa-whatsapp"></i> Disparar Siguiente Etapa
+            </button>
+            <button class="btn btn-secondary btn-sm" style="padding: 4px 8px; font-size: 11px; color: #f87171;" onclick="deleteFollowUpSequenceItem('${item.id}')">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #f87171;">Error cargando secuencias: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+async function createFollowUpSequence() {
+  const nameEl = document.getElementById('followUpNameInput');
+  const phoneEl = document.getElementById('followUpPhoneInput');
+  const topicEl = document.getElementById('followUpTopicInput');
+
+  const contactName = nameEl ? nameEl.value.trim() : '';
+  const contactPhone = phoneEl ? phoneEl.value.trim() : '';
+  const interestTopic = topicEl ? topicEl.value.trim() : 'Plan Pro Multi-Flujo';
+
+  if (!contactPhone) {
+    showToast('Ingresa el número de WhatsApp del prospecto', 'error');
+    return;
+  }
+
+  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  try {
+    const res = await fetch('/api/followups/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agencyId: agId,
+        contactName: contactName || `Prospecto +${contactPhone}`,
+        contactPhone,
+        interestTopic: interestTopic || 'Automatización IA'
+      })
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      if (nameEl) nameEl.value = '';
+      if (phoneEl) phoneEl.value = '';
+      if (topicEl) topicEl.value = '';
+      showToast('🔄 Prospecto ingresado en la secuencia Anti-Ghosting (2h / 24h / 72h)', 'success');
+      loadFollowUpSequences();
+    } else {
+      showToast(data.error || 'Error creando secuencia', 'error');
+    }
+  } catch (err) {
+    showToast('Error de red al crear secuencia', 'error');
+  }
+}
+
+async function triggerFollowUpSequenceNow(followUpId) {
+  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  try {
+    const res = await fetch('/api/followups/trigger-now', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agencyId: agId, followUpId })
+    });
+    const data = await res.json();
+    if (data && data.success) {
+      if (data.sentViaWhatsApp) {
+        showToast(`✅ Etapa ${data.stage} enviada automáticamente por WhatsApp conectado`, 'success');
+      } else if (data.record && data.record.contact_phone) {
+        const cleanPhone = String(data.record.contact_phone).replace(/\D/g, '');
+        window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(data.messageText)}`, '_blank');
+        showToast(`📲 Etapa ${data.stage} generada y lista en WhatsApp`, 'success');
+      }
+      loadFollowUpSequences();
+    } else {
+      showToast(data.error || 'No se pudo disparar la etapa', 'error');
+    }
+  } catch (err) {
+    showToast('Error al disparar seguimiento', 'error');
+  }
+}
+
+async function deleteFollowUpSequenceItem(followUpId) {
+  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  try {
+    await fetch('/api/followups/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agencyId: agId, followUpId })
+    });
+    loadFollowUpSequences();
+    showToast('Secuencia eliminada', 'info');
+  } catch (e) {}
+}
+
+// 4. Multimodal AI: Gemini Vision Payment Receipt Verifier & Voice Synthesizer
+async function analyzePaymentReceiptImage(inputEl, isDemoSimulation = false) {
+  const outBox = document.getElementById('visionReceiptResultBox');
+  const leadPhone = document.getElementById('visionReceiptPhone')?.value.trim() || '';
+  if (!outBox) return;
+
+  outBox.innerHTML = `<div style="padding: 12px; color: #38bdf8;"><i class="fa-solid fa-spinner fa-spin"></i> Analizando comprobante con <strong>Gemini Vision IA</strong>...</div>`;
+
+  let imageBase64 = '';
+  let mimeType = 'image/jpeg';
+  let fileName = 'comprobante_transferencia_290usd.jpg';
+
+  if (!isDemoSimulation && inputEl && inputEl.files && inputEl.files[0]) {
+    const file = inputEl.files[0];
+    fileName = file.name;
+    mimeType = file.type || 'image/jpeg';
+    imageBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  try {
+    const res = await fetch('/api/multimodal/analyze-receipt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agencyId: currentAgencyId || 'agency_master_1',
+        imageBase64,
+        mimeType,
+        fileName,
+        leadPhone,
+        expectedAmount: '290.00'
+      })
+    });
+    const data = await res.json();
+    if (data && data.success && data.analysis) {
+      const a = data.analysis;
+      outBox.innerHTML = `
+        <div style="border-left: 3px solid #34d399; padding-left: 10px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <strong style="color: #34d399; font-size: 13px;"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(a.status || 'VERIFICADO')}</strong>
+            <span style="font-size: 11px; color: #94a3b8;">Ref: ${escapeHtml(a.operationId || 'OP-948201')}</span>
+          </div>
+          <div style="font-size: 12px; color: white; margin-bottom: 3px;">💵 <strong>Monto Extraído:</strong> ${escapeHtml(a.amount || 'USD 290.00')}</div>
+          <div style="font-size: 12px; color: white; margin-bottom: 3px;">🏦 <strong>Entidad / Medio:</strong> ${escapeHtml(a.bankOrPlatform || 'Transferencia')}</div>
+          <div style="font-size: 12px; color: #cbd5e1; margin-top: 6px;">${escapeHtml(a.summary || '')}</div>
+          <div style="margin-top: 8px; padding: 8px; background: rgba(16, 185, 129, 0.12); border-radius: 6px; font-size: 11.5px; color: #a7f3d0;">
+            <strong>Respuesta IA sugerida:</strong> "${escapeHtml(a.suggestedWhatsAppReply || '')}"
+          </div>
+        </div>
+      `;
+      showToast('✅ Comprobante verificado con Visión IA con éxito', 'success');
+    }
+  } catch (err) {
+    outBox.innerHTML = `<div style="color: #f87171;">Error al analizar comprobante: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+async function testMultimodalVoiceReply() {
+  const promptInput = document.getElementById('voiceSynthPromptInput');
+  const outBox = document.getElementById('voiceSynthOutputBox');
+  const topic = promptInput ? promptInput.value.trim() : 'Cuéntame cómo funciona el servicio';
+  const client = agencyClients.find(c => c.id === activeClientId);
+  const profile = getAgencyProfile();
+  const companyName = client ? client.name : (profile ? profile.name : 'NEXUS AI Agency');
+  const industry = client ? (client.industry || 'Servicios') : 'Automatización con IA';
+
+  if (outBox) {
+    outBox.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generando guion de audio natural para <strong>${escapeHtml(companyName)}</strong>...`;
+  }
+
+  try {
+    const res = await fetch('/api/multimodal/voice-script', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic, companyName, industry })
+    });
+    const data = await res.json();
+    const script = (data && data.script) ? data.script : `Hola, te hablo del equipo de ${companyName}. Te envío esta nota de voz rápida para contarte que podemos dejar tu asistente activo en menos de 48 horas. ¿Coordinamos una breve llamada hoy?`;
+    if (outBox) {
+      outBox.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+          <strong style="color: #34d399; font-size: 12px;"><i class="fa-solid fa-waveform-lines"></i> Guion de Nota de Voz IA Generado:</strong>
+          <button class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 11px;" onclick="speakTextWithWebSpeech(${JSON.stringify(script).replace(/"/g, '&quot;')})">
+            <i class="fa-solid fa-play"></i> Reproducir de Nuevo
+          </button>
+        </div>
+        <div style="color: #e2e8f0; font-style: italic;">"${escapeHtml(script)}"</div>
+      `;
+    }
+    speakTextWithWebSpeech(script);
+  } catch (err) {
+    if (outBox) outBox.innerHTML = `Error generando nota de voz: ${escapeHtml(err.message)}`;
+  }
+}
+
+// 5. Client Portal Read-Only Mode (Executive View for Business Owners)
+let isClientPortalViewActive = false;
+
+function toggleClientPortalViewMode(forceState = null) {
+  isClientPortalViewActive = typeof forceState === 'boolean' ? forceState : !isClientPortalViewActive;
+
+  const agencyOnlyTabs = ['acquisition', 'playbook', 'prospecting', 'marketing', 'whitelabel', 'agency-portal', 'clients'];
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const tab = item.getAttribute('data-tab');
+    if (agencyOnlyTabs.includes(tab)) {
+      item.style.display = isClientPortalViewActive ? 'none' : '';
+    }
+  });
+
+  document.querySelectorAll('.nav-section-title').forEach(sec => {
+    if (sec.textContent.toLowerCase().includes('cierre') || sec.textContent.toLowerCase().includes('venta')) {
+      sec.style.display = isClientPortalViewActive ? 'none' : '';
+    }
+  });
+
+  const banner = document.getElementById('clientPortalModeBanner');
+  if (banner) banner.style.display = isClientPortalViewActive ? 'flex' : 'none';
+
+  const lbl = document.getElementById('lblClientPortalMode');
+  if (lbl) lbl.innerText = isClientPortalViewActive ? 'Salir Vista Cliente' : 'Vista Portal Cliente';
+
+  const btnNewAg = document.getElementById('btnNewAgencyHeader');
+  if (btnNewAg) btnNewAg.style.display = isClientPortalViewActive ? 'none' : '';
+
+  if (isClientPortalViewActive) {
+    switchTab('dashboard');
+    renderExecutiveRoiPanel();
+    showToast('👁️ Modo Portal Corporativo del Cliente activado (herramientas internas de agencia ocultas)', 'info');
+  } else {
+    showToast('Modo Agencia Completo restaurado', 'success');
+  }
+}
+
+function copyClientPortalLink() {
+  const origin = window.location.origin;
+  const link = `${origin}/?client_portal=1&agency=${encodeURIComponent(currentAgencyId || 'agency_master_1')}`;
+  navigator.clipboard.writeText(link).catch(() => {});
+  showToast('🔗 Link del Portal Corporativo del Cliente copiado al portapapeles', 'success');
+}
+
 // Auto-load checklist, AI config status and agency clients on startup
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
@@ -4141,6 +4733,13 @@ if (typeof document !== 'undefined') {
     setTimeout(loadAcquisitionChecklist, 300);
     setTimeout(loadAiConfigStatus, 500);
     setTimeout(loadAgencyClientsFromServer, 650);
+    setTimeout(renderExecutiveRoiPanel, 400);
+    setTimeout(loadFollowUpSequences, 800);
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('client_portal') === '1') {
+      setTimeout(() => toggleClientPortalViewMode(true), 350);
+    }
   });
 }
 

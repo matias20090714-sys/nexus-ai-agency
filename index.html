@@ -214,7 +214,10 @@
             </button>
           </div>
 
-          <button class="btn btn-primary btn-sm desktop-only" onclick="openNewAgencyWorkspaceModal()">
+          <button class="btn btn-secondary btn-sm" id="btnToggleClientPortalMode" onclick="toggleClientPortalViewMode()" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;" title="Ver cómo ve tu cliente su panel exclusivo de resultados">
+            <i class="fa-solid fa-eye"></i> <span id="lblClientPortalMode">Vista Portal Cliente</span>
+          </button>
+          <button class="btn btn-primary btn-sm desktop-only" id="btnNewAgencyHeader" onclick="openNewAgencyWorkspaceModal()">
             <i class="fa-solid fa-plus"></i> Nueva Agencia
           </button>
           <button class="btn btn-emerald btn-sm desktop-only" onclick="openSendRealWaModal()">
@@ -222,6 +225,22 @@
           </button>
         </div>
       </header>
+
+      <!-- Client Portal Read-Only Mode Banner (Visible when Client Portal Mode is active) -->
+      <div id="clientPortalModeBanner" style="display: none; background: linear-gradient(90deg, rgba(14, 165, 233, 0.2), rgba(16, 185, 129, 0.2)); border-bottom: 1px solid rgba(56, 189, 248, 0.35); padding: 10px 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #e0f2fe;">
+          <span class="brand-badge" style="background: rgba(16, 185, 129, 0.25); color: #34d399; font-weight: 800;"><i class="fa-solid fa-shield-check"></i> PORTAL CORPORATIVO DEL CLIENTE</span>
+          <span>Vista ejecutiva de resultados, ROI, citas y conversaciones en tiempo real para el dueño del negocio.</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn btn-secondary btn-sm" onclick="copyClientPortalLink()" style="font-size: 11.5px; padding: 5px 12px;">
+            <i class="fa-solid fa-link"></i> Copiar Link para el Cliente
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="toggleClientPortalViewMode()" style="font-size: 11.5px; padding: 5px 12px;">
+            <i class="fa-solid fa-arrow-rotate-left"></i> Volver a Modo Agencia Completo
+          </button>
+        </div>
+      </div>
 
       <!-- CONTENT BODY -->
       <div class="content-body">
@@ -271,6 +290,76 @@
                 <div class="stat-value" id="dashTotalAgents">0</div>
                 <div class="stat-label">Agentes de IA Desplegados</div>
                 <div class="stat-growth" style="color: #34d399;">Atendiendo 24/7 sin parar</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- HIGH-TICKET FEATURE 1: PANEL DE ROI EJECUTIVO, AHORRO EN SUELDOS & REPORTE MENSUAL -->
+          <div class="glass-panel" style="margin-bottom: 28px; border: 1px solid rgba(16, 185, 129, 0.35); background: linear-gradient(135deg, rgba(10, 15, 32, 0.92) 0%, rgba(6, 78, 59, 0.18) 100%);">
+            <div class="panel-header" style="flex-wrap: wrap; gap: 14px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <span class="brand-badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 11px; font-weight: 800;">
+                    💎 RETENCIÓN HIGH-TICKET & AUDITORÍA DE VALOR
+                  </span>
+                  <span style="font-size: 11.5px; color: #94a3b8;">Justificación financiera automática de tu abono mensual</span>
+                </div>
+                <h3 style="font-size: 18px; font-weight: 800; color: white; margin: 6px 0 0 0;">
+                  Panel de Retorno de Inversión (ROI) & Ahorro en Sueldos Generado por IA
+                </h3>
+              </div>
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <select id="roiClientSelector" class="form-control" style="width: auto; min-width: 210px; font-size: 12.5px; padding: 7px 12px;" onchange="renderExecutiveRoiPanel()">
+                  <option value="all">🏢 Consolidado Agencia / Cliente Activo</option>
+                </select>
+                <button class="btn btn-secondary btn-sm" onclick="openExecutiveRoiReportModal()">
+                  <i class="fa-solid fa-file-pdf" style="color: #f43f5e;"></i> Reporte Ejecutivo Mensual (PDF)
+                </button>
+                <button class="btn btn-emerald btn-sm" onclick="sendExecutiveRoiWhatsApp()">
+                  <i class="fa-brands fa-whatsapp"></i> Enviar Resumen ROI al Dueño
+                </button>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-top: 18px;">
+              <!-- Metric 1: Ventas Recuperadas Fuera de Horario -->
+              <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(52, 211, 153, 0.25); border-radius: var(--radius-md); padding: 16px;">
+                <div style="font-size: 11.5px; color: #94a3b8; font-weight: 600; display: flex; justify-content: space-between;">
+                  <span>🌙 Ventas Recuperadas (Noche/Finde)</span>
+                  <i class="fa-solid fa-sack-dollar" style="color: #34d399;"></i>
+                </div>
+                <div style="font-size: 24px; font-weight: 900; color: #34d399; margin: 8px 0 4px 0;" id="roiAfterHoursSales">$4,350 USD</div>
+                <div style="font-size: 11px; color: #a7f3d0;" id="roiAfterHoursSub">29 cierres fuera de horario comercial</div>
+              </div>
+
+              <!-- Metric 2: Ahorro en Sueldos y Cargas Sociales -->
+              <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-md); padding: 16px;">
+                <div style="font-size: 11.5px; color: #94a3b8; font-weight: 600; display: flex; justify-content: space-between;">
+                  <span>👥 Ahorro en Sueldos & Horas-Hombre</span>
+                  <i class="fa-solid fa-user-clock" style="color: #818cf8;"></i>
+                </div>
+                <div style="font-size: 24px; font-weight: 900; color: #a5b4fc; margin: 8px 0 4px 0;" id="roiSalarySavings">$1,650 USD/mes</div>
+                <div style="font-size: 11px; color: #c7d2fe;" id="roiHoursSavedSub">186 hs operativas ahorradas (≈ 1.5 empleados)</div>
+              </div>
+
+              <!-- Metric 3: Múltiplo de Retorno Neto (ROI) -->
+              <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-md); padding: 16px;">
+                <div style="font-size: 11.5px; color: #94a3b8; font-weight: 600; display: flex; justify-content: space-between;">
+                  <span>🚀 Retorno sobre el Mantenimiento</span>
+                  <i class="fa-solid fa-chart-line" style="color: #fbbf24;"></i>
+                </div>
+                <div style="font-size: 24px; font-weight: 900; color: #fbbf24; margin: 8px 0 4px 0;" id="roiMultipleBadge">12.4x ROI</div>
+                <div style="font-size: 11px; color: #fde68a;" id="roiMultipleSub">Cada $1 invertido genera $12.40 en valor</div>
+              </div>
+
+              <!-- Metric 4: Velocidad & Anti-Ghosting -->
+              <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 16px;">
+                <div style="font-size: 11.5px; color: #94a3b8; font-weight: 600; display: flex; justify-content: space-between;">
+                  <span>⚡ Velocidad & Recupero Anti-Ghosting</span>
+                  <i class="fa-solid fa-bolt" style="color: #38bdf8;"></i>
+                </div>
+                <div style="font-size: 24px; font-weight: 900; color: #38bdf8; margin: 8px 0 4px 0;" id="roiFollowUpRecovered">18 Leads</div>
+                <div style="font-size: 11px; color: #bae6fd;">Reactivados por secuencia 2h / 24h / 72h</div>
               </div>
             </div>
           </div>
@@ -457,7 +546,11 @@
                       ✨ Solución con nuestro Asistente de IA:
                     </div>
                     <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">
-                      Recuperando solo un 20% de esas ventas perdidas, generas <strong id="calcRecoveredMonthly" style="color: #34d399;">+$1,680 USD extras/mes</strong>. ¡El servicio de IA se paga solo desde la primera semana!
+                      Recuperando solo un 25% de esas ventas perdidas generas <strong id="calcRecoveredMonthly" style="color: #34d399;">+$2,100 USD extras/mes</strong>, más un ahorro directo de <strong id="calcSalarySaved" style="color: #a5b4fc;">+$1,200 USD/mes en sueldos</strong>.
+                    </div>
+                    <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(52, 211, 153, 0.2); display: flex; justify-content: space-between; font-size: 11.5px; color: #fde68a; font-weight: 700;">
+                      <span>⏱️ Recuperas la inversión en: <strong id="calcPaybackDays" style="color: white;">4 días</strong></span>
+                      <span>📈 ROI Neto: <strong id="calcNetRoiPct" style="color: #34d399;">+680%</strong></span>
                     </div>
                   </div>
 
@@ -519,16 +612,34 @@
 
             <!-- SECTION: INTERACTIVE LIVE WHATSAPP SIMULATOR -->
             <div id="liveChatSimAnchor" style="margin-bottom: 60px;">
-              <div style="text-align: center; margin-bottom: 24px;">
+              <div style="text-align: center; margin-bottom: 20px;">
                 <span class="brand-badge" style="background: rgba(37,211,102,0.15); color: #25d366; font-size: 11px; padding: 4px 14px;">
-                  ⚡ EXPERIENCIA INTERACTIVA EN TIEMPO REAL
+                  ⚡ MODO DEMO PERSONALIZADA EN 30 SEGUNDOS (EN VIVO)
                 </span>
                 <h2 style="font-size: 28px; font-weight: 800; color: white; margin-top: 8px;">
-                  Prueba la Rapidez y Persuasión del Agente
+                  Transforma el Simulador en Tu Propia Empresa y Chatea con Tu IA
                 </h2>
                 <p style="font-size: 14px; color: var(--text-muted);">
-                  Haz clic en cualquiera de los mensajes de ejemplo y mira cómo la IA atiende, califica y cierra:
+                  Escribe el nombre de tu negocio y tu rubro: el Agente adoptará tu identidad al instante para que pruebes cómo atenderá a tus clientes reales:
                 </p>
+              </div>
+
+              <!-- 30-Second Customizer Bar -->
+              <div style="max-width: 780px; margin: 0 auto 20px auto; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: var(--radius-lg); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.35);">
+                <input type="text" id="customSimCompanyInput" class="form-control" placeholder="🏢 Nombre de tu Empresa (Ej: Clínica Dental Sonrisas)" style="flex: 1; min-width: 210px; font-size: 13px;">
+                <select id="customSimIndustrySelect" class="form-control" style="width: auto; min-width: 190px; font-size: 13px;">
+                  <option value="Clínica Médica / Odontológica">🏥 Clínica / Odontología</option>
+                  <option value="Inmobiliaria & Desarrollos">🏢 Inmobiliaria / Bienes Raíces</option>
+                  <option value="Centro de Estética & Belleza">✨ Estética / Barbería / Spa</option>
+                  <option value="Estudio Jurídico / Contable">⚖️ Estudio Jurídico / B2B</option>
+                  <option value="Restaurante & Gastronomía">🍽️ Restaurante / Gastronomía</option>
+                  <option value="Concesionaria & Automotriz">🚗 Automotriz / Concesionaria</option>
+                  <option value="Gimnasio & Fitness">🏋️ Gimnasio / Centro Fitness</option>
+                  <option value="E-Commerce & Tienda Online">🛍️ E-Commerce / Mayorista</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="applyCustomLandingSimulator()" style="padding: 10px 16px; font-weight: 800; white-space: nowrap;">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> Personalizar Demo Ahora
+                </button>
               </div>
 
               <div class="portal-chat-simulator">
@@ -540,19 +651,20 @@
                     </div>
                     <div>
                       <div style="font-size: 14px; font-weight: 700; color: white;" id="portalSimHeaderName">Asistente Virtual IA • Empresa</div>
-                      <div style="font-size: 11px; color: #a7f3d0;">🟢 En línea • Responde en 1.8s</div>
+                      <div style="font-size: 11px; color: #a7f3d0;" id="portalSimHeaderSub">🟢 En línea • Responde en 1.8s • Texto y Audio IA</div>
                     </div>
                   </div>
-                  <div style="font-size: 18px; color: rgba(255,255,255,0.7); display: flex; gap: 14px;">
-                    <i class="fa-solid fa-phone"></i>
-                    <i class="fa-solid fa-ellipsis-vertical"></i>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="btn btn-secondary btn-sm" onclick="speakSimulatorLastReply()" title="Escuchar última respuesta como Nota de Voz IA" style="padding: 4px 10px; font-size: 11px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #a7f3d0;">
+                      <i class="fa-solid fa-volume-high"></i> Audio IA
+                    </button>
                   </div>
                 </div>
 
                 <!-- Chat Body with messages -->
                 <div class="chat-sim-body" id="portalSimChatBody">
                   <div class="chat-sim-msg agent">
-                    👋 ¡Hola! Bienvenido a nuestro canal oficial de atención. ¿En qué te podemos ayudar hoy? Puedes tocar una opción rápida o escribir tu consulta:
+                    👋 ¡Hola! Bienvenido a nuestro canal oficial de atención. ¿En qué te podemos ayudar hoy? Puedes tocar una opción rápida o escribir cualquier pregunta abajo:
                     <div style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: right; margin-top: 4px;">10:42 AM</div>
                   </div>
                 </div>
@@ -560,16 +672,24 @@
                 <!-- Interactive Chips Footer -->
                 <div class="chat-sim-chips-container">
                   <button class="quick-chip" onclick="simulatePortalReply('turnos')">
-                    🦷 ¿Tienen turnos para hoy?
+                    📅 ¿Tienen turnos para esta semana?
                   </button>
                   <button class="quick-chip" onclick="simulatePortalReply('precios')">
                     💵 ¿Cuáles son los precios y planes?
                   </button>
-                  <button class="quick-chip" onclick="simulatePortalReply('cotizacion')">
-                    📄 Necesito una cotización formal
+                  <button class="quick-chip" onclick="simulatePortalReply('objecion')">
+                    🤔 Es un poco caro, ¿tienen facilidades?
                   </button>
-                  <button class="quick-chip" onclick="simulatePortalReply('ubicacion')">
-                    📍 ¿Dónde están ubicados?
+                  <button class="quick-chip" onclick="simulatePortalReply('cotizacion')">
+                    📄 Quiero contratar / avanzar
+                  </button>
+                </div>
+
+                <!-- Live Free-Text Input Bar inside Landing Simulator -->
+                <div style="padding: 10px 14px; background: #1f2937; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 8px; align-items: center;">
+                  <input type="text" id="portalSimFreeInput" class="form-control" placeholder="Escribe cualquier pregunta o pon a prueba al agente aquí..." style="background: #111827; border-color: rgba(255,255,255,0.15); font-size: 13px;" onkeydown="if(event.key==='Enter') sendPublicSimulatorCustomMessage()">
+                  <button class="btn btn-emerald btn-sm" onclick="sendPublicSimulatorCustomMessage()" style="padding: 9px 14px; flex-shrink: 0;">
+                    <i class="fa-solid fa-paper-plane"></i> Enviar
                   </button>
                 </div>
               </div>
@@ -1055,6 +1175,12 @@
               <button class="subtab-btn" id="subtabBtn-rag" onclick="switchAgentSubtab('rag')">
                 <i class="fa-solid fa-file-pdf" style="color: #f43f5e;"></i> 7. Documentos RAG (IA)
               </button>
+              <button class="subtab-btn" id="subtabBtn-followup" onclick="switchAgentSubtab('followup')">
+                <i class="fa-solid fa-user-clock" style="color: #fbbf24;"></i> 8. Anti-Ghosting (2h/24h/72h)
+              </button>
+              <button class="subtab-btn" id="subtabBtn-multimodal" onclick="switchAgentSubtab('multimodal')">
+                <i class="fa-solid fa-eye" style="color: #38bdf8;"></i> 9. Visión Pagos & Voz IA
+              </button>
             </div>
 
             <!-- SUBTAB 1: IDENTIDAD & BASE DE CONOCIMIENTO -->
@@ -1434,6 +1560,155 @@
                       </tr>
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUBTAB 8: MOTOR ANTI-GHOSTING SECUENCIAL (2H / 24H / 72H) -->
+            <div id="subtabView-followup" class="subtab-view-content">
+              <div style="background: rgba(10, 13, 28, 0.75); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: var(--radius-lg); padding: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+                  <div>
+                    <strong style="font-size: 16px; color: white; display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-rotate" style="color: #fbbf24;"></i> Motor de Seguimiento Automático Anti-Ghosting (2h • 24h • 72h)
+                    </strong>
+                    <span style="font-size: 12.5px; color: var(--text-muted);">El 60% de las ventas de alto valor se cierran en el seguimiento. Si un prospecto pregunta el precio y deja en "visto", la IA lo reactiva automáticamente.</span>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" onclick="loadFollowUpSequences()">
+                    <i class="fa-solid fa-arrows-rotate"></i> Actualizar Lista
+                  </button>
+                </div>
+
+                <!-- Add Prospect to Sequence Form -->
+                <div style="background: rgba(15, 23, 42, 0.8); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px;">
+                  <div style="font-size: 13px; font-weight: 700; color: #fde68a; margin-bottom: 10px;">
+                    ➕ Programar Nuevo Prospecto en Secuencia Anti-Ghosting
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; align-items: end;">
+                    <div>
+                      <label class="form-label" style="font-size: 11.5px;">Nombre del Prospecto</label>
+                      <input type="text" id="followUpNameInput" class="form-control" placeholder="Ej: Roberto Gómez" style="font-size: 12.5px;">
+                    </div>
+                    <div>
+                      <label class="form-label" style="font-size: 11.5px;">WhatsApp (con cód. país)</label>
+                      <input type="text" id="followUpPhoneInput" class="form-control" placeholder="Ej: 5491148923310" style="font-size: 12.5px;">
+                    </div>
+                    <div>
+                      <label class="form-label" style="font-size: 11.5px;">Servicio / Tema Consultado</label>
+                      <input type="text" id="followUpTopicInput" class="form-control" placeholder="Ej: Plan Pro Multi-Flujo" style="font-size: 12.5px;">
+                    </div>
+                    <button class="btn btn-emerald btn-sm" onclick="createFollowUpSequence()" style="height: 38px; font-weight: 700;">
+                      <i class="fa-solid fa-bolt"></i> Activar Secuencia
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 3-Stage Cadence Preview Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px;">
+                  <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: var(--radius-md); padding: 14px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #38bdf8; margin-bottom: 4px;">⏱️ ETAPA 1 (A las 2 Horas)</div>
+                    <p style="font-size: 11.5px; color: #cbd5e1; margin: 0; line-height: 1.4;">Aporte de valor + Caso de éxito del rubro para romper la indecisión inicial sin presionar.</p>
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: var(--radius-md); padding: 14px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #c084fc; margin-bottom: 4px;">⏱️ ETAPA 2 (A las 24 Horas)</div>
+                    <p style="font-size: 11.5px; color: #cbd5e1; margin: 0; line-height: 1.4;">Derribo de objeciones + invitación a llamada corta de 5 minutos o demo guiada.</p>
+                  </div>
+                  <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-md); padding: 14px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #34d399; margin-bottom: 4px;">⏱️ ETAPA 3 (A las 72 Horas)</div>
+                    <p style="font-size: 11.5px; color: #cbd5e1; margin: 0; line-height: 1.4;">Escasez ética (últimos 2 cupos de instalación bonificada esta semana) y cierre directo.</p>
+                  </div>
+                </div>
+
+                <!-- Active Follow-Up Sequences Table -->
+                <div style="overflow-x: auto; background: rgba(15, 23, 42, 0.6); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                  <table style="width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: left;">
+                    <thead>
+                      <tr style="border-bottom: 1px solid var(--border-subtle); color: var(--text-muted); background: rgba(15,23,42,0.8);">
+                        <th style="padding: 10px 14px;">Prospecto</th>
+                        <th style="padding: 10px 14px;">WhatsApp</th>
+                        <th style="padding: 10px 14px;">Interés</th>
+                        <th style="padding: 10px 14px;">Etapa Actual</th>
+                        <th style="padding: 10px 14px;">Estado</th>
+                        <th style="padding: 10px 14px; text-align: right;">Disparo Manual / Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="followUpSequencesTableBody">
+                      <tr>
+                        <td colspan="6" style="padding: 20px; text-align: center; color: var(--text-dim);">
+                          Cargando secuencias de seguimiento...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- SUBTAB 9: IA MULTIMODAL (VERIFICADOR DE COMPROBANTES GEMINI VISION & NOTAS DE VOZ) -->
+            <div id="subtabView-multimodal" class="subtab-view-content">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 22px;">
+                <!-- Card 1: Gemini Vision Receipt & Image Verifier -->
+                <div style="background: rgba(10, 13, 28, 0.75); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: var(--radius-lg); padding: 22px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <strong style="font-size: 15.5px; color: white; display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-receipt" style="color: #38bdf8;"></i> Verificador IA de Comprobantes (Gemini Vision)
+                    </strong>
+                    <span class="brand-badge" style="background: rgba(56,189,248,0.15); color: #38bdf8; font-size: 10.5px;">Visión Artificial</span>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+                    Cuando un cliente envía una captura de transferencia o recibo por WhatsApp, la IA lee la imagen, extrae el monto, banco y código de operación, y marca al lead como <strong>Ganado</strong>.
+                  </p>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px;">Teléfono del Cliente (opcional para acreditar en CRM)</label>
+                    <input type="text" id="visionReceiptPhone" class="form-control" placeholder="Ej: 5491148923310" style="font-size: 12.5px;">
+                  </div>
+
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+                    <label class="btn btn-primary btn-sm" style="cursor: pointer; margin: 0;">
+                      <i class="fa-solid fa-camera"></i> Subir Captura de Comprobante
+                      <input type="file" id="inputVisionReceiptFile" accept="image/*" style="display: none;" onchange="analyzePaymentReceiptImage(this)">
+                    </label>
+                    <button class="btn btn-secondary btn-sm" onclick="analyzePaymentReceiptImage(null, true)">
+                      <i class="fa-solid fa-wand-magic-sparkles"></i> Simular Comprobante de $290 USD
+                    </button>
+                  </div>
+
+                  <!-- Vision Result Output Box -->
+                  <div id="visionReceiptResultBox" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12.5px; color: #cbd5e1;">
+                    <div style="color: var(--text-dim); text-align: center; padding: 10px;">
+                      <i class="fa-solid fa-eye" style="font-size: 20px; display: block; margin-bottom: 6px; opacity: 0.5;"></i>
+                      Sube una foto de transferencia o haz clic en "Simular Comprobante" para ver la extracción con Gemini Vision.
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 2: Natural Voice Note Synthesizer (Audio IA) -->
+                <div style="background: rgba(10, 13, 28, 0.75); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-lg); padding: 22px;">
+                  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <strong style="font-size: 15.5px; color: white; display: flex; align-items: center; gap: 8px;">
+                      <i class="fa-solid fa-microphone-lines" style="color: #34d399;"></i> Generador de Notas de Voz IA (Audio Ventas)
+                    </strong>
+                    <span class="brand-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 10.5px;">Voz Humana IA</span>
+                  </div>
+                  <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
+                    Genera guiones hablados ultra naturales adaptados a la empresa activa y reprodúcelos con síntesis de voz para cerrar prospectos indecisos.
+                  </p>
+
+                  <div class="form-group">
+                    <label class="form-label" style="font-size: 12px;">Situación o Consulta a Responder por Nota de Voz</label>
+                    <input type="text" id="voiceSynthPromptInput" class="form-control" value="Hola, quería saber cómo funciona el servicio y cuánto tarda la instalación" style="font-size: 12.5px;">
+                  </div>
+
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+                    <button class="btn btn-emerald btn-sm" onclick="testMultimodalVoiceReply()">
+                      <i class="fa-solid fa-volume-high"></i> Generar y Escuchar Nota de Voz IA
+                    </button>
+                  </div>
+
+                  <div id="voiceSynthOutputBox" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12.5px; color: #a7f3d0; line-height: 1.5;">
+                    🎙️ Presiona <strong>"Generar y Escuchar Nota de Voz IA"</strong> para sintetizar el audio comercial en vivo.
+                  </div>
                 </div>
               </div>
             </div>
@@ -3350,8 +3625,9 @@ Pruébalo 2 minutos y me dices qué te parece.
           </div>
           <div>
             <div style="font-size: 14px; font-weight: 700; color: white;" id="testModalAgentTitle">Asistente Virtual IA</div>
-            <div style="font-size: 11px; color: #34d399;" id="testModalAgentSubtitle">🟢 Motor Gemini 1.5 Flash Activo</div>
+            <div style="font-size: 11px; color: #34d399;" id="testModalAgentSubtitle">🟢 Motor Gemini 3.1 Flash Activo</div>
           </div>
+        </div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <button class="btn btn-secondary btn-sm" onclick="resetTestAgentChat()" title="Reiniciar conversación y memoria" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.15);">
             <i class="fa-solid fa-rotate-right"></i> Reiniciar
@@ -3403,6 +3679,24 @@ Pruébalo 2 minutos y me dices qué te parece.
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeModal('sendRealWaModal')">Cancelar</button>
         <button class="btn btn-emerald" onclick="submitModalRealWhatsApp()"><i class="fa-solid fa-paper-plane"></i> Enviar a WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Reporte Ejecutivo Mensual de ROI (Imprimible / PDF) -->
+  <div class="modal-backdrop" id="modalExecutiveRoiReport">
+    <div class="modal-content" style="max-width: 680px;">
+      <div class="modal-header">
+        <strong style="font-size: 17px; color: white;"><i class="fa-solid fa-chart-pie" style="color: #34d399;"></i> Auditoría Ejecutiva de Resultados & ROI Mensual</strong>
+        <button class="close-btn" onclick="closeModal('modalExecutiveRoiReport')">&times;</button>
+      </div>
+      <div class="modal-body" id="executiveRoiReportPrintableArea" style="background: rgba(15, 23, 42, 0.9); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 22px;">
+        <!-- Populated dynamically by openExecutiveRoiReportModal() -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modalExecutiveRoiReport')">Cerrar</button>
+        <button class="btn btn-emerald" onclick="sendExecutiveRoiWhatsApp()"><i class="fa-brands fa-whatsapp"></i> Enviar por WhatsApp al Dueño</button>
+        <button class="btn btn-primary" onclick="printExecutiveRoiReport()"><i class="fa-solid fa-print"></i> Imprimir / Guardar PDF</button>
       </div>
     </div>
   </div>
