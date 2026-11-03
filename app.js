@@ -522,9 +522,10 @@ function switchTab(tabName) {
   const mc = document.querySelector('.main-content');
   if (mc) mc.scrollTop = 0;
 
-  // Update nav items directly by matching exact data-tab attribute
+  // Update nav items directly by matching exact data-tab attribute (and unified B2B hub)
+  const navTargetTab = (tabName === 'playbook' || tabName === 'prospecting') ? 'acquisition' : tabName;
   document.querySelectorAll('.nav-item').forEach(item => {
-    if (item.getAttribute('data-tab') === tabName) {
+    if (item.getAttribute('data-tab') === navTargetTab) {
       item.classList.add('active');
     } else {
       item.classList.remove('active');
