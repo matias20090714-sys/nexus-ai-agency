@@ -1037,6 +1037,15 @@ function buildGeminiContents(history, currentMessage) {
 }
 
 // ==================== CONSULTATIVE SALES REASONING ENGINE ====================
+function stripAiEmojis(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\u20E3]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/^ +/gm, '')
+    .trim();
+}
+
 function generateContextualSalesReply(lowerText, rawText, history, ctx, docContext) {
   const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
   const lowerBot = lastBotMsg.toLowerCase();
@@ -1050,7 +1059,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
 
   // 1. RAG Documentation Match
   if (docContext && (lowerText.includes('precio') || lowerText.includes('catalogo') || lowerText.includes('catálogo') || lowerText.includes('servicio') || lowerText.includes('costo') || lowerText.includes('cuanto') || lowerText.includes('cuánto'))) {
-    reply = `¡Con gusto! Aquí tienes los detalles oficiales de *${ctx.companyName}*:\n\n${docContext.slice(0, 480)}...\n\n${dom.triageQuestion}`;
+    reply = `Con gusto. Aquí tienes los detalles oficiales de *${ctx.companyName}*:\n\n${docContext.slice(0, 480)}...\n\n${dom.triageQuestion}`;
   }
 
   // 2. Affirmations & Agreements (sii, si, sí, dale, opino que si, claro, etc.)
@@ -1060,16 +1069,16 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
 
   if (!reply && isAffirmative) {
     if (hadPriceDiscussion || hadTurnDiscussion || lowerBot.includes('turno') || lowerBot.includes('reservar') || lowerBot.includes('agendar') || lowerBot.includes('valoración') || lowerBot.includes('$')) {
-      reply = `¡Excelente! Avanzamos entonces en *${ctx.companyName}*. 📅\n\n${dom.closingCapturePrompt}`;
+      reply = `Excelente, avanzamos entonces en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
     } else if (isAiAgency) {
-      reply = `¡Excelente! 🚀 Te cuento en concreto cómo te ayudamos en *${ctx.companyName}*:\n\n` +
-        `1. ⚡ Automatizamos tu atención y ventas en WhatsApp 24/7 para responder al instante.\n` +
-        `2. 🎯 Calificamos a cada cliente y resolvemos dudas con naturalidad.\n` +
-        `3. 📅 Agendamos citas en calendario y enviamos cotizaciones.\n\n` +
+      reply = `Excelente. Te cuento en concreto cómo te ayudamos en *${ctx.companyName}*:\n\n` +
+        `1. Automatizamos tu atención y ventas en WhatsApp 24/7 para responder al instante.\n` +
+        `2. Calificamos a cada cliente y resolvemos dudas con naturalidad.\n` +
+        `3. Agendamos citas en calendario y enviamos cotizaciones.\n\n` +
         `Nuestros planes oficiales son:\n${ctx.catalogSummary}\n\n` +
         `¿Cuál de estas alternativas se ajusta mejor a tu negocio?`;
     } else {
-      reply = `¡Excelente! Te comparto las prestaciones y aranceles principales con los que trabajamos en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
+      reply = `Excelente. Te comparto las prestaciones y aranceles principales con los que trabajamos en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
     }
   }
 
@@ -1082,7 +1091,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('quiero empezar') || lowerText.includes('lo cerramos') || lowerText.includes('quiero un turno') || lowerText.includes('reservar turno');
 
   if (!reply && isBuyingSignal) {
-    reply = `¡Excelente decisión! Será un gusto atenderte en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
+    reply = `Excelente decisión. Será un gusto atenderte en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
   }
 
   // 4. Pregunta de Propuesta de Valor, Especialidad y Servicios ("En qué me ayuda", "De qué trata", "Para qué sirve", "Qué hacen", "Qué servicios ofrecen")
@@ -1096,14 +1105,14 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
 
   if (!reply && isHelpOrValueQuestion) {
     if (isAiAgency) {
-      reply = `⭐ En *${ctx.companyName}* somos especialistas en ${ctx.industry}. Ayudamos a empresas y profesionales a multiplicar sus ventas y ahorrar horas operativas:\n\n` +
-        `1. ⚡ Atención y ventas inmediatas en WhatsApp 24/7.\n` +
-        `2. 🎯 Calificación comercial de prospectos y manejo de objeciones.\n` +
-        `3. 📅 Agendamiento automático en Google Calendar y cobros directos.\n\n` +
+      reply = `En *${ctx.companyName}* somos especialistas en ${ctx.industry}. Ayudamos a empresas y profesionales a multiplicar sus ventas y ahorrar horas operativas:\n\n` +
+        `1. Atención y ventas inmediatas en WhatsApp 24/7.\n` +
+        `2. Calificación comercial de prospectos y manejo de objeciones.\n` +
+        `3. Agendamiento automático en Google Calendar y cobros directos.\n\n` +
         `Nuestros planes oficiales son:\n${ctx.catalogSummary}\n\n` +
         `¿Cuál de estos objetivos es el más prioritario para tu negocio hoy?`;
     } else {
-      reply = `✨ En *${ctx.companyName}* somos especialistas en *${ctx.industry}*. ${dom.valueJustification}\n\n` +
+      reply = `En *${ctx.companyName}* somos especialistas en *${ctx.industry}*. ${dom.valueJustification}\n\n` +
         `Actualmente nuestras prestaciones y aranceles principales son:\n${ctx.catalogSummary}\n\n` +
         `${dom.triageQuestion}`;
     }
@@ -1123,7 +1132,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('como se paga') || lowerText.includes('cómo se paga') || lowerText.includes('tarjeta') || lowerText.includes('transferencia') || lowerText.includes('cuotas') || lowerText.includes('obra social') || lowerText.includes('prepaga');
 
   if (!reply && isPaymentMethods) {
-    reply = `¡Por supuesto! En *${ctx.companyName}* ofrecemos diversas facilidades: aceptamos efectivo, transferencias bancarias, tarjetas de débito y crédito, y emitimos comprobantes oficiales para reintegros.\n\n${dom.closingCapturePrompt}`;
+    reply = `Por supuesto. En *${ctx.companyName}* ofrecemos diversas facilidades: aceptamos efectivo, transferencias bancarias, tarjetas de débito y crédito, y emitimos comprobantes oficiales para reintegros.\n\n${dom.closingCapturePrompt}`;
   }
 
   // 6.B Detección Inteligente por Ítem del Catálogo y Triaje Especializado de los 12 Rubros
@@ -1145,7 +1154,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
         if (it.description || it.benefits) parts.push(`— ${it.description || it.benefits}`);
         return parts.join(' ');
       }).join('\n');
-      reply = `✨ ¡Excelente elección! En *${ctx.companyName}* contamos con la opción exacta para lo que buscas:\n\n${itemsDetail}\n\n💡 ${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
+      reply = `Excelente elección. En *${ctx.companyName}* contamos con la opción exacta para lo que buscas:\n\n${itemsDetail}\n\n${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
     }
   }
 
@@ -1153,40 +1162,40 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
   if (!reply && !isAiAgency) {
     if ((normInd.includes('salud') || normInd.includes('clinic') || normInd.includes('dental') || normInd.includes('odont')) &&
         /dolor|duele|muela|diente|urgencia|inflam|hincha|sangr|caries|infeccion|partio|sensibil/.test(normUser)) {
-      reply = `🩺 Comprendo perfectamente tu molestia y en *${ctx.companyName}* le damos prioridad absoluta a los casos con dolor o sensibilidad aguda para aliviarte hoy mismo.\n\nLo indicado es realizar una valoración diagnóstica presencial con nuestro especialista para determinar el origen exacto y brindarte el tratamiento inmediato:\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
+      reply = `Comprendo perfectamente tu molestia y en *${ctx.companyName}* le damos prioridad absoluta a los casos con dolor o sensibilidad aguda para aliviarte hoy mismo.\n\nLo indicado es realizar una valoración diagnóstica presencial con nuestro especialista para determinar el origen exacto y brindarte el tratamiento inmediato:\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
     } else if ((normInd.includes('inmobili') || normInd.includes('bienes raic') || normInd.includes('propiedad')) &&
                /departament|casa|lote|terreno|alquil|compr|invertir|inversion|tasacion|tasar|ambiente|dormitorio|credito|apto/.test(normUser)) {
-      reply = `🏢 ¡Excelente búsqueda! En *${ctx.companyName}* contamos con opciones seleccionadas con títulos perfectos y asesoramiento patrimonial integral:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `Excelente búsqueda. En *${ctx.companyName}* contamos con opciones seleccionadas con títulos perfectos y asesoramiento patrimonial integral:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('juridic') || normInd.includes('abogad') || normInd.includes('legal') || normInd.includes('contabl') || normInd.includes('notar')) &&
                /despido|indemnizaci|divorcio|sucesion|herencia|contrato|carta documento|intimacion|juicio|demanda|impuesto|monotributo|balance|sociedad|escritura/.test(normUser)) {
-      reply = `⚖️ Gracias por contactarte con *${ctx.companyName}*. Tratamos tu consulta bajo estricto secreto profesional para resguardar tus derechos y plazos legales.\n\nNuestras instancias de atención profesional son:\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
+      reply = `Gracias por contactarte con *${ctx.companyName}*. Tratamos tu consulta bajo estricto secreto profesional para resguardar tus derechos y plazos legales.\n\nNuestras instancias de atención profesional son:\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('belleza') || normInd.includes('barber') || normInd.includes('peluquer') || normInd.includes('spa') || normInd.includes('estetic')) &&
                /corte|barba|color|tintur|mechas|balayage|alisado|keratina|unas|manicur|facial|limpieza|masaje|depilaci|cejas|pestanas/.test(normUser)) {
-      reply = `✂️ ¡Nos encantará recibirte en *${ctx.companyName}*! Trabajamos cada detalle de forma personalizada para lograr el resultado exacto que buscas:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
+      reply = `Nos encantará recibirte en *${ctx.companyName}*. Trabajamos cada detalle de forma personalizada para lograr el resultado exacto que buscas:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
     } else if ((normInd.includes('restauran') || normInd.includes('gastronom') || normInd.includes('comida') || normInd.includes('bar')) &&
                /mesa|carta|menu|plato|delivery|envio|pedido|celiac|tacc|vegan|vegetarian|cumpleanos|evento|cena|almuerzo/.test(normUser)) {
-      reply = `🍽️ ¡Será un placer agasajarte en *${ctx.companyName}*! Aquí tienes nuestras propuestas gastronómicas destacadas:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `Será un placer agasajarte en *${ctx.companyName}*. Aquí tienes nuestras propuestas gastronómicas destacadas:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('tienda') || normInd.includes('retail') || normInd.includes('ecommerce')) &&
                /stock|talle|talla|color|modelo|envio|despacho|cambio|devoluci|mayorist|prenda|producto|comprar/.test(normUser)) {
-      reply = `🛍️ ¡Qué bueno que nos escribas! En *${ctx.companyName}* contamos con disponibilidad inmediata y despacho asegurado:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `Qué bueno que nos escribas. En *${ctx.companyName}* contamos con disponibilidad inmediata y despacho asegurado:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('gimnasio') || normInd.includes('fitness') || normInd.includes('gym') || normInd.includes('crossfit')) &&
                /pase|membresia|musculaci|crossfit|funcional|pilates|bajar de peso|masa muscular|entrenar|clase|prueba|profesor/.test(normUser)) {
-      reply = `🏋️ ¡Excelente iniciativa para empezar a entrenar en *${ctx.companyName}*! Estos son nuestros pases y programas activos:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `Excelente iniciativa para empezar a entrenar en *${ctx.companyName}*. Estos son nuestros pases y programas activos:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('taller') || normInd.includes('automot') || normInd.includes('mecanic') || normInd.includes('concesionar')) &&
                /service|aceite|filtro|freno|embrague|correa|distribuci|ruido|falla|escan|bateria|neumatic|alineaci|balanceo|tren delantero|motor/.test(normUser)) {
-      reply = `🚗 En *${ctx.companyName}* revisamos tu vehículo con equipamiento de diagnóstico computarizado y repuestos homologados:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `En *${ctx.companyName}* revisamos tu vehículo con equipamiento de diagnóstico computarizado y repuestos homologados:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('hotel') || normInd.includes('caban') || normInd.includes('turism')) &&
                /habitaci|cabana|suite|noche|estadia|check|huesped|persona|pareja|familia|pileta|piscina|desayuno|vacacion|finde/.test(normUser)) {
-      reply = `🏨 ¡Qué alegría recibir tu consulta en *${ctx.companyName}*! Estas son nuestras opciones y tarifas por reserva directa:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `Qué alegría recibir tu consulta en *${ctx.companyName}*. Estas son nuestras opciones y tarifas por reserva directa:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('educac') || normInd.includes('academi') || normInd.includes('curso')) &&
                /curso|carrera|diplomatur|programa|temario|certificad|inscripci|matricul|vacante|online|vivo|clases|aprender/.test(normUser)) {
-      reply = `🎓 ¡Excelente paso para tu crecimiento profesional! En *${ctx.companyName}* contamos con estos programas de formación:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `Excelente paso para tu crecimiento profesional. En *${ctx.companyName}* contamos con estos programas de formación:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('construc') || normInd.includes('arquitec') || normInd.includes('reforma') || normInd.includes('piscin')) &&
                /obra|reforma|remodelaci|ampliaci|piscina|pileta|metros|m2|llave en mano|plano|construir|techo|cocina|bano/.test(normUser)) {
-      reply = `🏗️ En *${ctx.companyName}* ejecutamos tu proyecto con cómputo preciso, dirección técnica y presupuesto cerrado por contrato:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `En *${ctx.companyName}* ejecutamos tu proyecto con cómputo preciso, dirección técnica y presupuesto cerrado por contrato:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     } else if ((normInd.includes('b2b') || normInd.includes('empresa') || normInd.includes('consultor')) &&
                /consultor|auditor|estrategi|corporativ|implementaci|empresa|equipo|optimiz|ventas|proceso/.test(normUser)) {
-      reply = `💼 En *${ctx.companyName}* acompañamos a empresas con soluciones ejecutivas orientadas a resultados medibles:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+      reply = `En *${ctx.companyName}* acompañamos a empresas con soluciones ejecutivas orientadas a resultados medibles:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
     }
   }
 
@@ -1208,7 +1217,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('tengo que hablar') || lowerText.includes('tengo que consultar') || lowerText.includes('con mi socio') || lowerText.includes('con mi pareja') || lowerText.includes('con mi esposa') || lowerText.includes('con mi marido');
 
   if (!reply && isHesitation) {
-    reply = `¡Totalmente comprensible! Es importante que avances con total seguridad y claridad. Para ayudarte a evaluarlo: ¿hay alguna duda puntual sobre nuestras opciones, aranceles o modalidad que te gustaría aclarar?\n\nSi lo deseas, puedo dejarte pre-reservada la disponibilidad de esta semana sin compromiso mientras lo defines.`;
+    reply = `Totalmente comprensible. Es importante que avances con total seguridad y claridad. Para ayudarte a evaluarlo: ¿hay alguna duda puntual sobre nuestras opciones, aranceles o modalidad que te gustaría aclarar?\n\nSi lo deseas, puedo dejarte pre-reservada la disponibilidad de esta semana sin compromiso mientras lo defines.`;
   }
 
   // 9. Comparación con Competencia ("Encontré algo más barato")
@@ -1230,7 +1239,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
 
   // 11. Preguntas de Continuidad / Mensajes Cortos
   if (!reply && (lowerText === 'cuanto?' || lowerText === 'cuánto?' || lowerText === 'precio?' || lowerText === 'precios?' || lowerText === 'costo?' || lowerText === 'y el costo?')) {
-    reply = `¡Con gusto! Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Cuál de estas opciones se ajusta más a lo que necesitas hoy?`;
+    reply = `Con gusto. Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Cuál de estas opciones se ajusta más a lo que necesitas hoy?`;
   }
 
   if (!reply && (lowerText === 'y el otro?' || lowerText === 'que otro?' || lowerText === 'qué otro?' || lowerText === 'hay otro?')) {
@@ -1243,22 +1252,22 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
 
   // 12. Precios y Catálogo Oficial (Técnica del Sándwich Consultivo + Diagnóstico de Especialista)
   if (!reply && (lowerText.includes('precio') || lowerText.includes('precios') || lowerText.includes('costo') || lowerText.includes('costos') || lowerText.includes('cuanto') || lowerText.includes('cuánto') || lowerText.includes('tarifa') || lowerText.includes('tarifas') || lowerText.includes('planes') || lowerText.includes('cotiza') || lowerText.includes('presupuesto') || lowerText.includes('catalogo') || lowerText.includes('catálogo'))) {
-    reply = `¡Con gusto! Aquí tienes nuestros aranceles y opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    reply = `Con gusto. Aquí tienes nuestros aranceles y opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
   }
 
   // 13. Agendamiento de Turnos o Citas (Captura Proactiva de 3 Datos de Cierre por Rubro)
   if (!reply && (lowerText.includes('turno') || lowerText.includes('turnos') || lowerText.includes('cita') || lowerText.includes('citas') || lowerText.includes('agendar') || lowerText.includes('reunion') || lowerText.includes('reunión') || lowerText.includes('llamada') || lowerText.includes('reserva') || lowerText.includes('reservar') || lowerText.includes('disponibilidad'))) {
-    reply = `📅 ¡Por supuesto! Será un placer coordinar tu atención en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
+    reply = `Por supuesto, será un placer coordinar tu atención en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
   }
 
   // 14. Ubicación y Oficinas
   if (!reply && (lowerText.includes('donde estan') || lowerText.includes('dónde están') || lowerText.includes('donde quedan') || lowerText.includes('dónde quedan') || lowerText.includes('direccion') || lowerText.includes('dirección') || lowerText.includes('ubicacion') || lowerText.includes('ubicación') || lowerText.includes('como llego') || lowerText.includes('cómo llego'))) {
-    reply = `📍 Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Te gustaría coordinar una visita presencial o prefieres que gestionemos todo directamente por WhatsApp?`;
+    reply = `Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Te gustaría coordinar una visita presencial o prefieres que gestionemos todo directamente por este medio?`;
   }
 
   // 15. Horarios de atención
   if (!reply && (lowerText.includes('horario') || lowerText.includes('horarios') || lowerText.includes('a que hora') || lowerText.includes('a qué hora') || lowerText.includes('atienden hoy') || lowerText.includes('estan abiertos') || lowerText.includes('están abiertos'))) {
-    reply = `🕒 Horarios de atención de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nRecuerda que por este chat de WhatsApp te atendemos las 24 horas. ¿En qué podemos ayudarte en este momento?`;
+    reply = `Horarios de atención de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nRecuerda que por este chat de WhatsApp te atendemos las 24 horas. ¿En qué podemos ayudarte en este momento?`;
   }
 
   // 16. Solicitud de asesor humano (Detección precisa de intención)
@@ -1268,39 +1277,39 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('derivar con un') || lowerText.includes('derivar con una') || lowerText.includes('con el dueño') || lowerText.includes('con la dueña');
 
   if (!reply && isHumanAgentRequest) {
-    reply = `👤 ¡Por supuesto! Ya he tomado nota para que un especialista de nuestro equipo en ${ctx.companyName} revise tu caso y se comunique contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
+    reply = `Por supuesto. Ya he tomado nota para que un especialista de nuestro equipo en ${ctx.companyName} revise tu caso y se comunique contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
   }
 
   // 17. Agradecimientos
   if (!reply && (lowerText.includes('gracia') || lowerText.includes('agradecid') || lowerText.includes('te agradezco') || lowerText.includes('muy amable') || lowerText === 'grx' || lowerText === 'thx')) {
-    reply = `¡Al contrario, un verdadero placer! 😊 En ${ctx.companyName} estamos siempre a tu disposición para ayudarte. Si te gustaría que reservemos tu lugar o avancemos con tu propuesta, solo avísame y lo dejamos listo. ¡Que tengas un excelente día!`;
+    reply = `Al contrario, un verdadero placer. En ${ctx.companyName} estamos siempre a tu disposición para ayudarte. Si te gustaría que reservemos tu lugar o avancemos con tu propuesta, solo avísame y lo dejamos listo. Que tengas un excelente día.`;
   }
 
   // 18. Despedidas
   if (!reply && (lowerText.includes('chau') || lowerText.includes('adios') || lowerText.includes('adiós') || lowerText.includes('hasta luego') || lowerText.includes('nos vemos') || lowerText.includes('bye') || lowerText.includes('buenas noches') || lowerText.includes('buen finde'))) {
-    reply = `¡Hasta luego! 👋 Ha sido un gusto hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. ¡Que tengas un gran día!`;
+    reply = `Hasta luego. Ha sido un gusto hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. Que tengas un gran día.`;
   }
 
   // 19. Confirmaciones cortas (ok, genial, perfecto, entiendo)
   if (!reply && (lowerText === 'ok' || lowerText === 'genial' || lowerText === 'perfecto' || lowerText === 'buenisimo' || lowerText === 'buenísimo' || lowerText === 'excelente' || lowerText === 'entendido' || lowerText === 'comprendo' || lowerText === 'bien')) {
     if (hadPriceDiscussion) {
-      reply = `¡Genial! 👍 Dado que estuvimos viendo nuestras opciones en ${ctx.companyName}, ¿te gustaría que te reservemos tu cupo hoy mismo o prefieres que coordinemos una breve llamada para afinar detalles?`;
+      reply = `Genial. Dado que estuvimos viendo nuestras opciones en *${ctx.companyName}*, avanzamos cuando gustes.\n\n${dom.closingCapturePrompt}`;
     } else {
-      reply = `¡Excelente! 👍 En ${ctx.companyName} estamos listos para ayudarte. ¿Deseas que coordinemos una fecha para tu servicio o tienes alguna otra pregunta que quieras hacernos?`;
+      reply = `Excelente. En *${ctx.companyName}* estamos listos para ayudarte. ¿Deseas que coordinemos una fecha para tu atención o tienes alguna otra consulta?`;
     }
   }
 
   // 20. Saludos iniciales (Solo si la conversación recién empieza - Presentación de Especialista + Triaje del Rubro)
   if (!reply && !isConversationOngoing && (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal'))) {
-    reply = `¡Hola! 👋 Qué gusto saludarte. Te doy la bienvenida a *${ctx.companyName}* (${ctx.industry}). Soy ${ctx.agentName}, ${dom.roleTitle}.\n\n${dom.triageQuestion}`;
+    reply = `Hola, qué gusto saludarte. Te doy la bienvenida a *${ctx.companyName}* (${ctx.industry}). Soy ${ctx.agentName}, ${dom.roleTitle}.\n\n${dom.triageQuestion}`;
   }
 
   // 21. Multi-Turn Progressive Fallback (NEVER REPEATS)
   if (!reply) {
     const progressiveReplies = [
-      `¡Excelente consulta! En *${ctx.companyName}* (${ctx.industry}) trabajamos de forma personalizada para brindarte la mejor atención. ${dom.triageQuestion}`,
-      `¡Comprendo perfectamente! Aquí tienes nuestras prestaciones y valores principales en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`,
-      `¡Con todo gusto! Para coordinar tu atención en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`
+      `Excelente consulta. En *${ctx.companyName}* (${ctx.industry}) trabajamos de forma personalizada para brindarte la mejor atención. ${dom.triageQuestion}`,
+      `Comprendo perfectamente. Aquí tienes nuestras prestaciones y valores principales en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`,
+      `Con todo gusto. Para coordinar tu atención en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`
     ];
 
     for (const pr of progressiveReplies) {
@@ -1321,13 +1330,13 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
 
   if (isDuplicate) {
     if (hadPriceDiscussion || hadTurnDiscussion) {
-      reply = `¡Excelente! Para dejar reservado tu lugar en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`;
+      reply = `Excelente. Para dejar reservado tu lugar en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`;
     } else {
-      reply = `¡Con gusto! Te detallo nuestras opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
+      reply = `Con gusto. Te detallo nuestras opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
     }
   }
 
-  return reply;
+  return stripAiEmojis(reply);
 }
 
 // ==================== GENERATE AI AGENT RESPONSE ====================
@@ -1439,10 +1448,11 @@ FRAMEWORK COGNITIVO DE VENTA CONSULTIVA (4 PASOS POR TURNO):
 
 REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
 - NUNCA digas que eres una inteligencia artificial, un bot o un modelo de lenguaje. Habla como un especialista humano senior de "${ctx.companyName}".
-- FORMATO VISUAL ESCANEABLE EN 3 SEGUNDOS: Escribe en 2 o 3 bloques cortos separados por una línea en blanco. Usa *negritas de WhatsApp* únicamente para resaltar importes, horarios o conceptos clave. Usa máximo 1 o 2 emojis sobrios y acordes al rubro.
+- PROHIBICIÓN ABSOLUTA DE EMOJIS: NUNCA uses emojis, emoticones ni íconos gráficos en ningún momento bajo ninguna circunstancia. Responde exclusivamente con texto limpio, sobrio y natural.
+- FORMATO VISUAL ESCANEABLE EN 3 SEGUNDOS: Escribe en 2 o 3 bloques cortos separados por una línea en blanco. Usa *negritas de WhatsApp* únicamente para resaltar importes, horarios o conceptos clave.
 - ÉTICA POR RUBRO: En salud/clínicas jamás recetes medicamentos ni des diagnósticos definitivos sin valoración presencial; en derecho/contabilidad jamás prometas resultados judiciales garantizados ni emitas dictámenes vinculantes sin revisión documental.
-- NUNCA uses menús robóticos ("1️⃣ Opción 1, 2️⃣ Opción 2").
-- Si la conversación ya está en curso, NO vuelvas a saludar con "¡Hola!". Responde directamente con fluidez.
+- NUNCA uses menús robóticos ("Opción 1, Opción 2").
+- Si la conversación ya está en curso, NO vuelvas a saludar con "Hola". Responde directamente con fluidez.
 - HONESTIDAD ABSOLUTA: Jamás inventes descuentos no autorizados, garantías inexistentes ni precios falsos.`;
 
   // 5. Try Generative LLM with Multi-Turn Memory (Gemini / OpenAI)
@@ -1521,11 +1531,11 @@ REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
     }
   }
 
-  // If LLM returned a valid response, ensure it does not duplicate the previous message
+  // If LLM returned a valid response, strip emojis completely and ensure it does not duplicate the previous message
   const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
   if (generatedReply && generatedReply.trim()) {
-    const finalReply = generatedReply.trim();
-    if (!lastBotMsg || finalReply.trim().toLowerCase() !== lastBotMsg.trim().toLowerCase()) {
+    const finalReply = stripAiEmojis(generatedReply);
+    if (finalReply && (!lastBotMsg || finalReply.trim().toLowerCase() !== lastBotMsg.trim().toLowerCase())) {
       appendToConversationHistory(convKey, 'user', userText);
       appendToConversationHistory(convKey, 'assistant', finalReply);
       return finalReply;
@@ -1533,7 +1543,7 @@ REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
   }
 
   // 6. High-Converting Consultative Sales Heuristics Engine (Understands Multi-Turn Context & Human Intent)
-  const reply = generateContextualSalesReply(lowerText, userText, history, ctx, docContext);
+  const reply = stripAiEmojis(generateContextualSalesReply(lowerText, userText, history, ctx, docContext));
   appendToConversationHistory(convKey, 'user', userText);
   appendToConversationHistory(convKey, 'assistant', reply);
   return reply;

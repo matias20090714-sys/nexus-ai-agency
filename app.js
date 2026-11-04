@@ -1656,7 +1656,7 @@ function resetTestAgentChat() {
   if (chatBody) {
     chatBody.innerHTML = `
       <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
-        👋 ¡Hola! Soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o duda que tengas.
+        Hola, soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o duda que tengas.
       </div>
     `;
   }
@@ -1677,13 +1677,13 @@ function testAgentLiveDialog() {
   const titleEl = document.getElementById('testModalAgentTitle');
   const subEl = document.getElementById('testModalAgentSubtitle');
   if (titleEl) titleEl.innerText = `${agentName} • ${companyName}`;
-  if (subEl) subEl.innerText = `🟢 Rubro: ${industry} | Memoria Multi-Turno Activa`;
+  if (subEl) subEl.innerText = `Rubro: ${industry} | Memoria Multi-Turno Activa`;
 
   const chatBody = document.getElementById('testAgentChatBody');
   if (chatBody && (!chatBody.innerHTML || chatBody.children.length <= 1 || !chatBody.innerHTML.includes(escapeHtml(companyName)))) {
     chatBody.innerHTML = `
       <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
-        👋 ¡Hola! Soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
+        Hola, soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
       </div>
     `;
   }
@@ -2457,13 +2457,13 @@ function simulatePortalReply(type) {
   };
 
   const agentReplies = {
-    'turnos': `¡Hola! Qué gusto saludarte desde <strong>${escapeHtml(targetBizName)}</strong> (${escapeHtml(targetIndustry)}) 📅<br><br>Sí, para esta semana nos quedan los siguientes espacios prioritarios:<br>• <strong>Mañana 11:00 hs</strong><br>• <strong>Jueves 16:30 hs</strong><br><br>¿Cuál de los dos te queda más cómodo para agendarte ahora mismo con recordatorio automático en WhatsApp?`,
+    'turnos': `Hola, qué gusto saludarte desde <strong>${escapeHtml(targetBizName)}</strong> (${escapeHtml(targetIndustry)}).<br><br>Sí, para esta semana nos quedan los siguientes espacios prioritarios:<br>• <strong>Mañana 11:00 hs</strong><br>• <strong>Jueves 16:30 hs</strong><br><br>¿Cuál de los dos te queda más cómodo para agendarte ahora mismo con recordatorio automático en WhatsApp?`,
     'precios': customLandingDemoState.companyName
-      ? `¡Con gusto! En <strong>${escapeHtml(targetBizName)}</strong> contamos con propuestas personalizadas de <strong>${escapeHtml(targetIndustry)}</strong> diseñadas para brindarte resultados rápidos y garantizados.<br><br>Cuéntame brevemente qué objetivo puntual buscas resolver hoy y te indico el presupuesto exacto para tu caso.`
-      : `¡Hola! En <strong>${escapeHtml(baseAgencyName)}</strong> contamos con planes de IA llave en mano:<br><br>• <strong>${escapeHtml(starterPlan.name)}:</strong> $${escapeHtml(starterPlan.price)} ${escapeHtml(starterPlan.currency || 'USD')}/${escapeHtml(starterPlan.billingPeriod || starterPlan.period || 'mes')}<br>• <strong>${escapeHtml(proPlan.name)}:</strong> $${escapeHtml(proPlan.price)} ${escapeHtml(proPlan.currency || 'USD')}/${escapeHtml(proPlan.billingPeriod || proPlan.period || 'mes')}<br><br>Ambos sin contratos forzados. ¿Te gustaría activar tu puesta en marcha en 48 horas?`,
-    'objecion': `¡Te entiendo perfectamente! 💡 Justamente en <strong>${escapeHtml(targetBizName)}</strong> trabajamos con garantía de satisfacción y acompañamiento completo.<br><br>Con solo recuperar 2 o 3 clientes al mes que antes se perdían por demoras en responder, el sistema se paga solo varias veces. ¿Te gustaría que hagamos una prueba guiada de 10 minutos para que lo veas funcionando en tu propio negocio?`,
-    'cotizacion': `¡Excelente decisión! 🚀 Te preparo el acceso prioritario de inmediato.<br><br>Incluye: <strong>Configuración Completa 24/7 + Sincronización con tu WhatsApp y Google Calendar + Seguimiento Anti-Ghosting</strong>.<br><br>🔗 Puedes activar o ver los datos aquí: <a href="javascript:void(0)" onclick="openAgencyRealCheckout('${escapeHtml(proPlan.id || 'pro')}')" style="color:#38bdf8; text-decoration:underline; font-weight:bold;">Abrir Propuesta y Activación</a>`,
-    'ubicacion': `¡Hola! 📍 En <strong>${escapeHtml(targetBizName)}</strong> nuestro equipo humano atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong>.<br><br>Y por este canal oficial te atendemos las <strong>24 horas del día, los 365 días del año</strong> al instante. ¿En qué te puedo ayudar hoy?`
+      ? `Con gusto. En <strong>${escapeHtml(targetBizName)}</strong> contamos con propuestas personalizadas de <strong>${escapeHtml(targetIndustry)}</strong> diseñadas para brindarte resultados rápidos y garantizados.<br><br>Cuéntame brevemente qué objetivo puntual buscas resolver hoy y te indico el presupuesto exacto para tu caso.`
+      : `Hola. En <strong>${escapeHtml(baseAgencyName)}</strong> contamos con planes de IA llave en mano:<br><br>• <strong>${escapeHtml(starterPlan.name)}:</strong> $${escapeHtml(starterPlan.price)} ${escapeHtml(starterPlan.currency || 'USD')}/${escapeHtml(starterPlan.billingPeriod || starterPlan.period || 'mes')}<br>• <strong>${escapeHtml(proPlan.name)}:</strong> $${escapeHtml(proPlan.price)} ${escapeHtml(proPlan.currency || 'USD')}/${escapeHtml(proPlan.billingPeriod || proPlan.period || 'mes')}<br><br>Ambos sin contratos forzados. ¿Te gustaría activar tu puesta en marcha en 48 horas?`,
+    'objecion': `Te entiendo perfectamente. Justamente en <strong>${escapeHtml(targetBizName)}</strong> trabajamos con garantía de satisfacción y acompañamiento completo.<br><br>Con solo recuperar 2 o 3 clientes al mes que antes se perdían por demoras en responder, el sistema se paga solo varias veces. ¿Te gustaría que hagamos una prueba guiada de 10 minutos para que lo veas funcionando en tu propio negocio?`,
+    'cotizacion': `Excelente decisión. Te preparo el acceso prioritario de inmediato.<br><br>Incluye: <strong>Configuración Completa 24/7 + Sincronización con tu WhatsApp y Google Calendar + Seguimiento Anti-Ghosting</strong>.<br><br>Puedes activar o ver los datos aquí: <a href="javascript:void(0)" onclick="openAgencyRealCheckout('${escapeHtml(proPlan.id || 'pro')}')" style="color:#38bdf8; text-decoration:underline; font-weight:bold;">Abrir Propuesta y Activación</a>`,
+    'ubicacion': `Hola. En <strong>${escapeHtml(targetBizName)}</strong> nuestro equipo humano atiende de <strong>Lunes a Viernes de 09:00 a 19:00 hs</strong>.<br><br>Y por este canal oficial te atendemos las <strong>24 horas del día, los 365 días del año</strong> al instante. ¿En qué te puedo ayudar hoy?`
   };
 
   const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -4756,7 +4756,7 @@ function applyCustomLandingSimulator() {
   const container = document.getElementById('portalSimChatBody');
   if (container) {
     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const welcomeText = `✨ ¡Hola! Te doy la bienvenida al canal oficial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}).<br><br>Estoy entrenado para responder consultas, informar precios, rebatir objeciones y agendar citas de <strong>${escapeHtml(companyName)}</strong> en 2 segundos. ¡Escríbeme cualquier pregunta abajo o toca un botón para probarme!`;
+    const welcomeText = `Hola, te doy la bienvenida al canal oficial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}).<br><br>Estoy disponible para responder consultas, informar valores, resolver inquietudes y agendar citas de <strong>${escapeHtml(companyName)}</strong> al instante. Escríbeme cualquier pregunta abajo o toca un botón para comenzar.`;
     customLandingDemoState.lastReplyText = welcomeText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     container.innerHTML = `
       <div class="chat-sim-msg agent">

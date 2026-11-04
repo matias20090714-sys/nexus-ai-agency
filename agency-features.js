@@ -35,14 +35,14 @@ async function getAgencyKnowledgeContext(identifier) {
 async function checkAndAlertOwner(agencyId, senderPhone, textBody, activeSock) {
   try {
     const text = (textBody || '').toLowerCase();
-    const isHighIntent = 
-      text.includes('contrat') || 
-      text.includes('comprar') || 
-      text.includes('cotiz') || 
-      text.includes('transferencia') || 
-      text.includes('cbu') || 
-      text.includes('humano') || 
-      text.includes('asesor') || 
+    const isHighIntent =
+      text.includes('contrat') ||
+      text.includes('comprar') ||
+      text.includes('cotiz') ||
+      text.includes('transferencia') ||
+      text.includes('cbu') ||
+      text.includes('humano') ||
+      text.includes('asesor') ||
       text.includes('interesa el plan') ||
       text.includes('link de pago');
 
@@ -68,7 +68,7 @@ async function checkAndAlertOwner(agencyId, senderPhone, textBody, activeSock) {
     if (!alertPhone || alertPhone.length < 8) return;
 
     const alertJid = `${alertPhone}@s.whatsapp.net`;
-    const alertMessage = 
+    const alertMessage =
       `🚨 *¡ALERTA DE LEAD CALIFICADO!* (${agency.name})\n\n` +
       `👤 *Prospecto:* +${senderPhone}\n` +
       `💬 *Mensaje Recibido:* "${textBody}"\n\n` +
@@ -109,11 +109,11 @@ function startAppointmentReminderCron(getActiveSock) {
           const cleanPhone = appt.contact_phone.replace(/\D/g, '');
           const jid = `${cleanPhone}@s.whatsapp.net`;
           const timeStr = new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const msg = `👋 Hola *${appt.contact_name}*, te recordamos tu cita de *${appt.service_name || 'Atención'}* mañana a las *${timeStr} hs* con ${appt.agency_name}.\n\n¿Nos confirmas tu asistencia? (Responde *SI* para confirmar o avísanos si necesitas reprogramar). ¡Gracias!`;
-          
+          const msg = `Hola *${appt.contact_name}*, te recordamos tu cita de *${appt.service_name || 'Atención'}* mañana a las *${timeStr} hs* con ${appt.agency_name}.\n\n¿Nos confirmas tu asistencia? (Responde *SI* para confirmar o avísanos si necesitas reprogramar). Muchas gracias.`;
+
           await sock.sendMessage(jid, { text: msg });
           await db.query(`UPDATE appointments SET reminder_24h_sent = TRUE WHERE id = $1`, [appt.id]);
-          console.log(`[Recordatorios] 📲 Recordatorio 24h enviado a ${appt.contact_name} (+${cleanPhone})`);
+          console.log(`[Recordatorios] Recordatorio 24h enviado a ${appt.contact_name} (+${cleanPhone})`);
         }
       }
 
@@ -137,8 +137,8 @@ function startAppointmentReminderCron(getActiveSock) {
           const cleanPhone = appt.contact_phone.replace(/\D/g, '');
           const jid = `${cleanPhone}@s.whatsapp.net`;
           const timeStr = new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const msg = `⏰ Hola *${appt.contact_name}*, tu cita de *${appt.service_name || 'Atención'}* es en menos de 2 horas (*${timeStr} hs*). Te esperamos puntual en ${appt.agency_name}. ¡Hasta pronto!`;
-          
+          const msg = `Hola *${appt.contact_name}*, tu cita de *${appt.service_name || 'Atención'}* es en menos de 2 horas (*${timeStr} hs*). Te esperamos puntual en ${appt.agency_name}. Hasta pronto.`;
+
           await sock.sendMessage(jid, { text: msg });
           await db.query(`UPDATE appointments SET reminder_2h_sent = TRUE WHERE id = $1`, [appt.id]);
           console.log(`[Recordatorios] 📲 Recordatorio 2h enviado a ${appt.contact_name} (+${cleanPhone})`);
@@ -218,14 +218,14 @@ async function getGoogleCalendarAccessToken() {
   if (process.env.GOOGLE_CREDENTIALS_JSON) {
     try {
       creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-    } catch (e) {}
+    } catch (e) { }
   }
   if (!creds) {
     const credsPath = path.join(__dirname, 'google-credentials.json');
     if (fs.existsSync(credsPath)) {
       try {
         creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-      } catch (e) {}
+      } catch (e) { }
     }
   }
   if (!creds || !creds.client_email || !creds.private_key) return null;
@@ -304,9 +304,9 @@ function getDefaultFollowUpTemplates(contactName = 'Cliente', topic = 'Automatiz
   const cleanName = contactName || 'Cliente';
   const cleanTopic = topic || 'nuestros servicios';
   return {
-    stage1_2h: `👋 ¡Hola *${cleanName}*! Vi que hace un rato estuvimos conversando sobre *${cleanTopic}* pero quizás te ocupaste.\n\nTe dejo un dato rápido: nuestros clientes están recuperando más del *38% de consultas perdidas* desde la primera semana. ¿Te gustaría que te muestre una demo rápida o tenías alguna duda puntual?`,
-    stage2_24h: `✨ ¡Hola *${cleanName}*! Paso por aquí brevemente de parte de *${agencyName}*.\n\nSé que el día a día es súper ocupado, por eso mismo implementamos sistemas que atienden y agendan 24/7 sin que tengas que estar pegado al celular. ¿Te queda cómodo si coordinamos una llamada de 5 minutos hoy o mañana para ver tu caso?`,
-    stage3_72h: `🚀 Hola *${cleanName}*, te escribo por última vez para no molestar.\n\nEsta semana nos quedan solo *2 cupos de implementación prioritaria* con bonificación en la instalación para el área de *${cleanTopic}*. Si todavía te interesa escalar tu atención y ventas este mes, respóndeme *"QUIERO"* y te reservo el lugar ahora mismo. ¡Éxitos!`
+    stage1_2h: `Hola *${cleanName}*, vi que hace un rato estuvimos conversando sobre *${cleanTopic}* pero quizás te ocupaste.\n\nQuedamos a tu disposición por si te quedó alguna duda puntual o si deseas que avancemos con tu reserva o propuesta.`,
+    stage2_24h: `Hola *${cleanName}*, te escribo brevemente de parte de *${agencyName}*.\n\nSé que el día a día es muy ocupado; cuando te quede cómodo avísame si prefieres que coordinemos tu atención para esta semana o si necesitas alguna información adicional.`,
+    stage3_72h: `Hola *${cleanName}*, te contacto por última vez para no incomodar.\n\nSeguimos con disponibilidad abierta para *${cleanTopic}* en *${agencyName}*. Si todavía deseas avanzar este mes, respóndeme por este medio y lo dejamos coordinado de inmediato. Muchos éxitos.`
   };
 }
 
@@ -367,7 +367,7 @@ async function getFollowUpsList(agencyId) {
       [cleanAgency]
     );
     if (res && res.rows) return res.rows;
-  } catch (e) {}
+  } catch (e) { }
   return memoryFollowUps.filter(f => f.agency_id === cleanAgency);
 }
 
@@ -381,7 +381,7 @@ async function triggerFollowUpNow(agencyId, followUpId, customStage, getActiveSo
       [followUpId, cleanAgency]
     );
     record = res?.rows?.[0];
-  } catch (e) {}
+  } catch (e) { }
 
   if (!record) {
     record = memoryFollowUps.find(f => String(f.id) === String(followUpId));
@@ -436,7 +436,7 @@ async function deleteFollowUpSequence(agencyId, followUpId) {
   const cleanAgency = agencyId || 'agency_master_1';
   try {
     await db.query(`DELETE FROM followup_sequences WHERE id = $1 AND agency_id = $2`, [followUpId, cleanAgency]);
-  } catch (e) {}
+  } catch (e) { }
   const idx = memoryFollowUps.findIndex(f => String(f.id) === String(followUpId));
   if (idx !== -1) memoryFollowUps.splice(idx, 1);
   return true;
