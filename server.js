@@ -40,6 +40,7 @@ const {
   deleteFollowUpSequence,
   startFollowUpCron
 } = require('./agency-features');
+const { AGENCY_BLUEPRINTS } = require('./agents-data');
 
 const PORT = process.env.PORT || 5180;
 const MIME_TYPES = {
@@ -54,6 +55,86 @@ const MIME_TYPES = {
 
 // Active Baileys sessions store
 const activeSessions = {};
+const activeClientByAgency = {}; // agencyId -> activeClientId selected in UI
+const processedWaMsgIds = new Set(); // prevent duplicate replies
+const liveWaContactsByAgency = {}; // agencyId -> array of live WhatsApp leads/messages
+
+function recordLiveWaMessage(agencyId, phone, pushName, senderRole, text, companyName = 'WhatsApp Directo') {
+  const agKey = agencyId || 'agency_master_1';
+  if (!liveWaContactsByAgency[agKey]) liveWaContactsByAgency[agKey] = [];
+  const clean = String(phone || '').replace(/\D/g, '') || String(phone || 'contacto');
+  let lead = liveWaContactsByAgency[agKey].find(l => l.phone.replace(/\D/g, '') === clean || l.phone === phone);
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (!lead) {
+    lead = {
+      id: 'wa_' + clean,
+      phone: clean.startsWith('+') ? clean : `+${clean}`,
+      name: pushName || `Cliente (+${clean.slice(-4)})`,
+      company: companyName,
+      stage: 'Calificado',
+      timestamp: timeStr,
+      lastMessage: text,
+      history: []
+    };
+    liveWaContactsByAgency[agKey].unshift(lead);
+  } else {
+    if (pushName && (!lead.name || lead.name.startsWith('Cliente') || lead.name.startsWith('Lead'))) {
+      lead.name = pushName;
+    }
+    if (companyName && companyName !== 'WhatsApp Directo') {
+      lead.company = companyName;
+    }
+    lead.timestamp = timeStr;
+    lead.lastMessage = text;
+  }
+  lead.history.push({
+    sender: senderRole === 'user' ? 'user' : 'agent',
+    text: String(text || ''),
+    time: timeStr
+  });
+  if (lead.history.length > 50) lead.history = lead.history.slice(-50);
+}
+
+function extractIncomingMessageText(rawMessage) {
+  if (!rawMessage || typeof rawMessage !== 'object') return '';
+  // Unwrap ephemeral / viewOnce / edited / documentWithCaption containers
+  const m =
+    rawMessage.ephemeralMessage?.message ||
+    rawMessage.viewOnceMessage?.message ||
+    rawMessage.viewOnceMessageV2?.message ||
+    rawMessage.viewOnceMessageV2Extension?.message ||
+    rawMessage.documentWithCaptionMessage?.message ||
+    rawMessage.editedMessage?.message?.protocolMessage?.editedMessage ||
+    rawMessage;
+
+  const directText =
+    m.conversation ||
+    m.extendedTextMessage?.text ||
+    m.buttonsResponseMessage?.selectedDisplayText ||
+    m.listResponseMessage?.title ||
+    m.templateButtonReplyMessage?.selectedDisplayText ||
+    '';
+
+  if (directText && directText.trim()) return directText.trim();
+
+  if (m.imageMessage) {
+    const caption = m.imageMessage.caption || '';
+    return caption
+      ? `[Imagen/Comprobante enviado con nota: "${caption}"]`
+      : 'Hola, te acabo de enviar una imagen / comprobante por aquí. ¿Me confirmas si lo recibiste?';
+  }
+  if (m.videoMessage) {
+    return m.videoMessage.caption || 'Hola, te acabo de enviar un video con mi consulta.';
+  }
+  if (m.audioMessage) {
+    return 'Hola, te acabo de enviar una nota de voz con mi consulta. ¿Me comentas qué servicios ofrecen y cómo trabajan?';
+  }
+  if (m.documentMessage) {
+    const docTitle = m.documentMessage.fileName || 'documento';
+    return `Hola, te acabo de adjuntar el archivo "${docTitle}". ¿Me confirmas recepción y próximos pasos?`;
+  }
+  return '';
+}
 
 // Human Takeover (Pausa Humana Anti-Choque por Conversación)
 const pausedHumanChats = new Map(); // key: `${sessionId}_${cleanPhone}` -> { pausedUntil, reason }
@@ -176,7 +257,14 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
   });
   sessionData.sock = sock;
 
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', async () => {
+    await saveCreds();
+    if (state?.creds?.me?.id) {
+      const mePhone = state.creds.me.id.split(':')[0].split('@')[0];
+      if (mePhone) sessionData.phone = mePhone;
+      if (state.creds.me.name) sessionData.userName = state.creds.me.name;
+    }
+  });
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -207,17 +295,19 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
       sessionData.pairingCode = null;
       sessionData.status = 'connected';
       
-      const userJid = sock.user ? sock.user.id : '';
-      const cleanPhone = userJid.split(':')[0] || userJid.split('@')[0];
+      const userObj = sock.user || state?.creds?.me || {};
+      const userJid = userObj.id || '';
+      const cleanPhone = userJid.split(':')[0] || userJid.split('@')[0] || sessionData.phone || '';
+      const userLid = (userObj.lid || '').split(':')[0].split('@')[0];
       sessionData.phone = cleanPhone;
-      sessionData.userName = (sock.user && sock.user.name) || 'WhatsApp Empresa';
+      sessionData.lid = userLid;
+      sessionData.userName = userObj.name || sessionData.userName || 'WhatsApp Empresa';
       
       console.log(`[Baileys - ${sessionId}] 🎉 ¡WhatsApp Real Vinculado con éxito! Línea: +${cleanPhone}`);
     }
 
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const wasConnected = sessionData.connected;
       sessionData.connected = false;
 
       console.log(`[Baileys - ${sessionId}] Conexión cerrada (${statusCode || 'unknown'}).`);
@@ -228,83 +318,101 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
 
       if (statusCode === DisconnectReason.loggedOut) {
         sessionData.status = 'logged_out';
+        sessionData.phone = null;
         try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) {}
       } else {
         sessionData.status = 'reconnecting';
       }
 
-      // Automatically re-initialize to keep QR or pairing code always alive and ready
+      // Fast reconnect (400ms) on 515 restartRequired right after QR scan, 1500ms otherwise
+      const delayMs = statusCode === DisconnectReason.restartRequired || statusCode === 515 ? 400 : 1500;
       setTimeout(() => {
         getOrInitBaileysSession(sessionId).catch(e => console.error('Error reiniciando sesión Baileys:', e.message));
-      }, 2000);
+      }, delayMs);
     }
   });
 
   // Listen to Real Incoming Messages & Auto-Respond with AI
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type === 'notify') {
-      for (const msg of messages) {
-        const senderJid = msg.key?.remoteJid;
-        if (!senderJid || senderJid.includes('@g.us') || senderJid.includes('status@broadcast')) continue;
-        const senderNumber = senderJid.split('@')[0];
+    if (type !== 'notify' && type !== 'append') return;
 
-        // Automatic Human Takeover Detection: If the business owner sends a manual message from their phone
-        if (msg.key.fromMe && msg.message) {
-          const aiCooldownUntil = aiOutgoingCooldowns.get(senderNumber) || 0;
-          if (Date.now() > aiCooldownUntil) {
-            setChatHumanTakeover(sessionId, senderNumber, true, 120, 'Mensaje manual enviado desde el teléfono del dueño');
-            console.log(`[Baileys - ${sessionId}] ⏸️ Pausa Humana Anti-Choque activada automáticamente (2h) para +${senderNumber} tras respuesta manual del humano.`);
+    for (const msg of messages) {
+      try {
+        if (!msg || !msg.message || !msg.key) continue;
+        const msgId = msg.key.id;
+        if (msgId && processedWaMsgIds.has(msgId)) continue;
+
+        // Ignore old history sync messages (older than 60 seconds)
+        const msgTimestamp = Number(msg.messageTimestamp || 0);
+        if (msgTimestamp > 0 && (Date.now() / 1000 - msgTimestamp) > 60) continue;
+
+        const senderJid = msg.key.remoteJid;
+        if (!senderJid || senderJid.includes('@g.us') || senderJid.includes('status@broadcast') || senderJid.includes('@newsletter')) continue;
+
+        const altJid = msg.key.remoteJidAlt || msg.key.participant || '';
+        const rawSenderPart = (altJid.includes('@s.whatsapp.net') ? altJid : senderJid).split('@')[0].split(':')[0];
+        const senderNumber = rawSenderPart || senderJid.split('@')[0];
+
+        const ownPhone = String(sessionData.phone || '').replace(/\D/g, '');
+        const ownLid = String(sessionData.lid || '').replace(/\D/g, '');
+        const cleanSenderDigits = senderNumber.replace(/\D/g, '');
+        const isSelfChat = (ownPhone && cleanSenderDigits === ownPhone) || (ownLid && cleanSenderDigits === ownLid);
+
+        // If message is fromMe: ignore unless the user is testing in their own "Message Yourself" chat
+        if (msg.key.fromMe) {
+          const aiCooldownUntil = aiOutgoingCooldowns.get(senderNumber) || aiOutgoingCooldowns.get(senderJid) || 0;
+          if (!isSelfChat || Date.now() <= aiCooldownUntil) {
+            continue;
           }
+        }
+
+        const textBody = extractIncomingMessageText(msg.message);
+        if (!textBody || !textBody.trim()) continue;
+
+        if (msgId) {
+          processedWaMsgIds.add(msgId);
+          if (processedWaMsgIds.size > 1000) {
+            const firstKey = processedWaMsgIds.values().next().value;
+            processedWaMsgIds.delete(firstKey);
+          }
+        }
+
+        const pushName = msg.pushName || `Cliente +${senderNumber}`;
+        console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber} (${senderJid}): "${textBody}"`);
+
+        const agId = sessionId.startsWith('agency_')
+          ? sessionId.replace('agency_', '')
+          : 'agency_master_1';
+
+        // Check manual Human Takeover / Pausa Humana (only when explicitly toggled in dashboard)
+        const pauseState = isChatPausedForHuman(sessionId, senderNumber);
+        if (pauseState) {
+          console.log(`[Baileys - ${sessionId}] ⏸️ IA en Pausa Humana manual para +${senderNumber}.`);
+          recordLiveWaMessage(agId, senderNumber, pushName, 'user', textBody);
           continue;
         }
 
-        if (!msg.key.fromMe && msg.message) {
-          const pushName = msg.pushName || `Lead +${senderNumber}`;
-          let textBody = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+        // Resolve which client/company this session belongs to
+        const ctx = await getAgentCompanyContext(sessionId, agId);
+        recordLiveWaMessage(agId, senderNumber, pushName, 'user', textBody, ctx.companyName);
 
-          // Support Multimodal Incoming Messages (Images/Receipts, Voice Notes, Documents)
-          if (!textBody && msg.message.imageMessage) {
-            const caption = msg.message.imageMessage.caption || '';
-            textBody = caption
-              ? `[Imagen/Comprobante enviado con nota: "${caption}"]`
-              : 'Hola, te acabo de enviar una imagen / comprobante por aquí. ¿Me confirmas si lo recibiste?';
-          } else if (!textBody && msg.message.audioMessage) {
-            textBody = 'Hola, te acabo de enviar una nota de voz con mi consulta. ¿Me comentas cómo trabajan y cuáles son los pasos?';
-          } else if (!textBody && msg.message.documentMessage) {
-            const docTitle = msg.message.documentMessage.fileName || 'documento';
-            textBody = `Hola, te acabo de adjuntar el archivo "${docTitle}". ¿Me confirmas recepción y próximos pasos?`;
-          }
+        // Feature 5 & 6: Owner Alerts & Anti-Ghosting Follow-up
+        checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
+        registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60)).catch(() => {});
 
-          console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber}: "${textBody}"`);
-
-          if (textBody && textBody.trim()) {
-            try {
-              const agId = sessionId.replace('agency_', '').replace('client_', '') || 'agency_master_1';
-              // Feature 5: Check and Alert Owner for High-Intent Lead
-              checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
-              // Feature 6: Register/Update Anti-Ghosting Follow-up Sequence (2h / 24h / 72h)
-              registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60)).catch(() => {});
-
-              // Check Human Takeover / Pausa Humana before AI replies
-              const pauseState = isChatPausedForHuman(sessionId, senderNumber);
-              if (pauseState) {
-                console.log(`[Baileys - ${sessionId}] ⏸️ IA en Pausa Humana para +${senderNumber} (no responde para no interrumpir al humano).`);
-                continue;
-              }
-
-              // Simulate human delay (1.2s)
-              await new Promise(r => setTimeout(r, 1200));
-              const aiReply = await generateAiAgentResponse(textBody, senderNumber, sessionId, agId);
-              if (aiReply && sock) {
-                aiOutgoingCooldowns.set(senderNumber, Date.now() + 8000);
-                await sock.sendMessage(senderJid, { text: aiReply });
-                console.log(`[Baileys - ${sessionId}] 🤖 IA respondió a +${senderNumber}: "${aiReply.slice(0, 40)}..."`);
-              }
-            } catch (replyErr) {
-              console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
-            }
-          }
+        // Simulate natural human typing delay (1.0s)
+        await new Promise(r => setTimeout(r, 1000));
+        const aiReply = await generateAiAgentResponse(textBody, senderNumber, sessionId, agId);
+        if (aiReply && sock) {
+          aiOutgoingCooldowns.set(senderNumber, Date.now() + 10000);
+          aiOutgoingCooldowns.set(senderJid, Date.now() + 10000);
+          const sentMsg = await sock.sendMessage(senderJid, { text: aiReply });
+          if (sentMsg?.key?.id) processedWaMsgIds.add(sentMsg.key.id);
+          recordLiveWaMessage(agId, senderNumber, pushName, 'agent', aiReply, ctx.companyName);
+          console.log(`[Baileys - ${sessionId}] 🤖 IA (${ctx.companyName}) respondió a +${senderNumber}: "${aiReply.slice(0, 50)}..."`);
         }
+      } catch (replyErr) {
+        console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
       }
     }
   });
@@ -596,19 +704,65 @@ function getNicheSalesPlaybook(industry = '') {
   ${dom.closingCapturePrompt}`;
 }
 
+function findMatchingBlueprintForCompany(industry = '', companyName = '') {
+  const combined = `${industry} ${companyName}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (!Array.isArray(AGENCY_BLUEPRINTS) || AGENCY_BLUEPRINTS.length === 0) return null;
+
+  if (combined.includes('salud') || combined.includes('clinic') || combined.includes('dental') || combined.includes('odont') || combined.includes('medic') || combined.includes('consultorio') || combined.includes('hospital') || combined.includes('dr.') || combined.includes('dra.')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'salud_clinicas') || AGENCY_BLUEPRINTS[0];
+  }
+  if (combined.includes('inmobili') || combined.includes('propiedad') || combined.includes('bienes raic') || combined.includes('real estate') || combined.includes('lote') || combined.includes('construct')) {
+    if (combined.includes('construc') || combined.includes('arquitec') || combined.includes('reforma') || combined.includes('piscin')) {
+      return AGENCY_BLUEPRINTS.find(b => b.id === 'construccion_reformas');
+    }
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'inmobiliarias');
+  }
+  if (combined.includes('juridic') || combined.includes('abogad') || combined.includes('legal') || combined.includes('contabl') || combined.includes('notar')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'legal_contable');
+  }
+  if (combined.includes('hotel') || combined.includes('caban') || combined.includes('turism') || combined.includes('resort') || combined.includes('posada')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'hoteleria_turismo');
+  }
+  if (combined.includes('educac') || combined.includes('academi') || combined.includes('curso') || combined.includes('instituto') || combined.includes('colegio')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'educacion_academias');
+  }
+  if (combined.includes('belleza') || combined.includes('barber') || combined.includes('peluquer') || combined.includes('spa') || combined.includes('salon') || combined.includes('estetic')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'belleza_barberias');
+  }
+  if (combined.includes('restauran') || combined.includes('gastronom') || combined.includes('comida') || combined.includes('pizz') || combined.includes('sushi') || combined.includes('bistro') || combined.includes('bar ')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'gastronomia');
+  }
+  if (combined.includes('tienda') || combined.includes('ecommerce') || combined.includes('retail') || combined.includes('ropa') || combined.includes('calzado') || combined.includes('boutique')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'ecommerce_retail');
+  }
+  if (combined.includes('gimnasio') || combined.includes('fitness') || combined.includes('gym') || combined.includes('crossfit') || combined.includes('entrenamient')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'fitness_gym');
+  }
+  if (combined.includes('taller') || combined.includes('mecanic') || combined.includes('automot') || combined.includes('concesionar') || combined.includes('autos') || combined.includes('lubricentro')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'automotriz');
+  }
+  return AGENCY_BLUEPRINTS.find(b => b.category === industry) || null;
+}
+
 // Resolver context of specific client / company by session or agency ID
 async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_1') {
   const allCompanies = Object.values(memoryCompanies).flat();
   let matched = null;
 
   // 1. Match by sessionId (e.g. client_client-1729... or client-1729...)
-  if (sessionId) {
+  if (sessionId && sessionId !== 'agency_hq') {
     const cleanSess = sessionId.replace('client_', '').replace('agency_', '');
     matched = allCompanies.find(c => c.id === cleanSess || c.id === sessionId || `client_${c.id}` === sessionId || `agency_${c.id}` === sessionId);
   }
 
-  // 2. Match by agencyId if not matched
-  if (!matched && agencyId) {
+  // 2. Match by activeClientByAgency if the user selected a client in the dashboard
+  if (!matched && agencyId && activeClientByAgency[agencyId] && activeClientByAgency[agencyId] !== 'agency_hq') {
+    const activeCid = activeClientByAgency[agencyId];
+    matched = allCompanies.find(c => c.id === activeCid);
+  }
+
+  // 3. Match by agencyId if not matched (and not explicitly requesting agency_hq)
+  if (!matched && agencyId && sessionId !== 'agency_hq') {
     const cleanAg = agencyId.replace('agency_', '').replace('client_', '');
     matched = allCompanies.find(c => c.id === cleanAg || c.id === agencyId);
     if (!matched && memoryCompanies[agencyId] && memoryCompanies[agencyId].length > 0) {
@@ -619,8 +773,8 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     }
   }
 
-  // 3. Fallback to first company in memory if available
-  if (!matched && allCompanies.length > 0) {
+  // 4. Fallback to first company in memory if available (unless explicitly testing agency_hq)
+  if (!matched && allCompanies.length > 0 && sessionId !== 'agency_hq') {
     matched = allCompanies[0];
   }
 
@@ -675,11 +829,25 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     } catch (e) {}
   }
 
+  // Auto-hydrate blueprint catalog and flows if company was created without explicit catalog items
+  const matchedBlueprint = findMatchingBlueprintForCompany(hydrated.industry, hydrated.name);
+  if (matchedBlueprint) {
+    if (!Array.isArray(hydrated.catalog) || hydrated.catalog.length === 0) {
+      hydrated.catalog = matchedBlueprint.defaultCatalog || [];
+    }
+    if (!hydrated.salesFlow) hydrated.salesFlow = matchedBlueprint.salesFlow;
+    if (!hydrated.supportFlow) hydrated.supportFlow = matchedBlueprint.supportFlow;
+    if (!hydrated.afterSalesFlow) hydrated.afterSalesFlow = matchedBlueprint.afterSalesFlow;
+    if (!hydrated.industry || hydrated.industry === 'Otro Rubro' || hydrated.industry === 'Servicios') {
+      hydrated.industry = matchedBlueprint.category;
+    }
+  }
+
   // Build rich catalog summary text from matched company's catalog
   let catalogSummary = '';
   if (Array.isArray(hydrated.catalog) && hydrated.catalog.length > 0) {
     catalogSummary = hydrated.catalog.map(item => {
-      const parts = [`• ${item.name}: $${item.price}`];
+      const parts = [`• ${item.name}: $${item.price} USD`];
       if (item.duration) parts.push(`(${item.duration})`);
       if (item.description || item.benefits) {
         parts.push(`- ${item.description || item.benefits}`);
@@ -689,7 +857,7 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
   } else if (hydrated.notes && hydrated.notes.includes('$')) {
     catalogSummary = hydrated.notes;
   } else {
-    catalogSummary = 'Contamos con servicios especializados y propuestas personalizadas adaptadas a cada cliente.';
+    catalogSummary = 'Contamos con servicios especializados y atención personalizada adaptada a cada necesidad.';
   }
 
   // Build sales flow string
@@ -697,7 +865,7 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
   if (hydrated.salesFlow && typeof hydrated.salesFlow === 'object') {
     salesFlowStr = [
       hydrated.salesFlow.qualification ? `Pregunta de Calificación: ${hydrated.salesFlow.qualification}` : '',
-      hydrated.salesFlow.budgetQuestion ? `Pregunta de Presupuesto: ${hydrated.salesFlow.budgetQuestion}` : '',
+      hydrated.salesFlow.budget || hydrated.salesFlow.budgetQuestion ? `Pregunta de Presupuesto: ${hydrated.salesFlow.budget || hydrated.salesFlow.budgetQuestion}` : '',
       hydrated.salesFlow.urgencyQuestion ? `Pregunta de Urgencia / Tiempo: ${hydrated.salesFlow.urgencyQuestion}` : '',
       hydrated.salesFlow.objections ? `Manejo de Objeciones: ${hydrated.salesFlow.objections}` : '',
       hydrated.salesFlow.closing ? `Llamado al Cierre: ${hydrated.salesFlow.closing}` : ''
@@ -713,7 +881,7 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
   if (hydrated.supportFlow && typeof hydrated.supportFlow === 'object') {
     const faqs = Array.isArray(hydrated.supportFlow.faq) 
       ? hydrated.supportFlow.faq.map(f => `P: ${f.q} | R: ${f.a}`).join('\n') 
-      : '';
+      : (hydrated.supportFlow.faqs || '');
     supportStr = [
       faqs ? `Preguntas Frecuentes:\n${faqs}` : '',
       hydrated.supportFlow.emergency ? `Protocolo de Emergencia / Escalación: ${hydrated.supportFlow.emergency}` : ''
@@ -730,7 +898,7 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     afterSalesStr = [
       hydrated.afterSalesFlow.onboarding ? `Onboarding: ${hydrated.afterSalesFlow.onboarding}` : '',
       hydrated.afterSalesFlow.guarantee ? `Garantía y Respaldo: ${hydrated.afterSalesFlow.guarantee}` : '',
-      hydrated.afterSalesFlow.followUp ? `Seguimiento: ${hydrated.afterSalesFlow.followUp}` : ''
+      hydrated.afterSalesFlow.followUp || hydrated.afterSalesFlow.message ? `Seguimiento: ${hydrated.afterSalesFlow.followUp || hydrated.afterSalesFlow.message}` : ''
     ].filter(Boolean).join('\n');
   } else if (hydrated.afterSalesFlow) {
     afterSalesStr = String(hydrated.afterSalesFlow);
@@ -745,11 +913,11 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     id: hydrated.id,
     companyName: hydrated.name || 'Empresa',
     industry: industryStr,
-    agentName: hydrated.agentName || `Asesor Comercial de ${hydrated.name || 'la empresa'}`,
+    agentName: hydrated.agentName || `Coordinador de ${hydrated.name || 'la empresa'}`,
     tone: hydrated.tone || 'profesional_calido_y_persuasivo',
-    systemPrompt: hydrated.systemPrompt || `Eres el asesor y consultor comercial de ${hydrated.name}. Dialoga con empatía, elocuencia y calidez humana. Explica con claridad los beneficios de nuestros servicios, resuelve objeciones con seguridad y orienta con naturalidad hacia el cierre comercial o reserva de turno.`,
+    systemPrompt: hydrated.systemPrompt || `Eres el especialista y asesor oficial de ${hydrated.name} (${industryStr}). Dialoga con empatía, solvencia profesional y calidez humana. Explica con claridad los beneficios de nuestros servicios/tratamientos, resuelve dudas con seguridad y orienta hacia la reserva de turno o contratación.`,
     catalogSummary: catalogSummary,
-    knowledgeBase: hydrated.knowledgeBase || `Atención de Lunes a Sábados. Consultas y reservas directas por WhatsApp.`,
+    knowledgeBase: hydrated.knowledgeBase || `Atención de Lunes a Sábados de 09:00 a 19:00 hs. Consultas y reservas de turnos directas por WhatsApp.`,
     salesFlow: salesFlowStr,
     supportSummary: supportStr,
     afterSalesSummary: afterSalesStr,
@@ -828,18 +996,18 @@ function buildGeminiContents(history, currentMessage) {
 // ==================== CONSULTATIVE SALES REASONING ENGINE ====================
 function generateContextualSalesReply(lowerText, rawText, history, ctx, docContext) {
   const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
-  const lastUserMsg = history.filter(h => h.role === 'user').slice(-2, -1)[0]?.text || '';
   const lowerBot = lastBotMsg.toLowerCase();
   const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan') || (h.text || '').toLowerCase().includes('costo') || (h.text || '').toLowerCase().includes('usd'));
   const hadTurnDiscussion = history.some(h => (h.text || '').toLowerCase().includes('turno') || (h.text || '').toLowerCase().includes('cita') || (h.text || '').toLowerCase().includes('agenda') || (h.text || '').toLowerCase().includes('horario'));
   const isConversationOngoing = history.length > 0;
   const dom = getIndustryDomainIntelligence(ctx.industry, ctx.companyName);
+  const isAiAgency = ctx.id === 'default_agency' || /automatizaci|inteligencia artificial|agencia de ia/i.test(ctx.industry || '');
 
   let reply = '';
 
   // 1. RAG Documentation Match
   if (docContext && (lowerText.includes('precio') || lowerText.includes('catalogo') || lowerText.includes('catálogo') || lowerText.includes('servicio') || lowerText.includes('costo') || lowerText.includes('cuanto') || lowerText.includes('cuánto'))) {
-    reply = `¡Con gusto! Aquí tienes los detalles oficiales de ${ctx.companyName}:\n\n${docContext.slice(0, 480)}...\n\n¿Te gustaría coordinar una cotización a medida o prefieres agendar un turno para avanzar?`;
+    reply = `¡Con gusto! Aquí tienes los detalles oficiales de *${ctx.companyName}*:\n\n${docContext.slice(0, 480)}...\n\n${dom.triageQuestion}`;
   }
 
   // 2. Affirmations & Agreements (sii, si, sí, dale, opino que si, claro, etc.)
@@ -848,53 +1016,54 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText === 'si' || lowerText.startsWith('si ') || lowerText === 'sí' || lowerText.startsWith('sí ') || lowerText.includes('sii') || lowerText.includes('siii');
 
   if (!reply && isAffirmative) {
-    if (lowerBot.includes('activación') || lowerBot.includes('activacion') || lowerBot.includes('datos directos') || lowerBot.includes('llamada de 10') || lowerBot.includes('cuál te va mejor') || lowerBot.includes('cual te va mejor')) {
-      reply = `¡Excelente! 🚀 Quedamos a un solo paso de activar tu servicio en ${ctx.companyName}. Puedes realizar el alta directa o si prefieres la breve llamada estratégica de 10 minutos, indícanos por favor qué horario te queda más cómodo (mañana o tarde) y tu número o disponibilidad para agendarte de inmediato. ¡Te esperamos!`;
-    } else if (hadPriceDiscussion || lowerBot.includes('starter') || lowerBot.includes('growth') || lowerBot.includes('usd') || lowerBot.includes('$') || lowerBot.includes('planes y servicios') || lowerBot.includes('alternativas oficiales') || lowerBot.includes('prioritario')) {
-      reply = `¡Genial, avancemos! 🚀 Para dejar todo listo y comenzar a operar de inmediato en ${ctx.companyName}:\n\n¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales? ¿Cuál te va mejor?`;
+    if (hadPriceDiscussion || hadTurnDiscussion || lowerBot.includes('turno') || lowerBot.includes('reservar') || lowerBot.includes('agendar') || lowerBot.includes('valoración') || lowerBot.includes('$')) {
+      reply = `¡Excelente! Avanzamos entonces en *${ctx.companyName}*. 📅\n\n${dom.closingCapturePrompt}`;
+    } else if (isAiAgency) {
+      reply = `¡Excelente! 🚀 Te cuento en concreto cómo te ayudamos en *${ctx.companyName}*:\n\n` +
+        `1. ⚡ Automatizamos tu atención y ventas en WhatsApp 24/7 para responder al instante.\n` +
+        `2. 🎯 Calificamos a cada cliente y resolvemos dudas con naturalidad.\n` +
+        `3. 📅 Agendamos citas en calendario y enviamos cotizaciones.\n\n` +
+        `Nuestros planes oficiales son:\n${ctx.catalogSummary}\n\n` +
+        `¿Cuál de estas alternativas se ajusta mejor a tu negocio?`;
     } else {
-      reply = `¡Excelente! 🚀 Te cuento en concreto cómo te ayudamos en ${ctx.companyName}:\n\n` +
-        `1. ⚡ Automatizamos tu atención y ventas en WhatsApp 24/7 para responder al instante y nunca perder prospectos por demoras.\n` +
-        `2. 🎯 Calificamos a cada cliente, resolvemos dudas frecuentes y manejamos objeciones con total naturalidad.\n` +
-        `3. 📅 Agendamos citas en calendario y enviamos cotizaciones con medios de pago directo.\n\n` +
-        `Nuestros planes y servicios oficiales son:\n${ctx.catalogSummary}\n\n` +
-        `¿Cuál de estas alternativas se ajusta mejor a tu negocio o prefieres que coordinemos una breve demo para mostrártelo en vivo?`;
+      reply = `¡Excelente! Te comparto las prestaciones y aranceles principales con los que trabajamos en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
     }
   }
 
-  // 3. Intención de Compra Directa / Pago / Contratación
+  // 3. Intención de Compra Directa / Reserva de Turno / Contratación
   const isBuyingSignal = lowerText.includes('me interesa') || lowerText.includes('quiero contratar') || lowerText.includes('como contrato') || lowerText.includes('cómo contrato') ||
     lowerText.includes('como pago') || lowerText.includes('cómo pago') || lowerText.includes('donde pago') || lowerText.includes('dónde pago') || lowerText.includes('donde transfiero') ||
     lowerText.includes('dónde transfiero') || lowerText.includes('empecemos') || lowerText.includes('lo quiero') || lowerText.includes('de una') || lowerText.includes('vamos con') ||
     lowerText.includes('acepto') || lowerText.includes('lo compro') || lowerText.includes('lo tomo') || lowerText.includes('reservamelo') || lowerText.includes('resérvamelo') ||
     lowerText.includes('agendemos') || lowerText.includes('dame los datos') || lowerText.includes('pasame el link') || lowerText.includes('pásame el link') ||
-    lowerText.includes('quiero empezar') || lowerText.includes('lo cerramos');
+    lowerText.includes('quiero empezar') || lowerText.includes('lo cerramos') || lowerText.includes('quiero un turno') || lowerText.includes('reservar turno');
 
   if (!reply && isBuyingSignal) {
-    const isPaymentOrContract = lowerText.includes('contrat') || lowerText.includes('pago') || lowerText.includes('pagar') || lowerText.includes('activ') || lowerText.includes('empez') || lowerText.includes('compr') || lowerText.includes('link') || lowerText.includes('datos');
-    if (hadTurnDiscussion && !isPaymentOrContract) {
-      reply = `¡Excelente! 🚀 Quedamos a un solo paso. Para dejar confirmada tu fecha en ${ctx.companyName}: ¿Te queda más cómodo en el turno de la mañana o prefieres por la tarde? Indícanos tu día preferido y te reservamos de inmediato.`;
-    } else {
-      reply = `¡Excelente decisión! 🚀 Nos entusiasma muchísimo comenzar a trabajar contigo en ${ctx.companyName}.\n\nPara dejar todo confirmado y avanzar de inmediato: ¿Prefieres que te pase por aquí los datos directos de activación / pago, o te queda más cómodo coordinar una breve llamada de 10 minutos para conocernos y repasar los detalles finales?`;
-    }
+    reply = `¡Excelente decisión! Será un gusto atenderte en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
   }
 
-  // 4. Pregunta de Propuesta de Valor, Ayuda y Servicios ("En qué me ayuda", "De qué trata", "Para qué sirve", "Qué hacen")
+  // 4. Pregunta de Propuesta de Valor, Especialidad y Servicios ("En qué me ayuda", "De qué trata", "Para qué sirve", "Qué hacen", "Qué servicios ofrecen")
   const isHelpOrValueQuestion = lowerText.includes('ayuda') || lowerText.includes('ayudan') || lowerText.includes('en que me') || lowerText.includes('en qué me') ||
     lowerText.includes('como me ayuda') || lowerText.includes('cómo me ayuda') || lowerText.includes('de que trata') || lowerText.includes('de qué trata') ||
     lowerText.includes('para que sirve') || lowerText.includes('para qué sirve') || lowerText.includes('que hacen') || lowerText.includes('qué hacen') ||
     lowerText.includes('a que se dedican') || lowerText.includes('a qué se dedican') || lowerText.includes('que ofrecen') || lowerText.includes('qué ofrecen') ||
-    lowerText.includes('como funciona') || lowerText.includes('cómo funciona') || lowerText.includes('que es su agencia') || lowerText.includes('qué es su agencia') ||
-    lowerText.includes('por que contratarlos') || lowerText.includes('por qué contratarlos') || lowerText.includes('beneficio') || lowerText.includes('beneficios') ||
+    lowerText.includes('como funciona') || lowerText.includes('cómo funciona') || lowerText.includes('tratamiento') || lowerText.includes('tratamientos') ||
+    lowerText.includes('especialidad') || lowerText.includes('beneficio') || lowerText.includes('beneficios') ||
     lowerText.includes('servicio') || lowerText.includes('servicios');
 
   if (!reply && isHelpOrValueQuestion) {
-    reply = `⭐ En ${ctx.companyName} somos especialistas en ${ctx.industry}. Ayudamos a empresas y profesionales a multiplicar sus ventas y ahorrar cientos de horas operativas:\n\n` +
-      `1. ⚡ Atención y ventas inmediatas en WhatsApp 24/7: ningún prospecto se va con tu competencia por demoras.\n` +
-      `2. 🎯 Calificación comercial de leads y respuestas a dudas u objeciones con lenguaje 100% natural.\n` +
-      `3. 📅 Agendamiento automático en Google Calendar y links de pago para cobrar en el acto.\n\n` +
-      `Nuestros planes y servicios oficiales son:\n${ctx.catalogSummary}\n\n` +
-      `¿Cuál de estos objetivos es el más prioritario para tu negocio hoy o prefieres coordinar una demo de 10 minutos para verlo en vivo?`;
+    if (isAiAgency) {
+      reply = `⭐ En *${ctx.companyName}* somos especialistas en ${ctx.industry}. Ayudamos a empresas y profesionales a multiplicar sus ventas y ahorrar horas operativas:\n\n` +
+        `1. ⚡ Atención y ventas inmediatas en WhatsApp 24/7.\n` +
+        `2. 🎯 Calificación comercial de prospectos y manejo de objeciones.\n` +
+        `3. 📅 Agendamiento automático en Google Calendar y cobros directos.\n\n` +
+        `Nuestros planes oficiales son:\n${ctx.catalogSummary}\n\n` +
+        `¿Cuál de estos objetivos es el más prioritario para tu negocio hoy?`;
+    } else {
+      reply = `✨ En *${ctx.companyName}* somos especialistas en *${ctx.industry}*. ${dom.valueJustification}\n\n` +
+        `Actualmente nuestras prestaciones y aranceles principales son:\n${ctx.catalogSummary}\n\n` +
+        `${dom.triageQuestion}`;
+    }
   }
 
   // 5. Manejo de Objeción de Precio (Reencuadre de Valor, ROI y Presupuesto)
@@ -903,23 +1072,38 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('algo mas barato') || lowerText.includes('algo más barato') || lowerText.includes('menos plata') || lowerText.includes('muy alto');
 
   if (!reply && isPriceObjection) {
-    reply = `Te entiendo perfectamente, cuidar la inversión es una prioridad inteligente. En ${ctx.companyName} nuestros valores están pensados para que el beneficio, la durabilidad y la tranquilidad que recibes superen con creces lo abonado, evitando gastos mayores o pérdidas de tiempo a futuro.\n\nAdemás, podemos evaluar alternativas o facilidades acordes a tu etapa actual. Cuéntame, ¿cuál de nuestras soluciones es la que más necesitas resolver hoy para ver cómo podemos adaptarla a tu caso?`;
+    reply = `Te entiendo perfectamente, cuidar tu inversión es muy importante. En *${ctx.companyName}* trabajamos con ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\nAdemás, contamos con facilidades de pago y podemos comenzar por una valoración inicial accesible para definir el plan ideal según tu presupuesto. ${dom.triageQuestion}`;
   }
 
   // 6. Facilidades y Métodos de Pago
   const isPaymentMethods = lowerText.includes('facilidades') || lowerText.includes('formas de pago') || lowerText.includes('metodos de pago') || lowerText.includes('métodos de pago') ||
-    lowerText.includes('como se paga') || lowerText.includes('cómo se paga') || lowerText.includes('tarjeta') || lowerText.includes('transferencia') || lowerText.includes('cuotas');
+    lowerText.includes('como se paga') || lowerText.includes('cómo se paga') || lowerText.includes('tarjeta') || lowerText.includes('transferencia') || lowerText.includes('cuotas') || lowerText.includes('obra social') || lowerText.includes('prepaga');
 
   if (!reply && isPaymentMethods) {
-    reply = `¡Totalmente! En ${ctx.companyName} ofrecemos diversas facilidades para que comiences de forma cómoda y sin trabas: aceptamos transferencias directas, tarjetas de débito/crédito y esquemas acordes a tu negocio.\n\nAdemás, puedes iniciar con nuestro plan base y escalar a medida que compruebes los resultados. ¿Te gustaría que te preparemos el alta con la alternativa más accesible para empezar?`;
+    reply = `¡Por supuesto! En *${ctx.companyName}* ofrecemos diversas facilidades: aceptamos efectivo, transferencias bancarias, tarjetas de débito y crédito, y emitimos comprobantes oficiales para reintegros.\n\n${dom.closingCapturePrompt}`;
+  }
+
+  // 6.B Triaje Clínico de Dolor / Urgencia Odontológica o Médica
+  const isClinicalUrgency = lowerText.includes('dolor') || lowerText.includes('duele') || lowerText.includes('muela') || lowerText.includes('diente') ||
+    lowerText.includes('urgencia') || lowerText.includes('inflam') || lowerText.includes('hincha') || lowerText.includes('sangr') ||
+    lowerText.includes('caries') || lowerText.includes('infeccion') || lowerText.includes('infección') || lowerText.includes('partio') || lowerText.includes('partió');
+
+  if (!reply && isClinicalUrgency && !isAiAgency) {
+    reply = `🩺 Comprendo perfectamente tu molestia y en *${ctx.companyName}* le damos prioridad absoluta a los casos con dolor o sensibilidad aguda para aliviarte hoy mismo.\n\n` +
+      `Lo indicado es realizar una valoración diagnóstica presencial con nuestro especialista para determinar el origen exacto y brindarte el tratamiento inmediato:\n${ctx.catalogSummary}\n\n` +
+      `${dom.closingCapturePrompt}`;
   }
 
   // 7. Recomendación Consultiva / Por cuál empezar
   const isRecommendation = lowerText.includes('que me recomiend') || lowerText.includes('qué me recomiend') || lowerText.includes('cual me recomiend') || lowerText.includes('cuál me recomiend') ||
-    lowerText.includes('por cual empiez') || lowerText.includes('por cuál empiez') || lowerText.includes('cual elijo') || lowerText.includes('cuál elijo') || lowerText.includes('recomiendan para empezar');
+    lowerText.includes('por cual empiez') || lowerText.includes('por cuál empiez') || lowerText.includes('cual elijo') || lowerText.includes('cuál elijo') || lowerText.includes('recomiendan para empezar') || lowerText.includes('molestia');
 
   if (!reply && isRecommendation) {
-    reply = `Para darte una recomendación honesta y rentable: la mayoría de las empresas comienza con nuestro Plan Starter o Growth Pro, ya que cubren de inmediato el flujo de ventas 24/7 y se pagan solos al rescatar las primeras ventas que antes se perdían por demoras.\n\nCuéntame, ¿cuál es el volumen o la meta principal que necesitas alcanzar este mes para confirmarte cuál es la mejor alternativa para ti?`;
+    if (isAiAgency) {
+      reply = `Para darte una recomendación honesta y rentable: la mayoría de las empresas comienza con nuestro Plan Starter o Growth Pro, ya que cubren de inmediato el flujo de ventas 24/7.\n\n${dom.triageQuestion}`;
+    } else {
+      reply = `Como ${dom.roleTitle} en *${ctx.companyName}*, lo que siempre recomendamos como primer paso es realizar nuestra instancia inicial de diagnóstico/valoración para evaluar tu caso en detalle y darte una solución 100% personalizada:\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
+    }
   }
 
   // 8. Manejo de Indecisión ("Lo voy a pensar", consulta con terceros)
@@ -1018,9 +1202,9 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
   // 21. Multi-Turn Progressive Fallback (NEVER REPEATS)
   if (!reply) {
     const progressiveReplies = [
-      `¡Excelente punto! En ${ctx.companyName} nos enfocamos en brindarte soluciones concretas de ${ctx.industry}. Cuéntame, ¿cuál es el principal objetivo o desafío comercial que te gustaría resolver hoy?`,
-      `¡Comprendo perfectamente! Para avanzar y mostrarte cómo podemos ayudarte de forma práctica:\n\n${ctx.catalogSummary}\n\n¿Te gustaría que analicemos cuál de estos planes se adapta mejor a tu caso o prefieres coordinar una llamada de 10 minutos para verlo en vivo?`,
-      `¡Totalmente! Para no dar vueltas y darte una propuesta a tu medida: ¿Te queda más cómodo coordinar una breve llamada estratégica de 10 minutos, o prefieres que te envíe los datos de los planes por aquí? ¿Qué te resulta más cómodo?`
+      `¡Excelente consulta! En *${ctx.companyName}* (${ctx.industry}) trabajamos de forma personalizada para brindarte la mejor atención. ${dom.triageQuestion}`,
+      `¡Comprendo perfectamente! Aquí tienes nuestras prestaciones y valores principales en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`,
+      `¡Con todo gusto! Para coordinar tu atención en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`
     ];
 
     for (const pr of progressiveReplies) {
@@ -1040,10 +1224,10 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
   );
 
   if (isDuplicate) {
-    if (hadPriceDiscussion || lowerBot.includes('starter') || lowerBot.includes('activación') || lowerBot.includes('activacion')) {
-      reply = `¡Totalmente de acuerdo! Para dar el siguiente paso en ${ctx.companyName}: ¿Prefieres que te pase los datos de pago / activación directa por aquí, o coordinamos una llamada de 10 minutos para dejarlo listo? ¿Qué te resulta más cómodo?`;
+    if (hadPriceDiscussion || hadTurnDiscussion) {
+      reply = `¡Excelente! Para dejar reservado tu lugar en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`;
     } else {
-      reply = `¡Comprendo perfectamente! Para avanzar y mostrarte cómo te ayudamos en ${ctx.companyName} (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n¿Cuál de estos planes se adapta mejor a lo que buscas hoy o prefieres coordinar una demo de 10 minutos para verlo en vivo?`;
+      reply = `¡Con gusto! Te detallo nuestras opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
     }
   }
 
@@ -1068,9 +1252,39 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
     if (customOverride.customCompanyName) ctx.companyName = String(customOverride.customCompanyName).trim();
     if (customOverride.customIndustry) {
       ctx.industry = String(customOverride.customIndustry).trim();
-      ctx.nichePlaybook = getNicheSalesPlaybook(ctx.industry);
     }
     if (customOverride.customAgentName) ctx.agentName = String(customOverride.customAgentName).trim();
+    if (customOverride.customSystemPrompt) ctx.systemPrompt = String(customOverride.customSystemPrompt).trim();
+    if (customOverride.customKnowledgeBase) ctx.knowledgeBase = String(customOverride.customKnowledgeBase).trim();
+
+    // If catalog was passed or if we should match the blueprint for the overridden company/industry
+    if (Array.isArray(customOverride.customCatalog) && customOverride.customCatalog.length > 0) {
+      ctx.catalogSummary = customOverride.customCatalog.map(item => {
+        const parts = [`• ${item.name}: $${item.price} USD`];
+        if (item.duration) parts.push(`(${item.duration})`);
+        if (item.description || item.benefits) parts.push(`- ${item.description || item.benefits}`);
+        return parts.join(' ');
+      }).join('\n');
+    } else if (customOverride.customCompanyName || customOverride.customIndustry) {
+      const bp = findMatchingBlueprintForCompany(ctx.industry, ctx.companyName);
+      if (bp) {
+        if (!customOverride.customIndustry || ctx.industry === 'Otro Rubro' || ctx.industry.includes('Automatización')) {
+          ctx.industry = bp.category;
+        }
+        if (Array.isArray(bp.defaultCatalog) && bp.defaultCatalog.length > 0) {
+          ctx.catalogSummary = bp.defaultCatalog.map(item => {
+            const parts = [`• ${item.name}: $${item.price} USD`];
+            if (item.duration) parts.push(`(${item.duration})`);
+            if (item.description) parts.push(`- ${item.description}`);
+            return parts.join(' ');
+          }).join('\n');
+        }
+        if (!customOverride.customSystemPrompt && bp.defaultSystemPrompt) {
+          ctx.systemPrompt = bp.defaultSystemPrompt.replace(/la clínica|la empresa|el salón|la firma|el Estudio|el complejo\/hotel|la institución|la empresa constructora\/estudio/gi, ctx.companyName);
+        }
+      }
+    }
+    ctx.nichePlaybook = getNicheSalesPlaybook(ctx.industry);
   }
 
   // 2. Load RAG Knowledge Documents if present
@@ -1170,52 +1384,38 @@ REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
           console.error('[OpenAI API Error]', oaiRes.status, await oaiRes.text());
         }
       } else {
-        // 5.B Google Gemini API with Multi-Turn
-        let geminiModel = activeAiModel && !activeAiModel.includes('1.5') && !activeAiModel.includes('2.5') ? activeAiModel : 'gemini-3.1-flash-lite';
-        let url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${effectiveAiKey}`;
+        // 5.B Google Gemini API with Multi-Turn & Multi-Model High-Availability Cascade
         const formattedContents = buildGeminiContents(history, userText);
+        const preferredModel = (activeAiModel && !activeAiModel.includes('1.5') && !activeAiModel.includes('3.1')) ? activeAiModel : 'gemini-2.5-flash';
+        const candidateModels = [...new Set([preferredModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'])];
 
-        let gRes = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: formattedContents,
-            system_instruction: {
-              parts: [{ text: systemPrompt }]
-            },
-            generationConfig: {
-              temperature: 0.65,
-              maxOutputTokens: 650
-            }
-          })
-        });
+        for (const modelName of candidateModels) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${effectiveAiKey}`;
+            const gRes = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: formattedContents,
+                system_instruction: {
+                  parts: [{ text: systemPrompt }]
+                },
+                generationConfig: {
+                  temperature: 0.65,
+                  maxOutputTokens: 650
+                }
+              })
+            });
 
-        if (gRes.ok) {
-          const json = await gRes.json();
-          generatedReply = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-        } else {
-          // If the model had issues (404/429), retry with gemini-3.1-flash-lite
-          const fallbackModel = 'gemini-3.1-flash-lite';
-          const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${effectiveAiKey}`;
-          const fallbackContents = JSON.parse(JSON.stringify(formattedContents));
-          fallbackContents[0].parts[0].text = `[INSTRUCCIONES OFICIALES DEL ASESOR COMERCIAL]\n${systemPrompt}\n\n[MENSAJE DEL CLIENTE]\n${fallbackContents[0].parts[0].text}`;
-          const retryRes = await fetch(fallbackUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: fallbackContents,
-              generationConfig: {
-                temperature: 0.65,
-                maxOutputTokens: 650
+            if (gRes.ok) {
+              const json = await gRes.json();
+              const candidateText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (candidateText && candidateText.trim()) {
+                generatedReply = candidateText;
+                break;
               }
-            })
-          });
-          if (retryRes.ok) {
-            const json = await retryRes.json();
-            generatedReply = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-          } else {
-            console.error('[Gemini API Error]', retryRes.status, await retryRes.text());
-          }
+            }
+          } catch (innerErr) {}
         }
       }
     } catch (llmErr) {
@@ -1383,9 +1583,34 @@ const server = http.createServer(async (req, res) => {
   // 3. Query Session Status & QR
   if (pathname === '/api/wa-session/status' && req.method === 'GET') {
     const sessionId = urlObj.searchParams.get('sessionId') || 'agency_hq';
-    const session = activeSessions[sessionId];
+    const strict = urlObj.searchParams.get('strict') === '1';
+    let session = activeSessions[sessionId];
+
+    // If querying agency session and a client session is already connected (or vice-versa), surface the active connection unless strict mode is requested
+    const anyConnectedEntry = Object.entries(activeSessions).find(([, s]) => s && s.connected && s.phone);
+    const connectedMap = {};
+    for (const [k, s] of Object.entries(activeSessions)) {
+      if (s && s.connected) {
+        connectedMap[k] = { phone: s.phone, userName: s.userName, status: s.status };
+      }
+    }
 
     if (!session) {
+      if (!strict && anyConnectedEntry) {
+        const [connKey, connSess] = anyConnectedEntry;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          connected: true,
+          status: 'connected',
+          phone: connSess.phone,
+          qr: null,
+          pairingCode: null,
+          userName: connSess.userName,
+          activeSessionKey: connKey,
+          connectedSessions: connectedMap
+        }));
+        return;
+      }
       getOrInitBaileysSession(sessionId)
         .then(s => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1395,25 +1620,39 @@ const server = http.createServer(async (req, res) => {
             phone: s.phone,
             qr: s.qrImage,
             pairingCode: s.pairingCode,
-            userName: s.userName
+            userName: s.userName,
+            connectedSessions: connectedMap
           }));
         })
         .catch(() => {
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ connected: false, status: 'uninitialized', phone: null, qr: null }));
+          res.end(JSON.stringify({ connected: false, status: 'uninitialized', phone: null, qr: null, connectedSessions: connectedMap }));
         });
       return;
     }
 
+    const effectiveConnected = session.connected || (!strict && sessionId.startsWith('agency_') && !!anyConnectedEntry);
+    const effectivePhone = session.connected ? session.phone : (anyConnectedEntry ? anyConnectedEntry[1].phone : session.phone);
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      connected: session.connected,
-      status: session.status,
-      phone: session.phone,
-      qr: session.qrImage,
+      connected: effectiveConnected,
+      status: effectiveConnected ? 'connected' : session.status,
+      phone: effectivePhone,
+      qr: effectiveConnected ? null : session.qrImage,
       pairingCode: session.pairingCode,
-      userName: session.userName
+      userName: session.userName,
+      connectedSessions: connectedMap
     }));
+    return;
+  }
+
+  // 3.1 Get Live WhatsApp Incoming/Outgoing Messages for Inbox Sync
+  if (pathname === '/api/wa-session/live-messages' && req.method === 'GET') {
+    const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
+    const list = liveWaContactsByAgency[agId] || liveWaContactsByAgency['agency_master_1'] || [];
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, leads: list }));
     return;
   }
 
@@ -1606,9 +1845,12 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { agencyId, clients } = JSON.parse(body || '{}');
+        const { agencyId, activeClientId, clients } = JSON.parse(body || '{}');
         const agId = agencyId || 'agency_master_1';
-        const cleanClients = (Array.isArray(clients) ? clients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
+        if (activeClientId) {
+          activeClientByAgency[agId] = activeClientId;
+        }
+        const cleanClients = (Array.isArray(clients) ? clients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1');
 
         memoryCompanies[agId] = cleanClients;
         saveCompaniesToDisk();
@@ -1671,9 +1913,25 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { message, clientId, agencyId, chatSessionId, reset, customCompanyName, customIndustry, customAgentName } = JSON.parse(body || '{}');
+        const { message, clientId, agencyId, chatSessionId, reset, customCompanyName, customIndustry, customAgentName, clientData } = JSON.parse(body || '{}');
         const agId = agencyId || 'agency_master_1';
         const sessionKey = chatSessionId || `sim_${clientId || 'hq'}`;
+
+        if (clientId) {
+          activeClientByAgency[agId] = clientId;
+        }
+
+        // If frontend sent the live clientData object, upsert it in memoryCompanies so server always has the latest client config
+        if (clientData && typeof clientData === 'object' && clientData.id) {
+          if (!Array.isArray(memoryCompanies[agId])) memoryCompanies[agId] = [];
+          const idx = memoryCompanies[agId].findIndex(c => c.id === clientData.id);
+          if (idx >= 0) {
+            memoryCompanies[agId][idx] = { ...memoryCompanies[agId][idx], ...clientData };
+          } else {
+            memoryCompanies[agId].unshift(clientData);
+          }
+          saveCompaniesToDisk();
+        }
 
         if (reset) {
           clearConversationHistory(getConvKey(agId, sessionKey));
@@ -1682,9 +1940,19 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-        const customOverride = (customCompanyName || customIndustry || customAgentName)
-          ? { customCompanyName, customIndustry, customAgentName }
-          : null;
+        let customOverride = null;
+        if (customCompanyName || customIndustry || customAgentName) {
+          customOverride = { customCompanyName, customIndustry, customAgentName };
+        } else if (clientData && typeof clientData === 'object') {
+          customOverride = {
+            customCompanyName: clientData.name,
+            customIndustry: clientData.industry,
+            customAgentName: clientData.agentName,
+            customSystemPrompt: clientData.systemPrompt,
+            customKnowledgeBase: clientData.knowledgeBase,
+            customCatalog: clientData.catalog
+          };
+        }
 
         const ctx = await getAgentCompanyContext(clientId, agId);
         if (customOverride) {

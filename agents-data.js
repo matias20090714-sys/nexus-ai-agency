@@ -1,14 +1,16 @@
 // NEXUS AI - Production Multi-Tenant Multi-Flow Data Model & Blueprints
 
-window.escapeHtml = function(str) {
-  if (str === null || str === undefined) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-};
+if (typeof window !== 'undefined') {
+  window.escapeHtml = function(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+}
 
 // Industry Blueprints (Pre-trained High-Ticket Consultative Sales Templates for New Clients)
 const AGENCY_BLUEPRINTS = [
@@ -435,4 +437,9 @@ function getStoredQuotes() {
 function saveQuotes(quotes) {
   localStorage.setItem('nexus_agency_quotes', JSON.stringify(quotes));
 }
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { AGENCY_BLUEPRINTS };
+}
+
 

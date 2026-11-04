@@ -54,6 +54,91 @@ function purgeSimulationClients(arr) {
   return arr.filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
 }
 
+function findBlueprintForClient(industry, companyName) {
+  if (typeof AGENCY_BLUEPRINTS === 'undefined' || !Array.isArray(AGENCY_BLUEPRINTS)) return null;
+  const ind = String(industry || '').toLowerCase();
+  const name = String(companyName || '').toLowerCase();
+  const combined = `${ind} ${name}`;
+
+  const exact = AGENCY_BLUEPRINTS.find(b => String(b.category || '').toLowerCase() === ind);
+  if (exact && !/otro rubro/i.test(ind)) return exact;
+
+  if (/cl[ií]nica|dental|odont|m[eé]dic|salud|consultorio|hospital|ortodonc|pediatr|psicol|kinesi|veterin/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'salud_clinicas') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/inmobiliari|bienes ra[ií]ces|propiedad|arquitectur|loteo|desarrollo/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'bienes_raices') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/abogad|jur[ií]dic|contabl|contador|estudio|legal|notar/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'legal_contable') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/belleza|barber|sal[oó]n|spa|est[eé]tica|peluquer|u[ñn]as/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'belleza_salones') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/restauran|gastronom|bar|caf[eé]|pizz|sushi|burger|comida|catering/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'restaurantes_gastronomia') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/tienda|retail|ecommerce|ropa|calzado|moda| Ferreter|tecnolog/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'ecommerce_retail') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/gimnasio|fitness|crossfit|pilates|yoga|entrenam|deport/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'gimnasios_fitness') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/taller|mec[aá]nic|auto|veh[ií]cul|concesionari|detailing|lubricent/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'automotriz_talleres') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/educaci|curso|academia|instituto|colegio|universid|capacitaci/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'educacion_academias') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/hotel|turismo|caba[ñn]a|alojamiento|hospedaj|resort|apart/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'hoteleria_turismo') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/construcci|reforma|hogar|obra|mantenimiento|plomer|electric|climatizaci|piscina/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'construccion_hogar') || AGENCY_BLUEPRINTS[0];
+  }
+  return exact || AGENCY_BLUEPRINTS[0];
+}
+
+function hydrateClientWithBlueprint(client) {
+  if (!client || typeof client !== 'object') return client;
+  const bp = findBlueprintForClient(client.industry, client.name);
+  if (!bp) return client;
+
+  // If industry was "Otro Rubro" or mismatched with clear company name (e.g., "Clínica Rivera"), align category
+  if ((!client.industry || client.industry === 'Otro Rubro') && bp.category) {
+    client.industry = bp.category;
+  }
+  if (/cl[ií]nica|dental|odont/i.test(client.name || '') && bp.id === 'salud_clinicas') {
+    client.industry = bp.category;
+  }
+
+  if (!Array.isArray(client.catalog) || client.catalog.length === 0) {
+    client.catalog = JSON.parse(JSON.stringify(bp.defaultCatalog || []));
+  }
+  if (!client.salesFlow || typeof client.salesFlow !== 'object' || !client.salesFlow.qualification) {
+    client.salesFlow = JSON.parse(JSON.stringify(bp.salesFlow || {}));
+  }
+  if (!client.supportFlow || typeof client.supportFlow !== 'object' || !client.supportFlow.faqs) {
+    client.supportFlow = JSON.parse(JSON.stringify(bp.supportFlow || {}));
+  }
+  if (!client.afterSalesFlow || typeof client.afterSalesFlow !== 'object') {
+    client.afterSalesFlow = JSON.parse(JSON.stringify(bp.afterSalesFlow || {}));
+  }
+  if (!client.systemPrompt || /Eres el asistente de inteligencia artificial de la agencia NEXUS AI/i.test(client.systemPrompt)) {
+    client.systemPrompt = (bp.defaultSystemPrompt || '')
+      .replace(/la clínica/gi, client.name)
+      .replace(/la empresa/gi, client.name)
+      .replace(/el salón/gi, client.name);
+  }
+  const catSummary = Array.isArray(client.catalog) && client.catalog.length > 0
+    ? client.catalog.map(it => `• ${it.name}: $${it.price} USD (${it.duration || 'Estándar'}) - ${it.description || ''}`).join('\n')
+    : '';
+  if (!client.knowledgeBase || (!client.knowledgeBase.includes('Catálogo') && catSummary)) {
+    client.knowledgeBase = `Información Oficial de ${client.name}:\n- Rubro: ${client.industry}\n- Horario de Atención: Lunes a Sábados de 09:00 a 19:00 hs\n- Políticas: Turnos y citas con confirmación instantánea por este medio.\n\nCatálogo de Servicios y Tratamientos Disponibles:\n${catSummary}`;
+  }
+  return client;
+}
+
 // Clean any cached legacy simulation demo clients from localStorage on startup
 try {
   ['nexus_clients_agency_master_1', 'nexus_agency_clients'].forEach(key => {
@@ -61,7 +146,7 @@ try {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        localStorage.setItem(key, JSON.stringify(purgeSimulationClients(parsed)));
+        localStorage.setItem(key, JSON.stringify(purgeSimulationClients(parsed).map(hydrateClientWithBlueprint)));
       }
     }
   });
@@ -73,7 +158,7 @@ function getAgencyClients() {
     const data = localStorage.getItem(`nexus_clients_${currentAgencyId}`) || localStorage.getItem('nexus_agency_clients');
     if (data) clients = JSON.parse(data);
   } catch (e) {}
-  return purgeSimulationClients(clients);
+  return purgeSimulationClients(clients).map(hydrateClientWithBlueprint);
 }
 
 async function syncAgencyClientsWithServer(clients) {
@@ -337,8 +422,22 @@ function loadAgencyWorkspace(agencyId) {
 
   agencyClients = getAgencyClients();
   realLeads = getAgencyLeads();
-  activeClientId = 'agency_hq';
+  const savedActiveClient = localStorage.getItem(`nexus_active_client_id_${agencyId}`);
+  if (savedActiveClient && (savedActiveClient === 'agency_hq' || agencyClients.some(c => c.id === savedActiveClient))) {
+    activeClientId = savedActiveClient;
+  } else if (agencyClients.length > 0) {
+    activeClientId = agencyClients[0].id;
+  } else {
+    activeClientId = 'agency_hq';
+  }
   activeInboxLeadId = realLeads.length > 0 ? realLeads[0].id : null;
+
+  // Immediately sync local hydrated clients to backend memory and DB
+  if (agencyClients.length > 0) {
+    syncAgencyClientsWithServer(agencyClients);
+  } else {
+    loadAgencyClientsFromServer();
+  }
 
   const profile = getAgencyProfile();
   
@@ -662,24 +761,36 @@ function renderClientsList() {
 
   container.innerHTML = `
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
-      ${agencyClients.map(c => `
-        <div class="agent-card">
+      ${agencyClients.map(c => {
+        const isConnected = !!(c.waConnected || (window.liveWaConnectedPhone && (!c.phone || c.phone.includes(window.liveWaConnectedPhone) || agencyClients.length === 1)));
+        const displayPhone = (isConnected && window.liveWaConnectedPhone && (!c.phone || c.phone === '+1 555-658-2385'))
+          ? `+${window.liveWaConnectedPhone}`
+          : (c.phone || 'Línea no vinculada');
+        return `
+        <div class="agent-card" style="${isConnected ? 'border-color: rgba(16,185,129,0.45);' : ''}">
           <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
             <div>
-              <span class="agent-category">${c.industry}</span>
-              <div class="agent-name" style="margin-top: 2px;">${c.name}</div>
+              <span class="agent-category">${escapeHtml(c.industry)}</span>
+              <div class="agent-name" style="margin-top: 2px;">${escapeHtml(c.name)}</div>
             </div>
-            <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">$${c.monthlyFee}/mes</span>
+            <span class="brand-badge" style="background: rgba(16,185,129,0.2); color: #34d399;">$${escapeHtml(c.monthlyFee)}/mes</span>
           </div>
 
-          <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
-            <div><strong>WhatsApp:</strong> ${c.phone || 'Línea no vinculada'}</div>
-            <div><strong>Agente:</strong> ${c.agentName || 'Asistente IA Estándar'}</div>
+          <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px;">
+            <div>
+              <strong>WhatsApp:</strong> ${escapeHtml(displayPhone)}
+              ${isConnected
+                ? `<span style="display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 8px; border-radius: 99px; background: rgba(16,185,129,0.18); color: #34d399; font-size: 11px; font-weight: 700;"><i class="fa-solid fa-circle-check"></i> Vinculado Activo</span>`
+                : `<span style="display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 2px 8px; border-radius: 99px; background: rgba(245,158,11,0.15); color: #fbbf24; font-size: 11px; font-weight: 600;">Pendiente QR</span>`
+              }
+            </div>
+            <div><strong>Agente:</strong> ${escapeHtml(c.agentName || 'Asistente IA Estándar')}</div>
+            <div><strong>Catálogo:</strong> ${Array.isArray(c.catalog) ? c.catalog.length : 0} servicios configurados</div>
           </div>
 
           <div style="display: flex; gap: 8px; margin-top: auto;">
-            <button class="btn btn-emerald btn-sm" onclick="openQrPairModalForClient('${c.id}')" title="Vincular WhatsApp de esta empresa">
-              <i class="fa-solid fa-qrcode"></i> Vincular QR
+            <button class="btn ${isConnected ? 'btn-secondary' : 'btn-emerald'} btn-sm" onclick="openQrPairModalForClient('${c.id}')" title="Vincular o verificar estado de WhatsApp de esta empresa" style="${isConnected ? 'border-color: rgba(16,185,129,0.5); color: #34d399;' : ''}">
+              <i class="fa-solid ${isConnected ? 'fa-check-double' : 'fa-qrcode'}"></i> ${isConnected ? 'WA Vinculado' : 'Vincular QR'}
             </button>
             <button class="btn btn-primary btn-sm" style="flex: 1;" onclick="selectAndManageClient('${c.id}')">
               <i class="fa-solid fa-robot"></i> Configurar Agente
@@ -689,7 +800,8 @@ function renderClientsList() {
             </button>
           </div>
         </div>
-      `).join('')}
+      `;
+      }).join('')}
     </div>
   `;
 }
@@ -709,23 +821,37 @@ function saveNewAgencyClient() {
     return;
   }
 
-  // Find matching blueprint
-  const blueprint = AGENCY_BLUEPRINTS.find(b => b.category === industry) || AGENCY_BLUEPRINTS[0];
+  const blueprint = findBlueprintForClient(industry, name) || AGENCY_BLUEPRINTS[0];
+  const resolvedIndustry = (/cl[ií]nica|dental|odont/i.test(name) && blueprint.id === 'salud_clinicas')
+    ? blueprint.category
+    : (industry === 'Otro Rubro' && blueprint.category ? blueprint.category : industry);
 
-  const newClient = {
+  const newClient = hydrateClientWithBlueprint({
     id: 'client-' + Date.now(),
     name: name,
-    industry: industry,
-    phone: phone || '+1 555-658-2385',
+    industry: resolvedIndustry,
+    phone: phone || (window.liveWaConnectedPhone ? `+${window.liveWaConnectedPhone}` : '+54 9 11 0000-0000'),
+    waConnected: !!window.liveWaConnectedPhone,
     monthlyFee: fee,
-    agentName: `Asistente Virtual - ${name}`,
-    systemPrompt: blueprint.defaultSystemPrompt.replace('la clínica', name).replace('la empresa', name).replace('el salón', name),
-    knowledgeBase: `Información de ${name}:\n- Rubro: ${industry}\n- Atención: Lunes a Sábados 09:00 a 19:00\n- Precios: Consultar catálogo de servicios\n- Políticas: Citas con confirmación previa.`,
+    agentName: `Asistente de ${name}`,
+    systemPrompt: (blueprint.defaultSystemPrompt || '')
+      .replace(/la clínica/gi, name)
+      .replace(/la empresa/gi, name)
+      .replace(/el salón/gi, name),
+    catalog: JSON.parse(JSON.stringify(blueprint.defaultCatalog || [])),
+    salesFlow: JSON.parse(JSON.stringify(blueprint.salesFlow || {})),
+    supportFlow: JSON.parse(JSON.stringify(blueprint.supportFlow || {})),
+    afterSalesFlow: JSON.parse(JSON.stringify(blueprint.afterSalesFlow || {})),
     createdAt: new Date().toISOString()
-  };
+  });
 
   agencyClients.unshift(newClient);
   saveAgencyClients(agencyClients);
+
+  const nameInp = document.getElementById('newClientName');
+  const phoneInp = document.getElementById('newClientPhone');
+  if (nameInp) nameInp.value = '';
+  if (phoneInp) phoneInp.value = '';
 
   renderAgencyDashboard();
   renderClientSelector();
@@ -733,29 +859,45 @@ function saveNewAgencyClient() {
   closeModal('newClientModal');
 
   selectAndManageClient(newClient.id);
-  showToast(`¡Sub-cuenta '${name}' creada exitosamente!`, 'success');
+  showToast(`¡Sub-cuenta '${name}' creada con catálogo y flujos de ${resolvedIndustry}!`, 'success');
 }
 
 function selectAndManageClient(clientId) {
   activeClientId = clientId;
+  localStorage.setItem(`nexus_active_client_id_${currentAgencyId}`, clientId);
+  testChatSessionId = null;
+  const chatBody = document.getElementById('testAgentChatBody');
+  if (chatBody) chatBody.innerHTML = '';
   renderClientSelector();
   loadActiveAgentForClient();
+  syncAgencyClientsWithServer(agencyClients);
   switchTab('agents-builder');
 }
 
 function switchClientAccount(val) {
   activeClientId = val;
+  localStorage.setItem(`nexus_active_client_id_${currentAgencyId}`, val);
+  testChatSessionId = null;
+  const chatBody = document.getElementById('testAgentChatBody');
+  if (chatBody) chatBody.innerHTML = '';
   loadActiveAgentForClient();
-  showToast(`Entorno cambiado a: ${val === 'agency_hq' ? 'Vista Global HQ' : 'Sub-Cuenta de Cliente'}`, 'info');
+  syncAgencyClientsWithServer(agencyClients);
+  const client = agencyClients.find(c => c.id === val);
+  showToast(`Entorno activo: ${val === 'agency_hq' ? 'Vista Global HQ' : (client ? client.name : 'Sub-Cuenta de Cliente')}`, 'info');
 }
 
 function deleteClientAccount(clientId) {
   if (!confirm('¿Seguro que deseas eliminar esta sub-cuenta de cliente?')) return;
   agencyClients = agencyClients.filter(c => c.id !== clientId);
+  if (activeClientId === clientId) {
+    activeClientId = agencyClients.length > 0 ? agencyClients[0].id : 'agency_hq';
+    localStorage.setItem(`nexus_active_client_id_${currentAgencyId}`, activeClientId);
+  }
   saveAgencyClients(agencyClients);
   renderAgencyDashboard();
   renderClientSelector();
   renderClientsList();
+  loadActiveAgentForClient();
   showToast('Sub-cuenta eliminada', 'info');
 }
 
@@ -791,28 +933,17 @@ function switchAgentSubtab(subtabId) {
 }
 
 function loadActiveAgentForClient() {
-  const client = agencyClients.find(c => c.id === activeClientId);
+  let client = agencyClients.find(c => c.id === activeClientId);
+  if (!client && agencyClients.length > 0 && activeClientId !== 'agency_hq') {
+    client = agencyClients[0];
+    activeClientId = client.id;
+  }
   const badge = document.getElementById('agentActiveCompanyBadge');
   if (badge) badge.innerText = client ? client.name : 'NEXUS AI Agency HQ';
 
-  // Ensure client has catalog & multi-flows
+  // Ensure client has catalog & multi-flows hydrated with industry blueprint
   if (client) {
-    if (!client.catalog || !Array.isArray(client.catalog)) {
-      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
-      client.catalog = JSON.parse(JSON.stringify(bp.defaultCatalog || []));
-    }
-    if (!client.salesFlow) {
-      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
-      client.salesFlow = JSON.parse(JSON.stringify(bp.salesFlow || {}));
-    }
-    if (!client.supportFlow) {
-      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
-      client.supportFlow = JSON.parse(JSON.stringify(bp.supportFlow || {}));
-    }
-    if (!client.afterSalesFlow) {
-      const bp = AGENCY_BLUEPRINTS.find(b => b.category === client.industry) || AGENCY_BLUEPRINTS[0];
-      client.afterSalesFlow = JSON.parse(JSON.stringify(bp.afterSalesFlow || {}));
-    }
+    hydrateClientWithBlueprint(client);
 
     // Populate Identity & Base
     document.getElementById('agentEditorName').value = client.agentName || `Asistente de ${client.name}`;
@@ -1456,16 +1587,47 @@ function testGoogleCalendarLink() {
 
 let testChatSessionId = null;
 
+function getLiveClientForSimulator() {
+  let client = agencyClients.find(c => c.id === activeClientId);
+  if (!client && agencyClients.length > 0) {
+    // If user created a company (e.g. Clínica Rivera) and opened simulator, use that company
+    client = agencyClients[0];
+    activeClientId = client.id;
+    renderClientSelector();
+  }
+  if (!client) return null;
+
+  hydrateClientWithBlueprint(client);
+  const copy = JSON.parse(JSON.stringify(client));
+  const edName = document.getElementById('agentEditorName')?.value?.trim();
+  const edPrompt = document.getElementById('agentEditorPrompt')?.value?.trim();
+  const edKnow = document.getElementById('agentEditorKnowledge')?.value?.trim();
+  const edTone = document.getElementById('agentEditorTone')?.value;
+
+  if (edName && edName !== 'Asistente Global de Agencia') copy.agentName = edName;
+  if (edPrompt && !/agencia NEXUS AI/i.test(edPrompt)) copy.systemPrompt = edPrompt;
+  if (edKnow && !/Plan Starter: \$290/i.test(edKnow)) copy.knowledgeBase = edKnow;
+  if (edTone) copy.tone = edTone;
+  return copy;
+}
+
 function resetTestAgentChat() {
-  testChatSessionId = 'sim_' + (activeClientId || 'hq') + '_' + Date.now();
+  const client = getLiveClientForSimulator();
+  const resolvedClientId = client ? client.id : (activeClientId || 'agency_hq');
+  testChatSessionId = 'sim_' + resolvedClientId + '_' + Date.now();
   const agencyId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
   fetch('/api/agents/test-chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ agencyId, clientId: activeClientId, chatSessionId: testChatSessionId, reset: true })
+    body: JSON.stringify({
+      agencyId,
+      clientId: resolvedClientId,
+      clientData: client,
+      chatSessionId: testChatSessionId,
+      reset: true
+    })
   }).catch(() => {});
 
-  const client = agencyClients.find(c => c.id === activeClientId);
   const companyName = client ? client.name : 'NEXUS AI Agency HQ';
   const industry = client ? client.industry : 'Agencia de IA & Automatización';
   const agentName = client ? (client.agentName || `Asistente de ${companyName}`) : 'Asistente Virtual IA';
@@ -1474,7 +1636,7 @@ function resetTestAgentChat() {
   if (chatBody) {
     chatBody.innerHTML = `
       <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
-        👋 ¡Hola! Soy ${escapeHtml(agentName)}, asesor comercial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o duda que tengas.
+        👋 ¡Hola! Soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o duda que tengas.
       </div>
     `;
   }
@@ -1482,25 +1644,26 @@ function resetTestAgentChat() {
 }
 
 function testAgentLiveDialog() {
-  const client = agencyClients.find(c => c.id === activeClientId);
+  const client = getLiveClientForSimulator();
   const companyName = client ? client.name : 'NEXUS AI Agency HQ';
   const industry = client ? client.industry : 'Agencia de IA & Automatización';
   const agentName = client ? (client.agentName || `Asistente de ${companyName}`) : 'Asistente Virtual IA';
+  const resolvedClientId = client ? client.id : (activeClientId || 'agency_hq');
 
-  if (!testChatSessionId) {
-    testChatSessionId = 'sim_' + (activeClientId || 'hq') + '_' + Date.now();
+  if (!testChatSessionId || !testChatSessionId.includes(resolvedClientId)) {
+    testChatSessionId = 'sim_' + resolvedClientId + '_' + Date.now();
   }
 
   const titleEl = document.getElementById('testModalAgentTitle');
   const subEl = document.getElementById('testModalAgentSubtitle');
   if (titleEl) titleEl.innerText = `${agentName} • ${companyName}`;
-  if (subEl) subEl.innerText = `🟢 Nicho: ${industry} | Memoria Multi-Turno Activa`;
+  if (subEl) subEl.innerText = `🟢 Rubro: ${industry} | Memoria Multi-Turno Activa`;
 
   const chatBody = document.getElementById('testAgentChatBody');
-  if (chatBody && (!chatBody.innerHTML || chatBody.children.length <= 1)) {
+  if (chatBody && (!chatBody.innerHTML || chatBody.children.length <= 1 || !chatBody.innerHTML.includes(escapeHtml(companyName)))) {
     chatBody.innerHTML = `
       <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
-        👋 ¡Hola! Soy ${escapeHtml(agentName)}, asesor comercial de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
+        👋 ¡Hola! Soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
       </div>
     `;
   }
@@ -1550,8 +1713,10 @@ async function sendTestChatMessage(customText) {
 
   try {
     const agencyId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
+    const liveClient = getLiveClientForSimulator();
+    const resolvedClientId = liveClient ? liveClient.id : (activeClientId || 'agency_hq');
     if (!testChatSessionId) {
-      testChatSessionId = 'sim_' + (activeClientId || 'hq') + '_' + Date.now();
+      testChatSessionId = 'sim_' + resolvedClientId + '_' + Date.now();
     }
 
     const res = await fetch('/api/agents/test-chat', {
@@ -1559,7 +1724,8 @@ async function sendTestChatMessage(customText) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: text,
-        clientId: activeClientId,
+        clientId: resolvedClientId,
+        clientData: liveClient,
         agencyId,
         chatSessionId: testChatSessionId
       })
@@ -2529,6 +2695,58 @@ function refreshWhatsAppQR() {
     .then(() => startRealQrListener(sessionId));
 }
 
+function applyGlobalWaConnectedState(data) {
+  if (!data) return;
+  const connectedList = Array.isArray(data.connectedSessions) ? data.connectedSessions : [];
+  const isAnyConnected = !!(data.connected || connectedList.length > 0);
+  const resolvedPhone = data.phone || (connectedList[0] && connectedList[0].phone) || null;
+
+  if (isAnyConnected) {
+    const wasPreviouslyConnected = !!window.liveWaConnectedPhone;
+    window.liveWaConnectedPhone = resolvedPhone || 'Conectado';
+
+    const unpaired = document.getElementById('qrUnpairedView');
+    const paired = document.getElementById('qrPairedView');
+    if (unpaired) unpaired.style.display = 'none';
+    if (paired) paired.style.display = 'flex';
+
+    const phoneDisplay = document.getElementById('qrConnectedPhoneDisplay');
+    if (phoneDisplay && resolvedPhone) {
+      phoneDisplay.innerText = `+${resolvedPhone}`;
+    }
+    const sidebarPhone = document.getElementById('sidebarPhoneDisplay');
+    if (sidebarPhone) {
+      sidebarPhone.innerHTML = `<span style="color:#34d399; font-weight:700;">🟢 WhatsApp Vinculado: +${resolvedPhone || 'Activo'}</span>`;
+    }
+
+    let clientsChanged = false;
+    agencyClients.forEach(c => {
+      const matchedSession = connectedList.find(s => s.sessionId === `client_${c.id}`);
+      if (matchedSession || agencyClients.length === 1 || c.id === activeQrClientId) {
+        if (!c.waConnected) {
+          c.waConnected = true;
+          clientsChanged = true;
+        }
+        const ph = (matchedSession && matchedSession.phone) || resolvedPhone;
+        if (ph && (!c.phone || c.phone === '+1 555-658-2385' || c.phone === '+54 9 11 0000-0000')) {
+          c.phone = `+${ph}`;
+          clientsChanged = true;
+        }
+      }
+    });
+
+    if (clientsChanged) {
+      saveAgencyClients(agencyClients);
+      renderClientsList();
+      renderAgencyDashboard();
+    } else if (!wasPreviouslyConnected) {
+      renderClientsList();
+    }
+
+    localStorage.setItem(`nexus_qr_paired_${currentAgencyId}`, 'true');
+  }
+}
+
 async function startRealQrListener(sessionId = 'agency_master_1') {
   stopRealQrListener();
   
@@ -2538,18 +2756,7 @@ async function startRealQrListener(sessionId = 'agency_master_1') {
     const qrContainer = document.getElementById('qrRealImageContainer');
 
     if (data.connected) {
-      if (unpaired) unpaired.style.display = 'none';
-      if (paired) paired.style.display = 'flex';
-      
-      const phoneDisplay = document.getElementById('qrConnectedPhoneDisplay');
-      if (phoneDisplay && data.phone) {
-        phoneDisplay.innerText = `+${data.phone}`;
-      }
-      const sidebarPhone = document.getElementById('sidebarPhoneDisplay');
-      if (sidebarPhone && data.phone) {
-        sidebarPhone.innerText = `Línea: +${data.phone}`;
-      }
-      localStorage.setItem(`nexus_qr_paired_${currentAgencyId}`, 'true');
+      applyGlobalWaConnectedState(data);
       stopRealQrListener();
     } else if (data.qr) {
       if (unpaired) unpaired.style.display = 'flex';
@@ -2600,12 +2807,20 @@ async function unpairWhatsAppQR() {
     await fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' });
   } catch (e) {}
 
+  window.liveWaConnectedPhone = null;
+  agencyClients.forEach(c => { c.waConnected = false; });
+  saveAgencyClients(agencyClients);
+  renderClientsList();
+
   const unpaired = document.getElementById('qrUnpairedView');
   const paired = document.getElementById('qrPairedView');
   if (unpaired && paired) {
     paired.style.display = 'none';
     unpaired.style.display = 'flex';
   }
+  const sidebarPhone = document.getElementById('sidebarPhoneDisplay');
+  if (sidebarPhone) sidebarPhone.innerText = 'Línea: Desconectada';
+
   localStorage.removeItem(`nexus_qr_paired_${currentAgencyId}`);
   showToast('Dispositivo WhatsApp desvinculado', 'info');
   startRealQrListener(sessionId);
@@ -2613,22 +2828,133 @@ async function unpairWhatsAppQR() {
 
 function checkQrConnectionState() {
   startRealQrListener(`agency_${currentAgencyId}`);
+  startGlobalWaLiveSync();
 }
 
 let clientQrPollInterval = null;
+let globalWaSyncInterval = null;
+
+function startGlobalWaLiveSync() {
+  if (globalWaSyncInterval) clearInterval(globalWaSyncInterval);
+  const pollFn = async () => {
+    try {
+      const sessionId = activeQrClientId ? `client_${activeQrClientId}` : `agency_${currentAgencyId}`;
+      const stRes = await fetch(`/api/wa-session/status?sessionId=${encodeURIComponent(sessionId)}`);
+      if (stRes.ok) {
+        const stData = await stRes.json();
+        if (stData.connected || (Array.isArray(stData.connectedSessions) && stData.connectedSessions.length > 0)) {
+          applyGlobalWaConnectedState(stData);
+        }
+      }
+
+      // Sync real incoming/outgoing WhatsApp conversations into Inbox & Leads
+      const msgRes = await fetch(`/api/wa-session/live-messages?agencyId=${encodeURIComponent(currentAgencyId)}`);
+      if (msgRes.ok) {
+        const msgData = await msgRes.json();
+        if (msgData.success && Array.isArray(msgData.chats) && msgData.chats.length > 0) {
+          let updatedInbox = false;
+          msgData.chats.forEach(liveChat => {
+            if (!liveChat.phone || !Array.isArray(liveChat.history) || liveChat.history.length === 0) return;
+            const cleanPh = String(liveChat.phone).replace(/\D/g, '');
+            let existing = realLeads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPh);
+            if (!existing) {
+              const activeComp = agencyClients.find(c => c.id === activeClientId) || agencyClients[0];
+              existing = {
+                id: 'wa_' + cleanPh,
+                name: liveChat.name || `WhatsApp +${cleanPh}`,
+                phone: `+${cleanPh}`,
+                company: activeComp ? activeComp.name : 'WhatsApp Directo',
+                stage: 'calificado',
+                value: activeComp ? Number(activeComp.monthlyFee || 150) : 290,
+                source: 'WhatsApp QR Real',
+                humanTakeover: false,
+                history: []
+              };
+              realLeads.unshift(existing);
+              if (!activeInboxLeadId) activeInboxLeadId = existing.id;
+              updatedInbox = true;
+            }
+            if (liveChat.history.length > (existing.history ? existing.history.length : 0)) {
+              existing.history = liveChat.history;
+              updatedInbox = true;
+            }
+          });
+          if (updatedInbox) {
+            saveAgencyLeads(realLeads);
+            renderRealInbox();
+            renderRealKanban();
+            renderAgencyDashboard();
+          }
+        }
+      }
+    } catch (e) {}
+  };
+  setTimeout(pollFn, 800);
+  globalWaSyncInterval = setInterval(pollFn, 3500);
+}
+
+function updateClientQrModalUI(data, client) {
+  const unpairedBox = document.getElementById('qrClientUnpairedBox');
+  const connectedBox = document.getElementById('qrClientConnectedBox');
+  const container = document.getElementById('qrRealClientImageContainer');
+  const connectedPhoneEl = document.getElementById('qrClientConnectedPhone');
+  const statusText = document.getElementById('qrClientStatusText');
+
+  if (data && data.connected) {
+    if (unpairedBox) unpairedBox.style.display = 'none';
+    if (connectedBox) connectedBox.style.display = 'block';
+    const ph = data.phone || window.liveWaConnectedPhone || (client && client.phone) || 'Activa';
+    if (connectedPhoneEl) {
+      connectedPhoneEl.innerText = `📱 Línea Vinculada: +${String(ph).replace(/^\+/, '')}`;
+    }
+    if (client) {
+      const wasConnected = !!client.waConnected;
+      client.waConnected = true;
+      if (data.phone) client.phone = `+${data.phone}`;
+      saveAgencyClients(agencyClients);
+      renderClientsList();
+      renderAgencyDashboard();
+      if (!wasConnected) {
+        showToast(`🎉 ¡WhatsApp de ${client.name} vinculado y respondiendo 24/7! (+${data.phone || ''})`, 'success');
+      }
+    }
+    applyGlobalWaConnectedState(data);
+  } else {
+    if (unpairedBox) unpairedBox.style.display = 'block';
+    if (connectedBox) connectedBox.style.display = 'none';
+    if (data && data.qr && container) {
+      container.innerHTML = `
+        <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px; display: block;" alt="Código QR Real de WhatsApp">
+      `;
+      if (statusText) {
+        statusText.innerText = 'Escanea el código QR con tu celular. Se vinculará automáticamente en segundos...';
+      }
+    }
+  }
+}
 
 async function openQrPairModalForClient(clientId) {
   activeQrClientId = clientId;
   const client = agencyClients.find(c => c.id === clientId);
   if (client) {
     const title = document.getElementById('qrClientModalName');
-    if (title) title.innerText = `Vincular: ${client.name}`;
+    if (title) title.innerText = `WhatsApp de: ${client.name}`;
+    // Also set this client as active so incoming WhatsApp messages use its AI agent
+    activeClientId = client.id;
+    localStorage.setItem(`nexus_active_client_id_${currentAgencyId}`, client.id);
+    renderClientSelector();
+    loadActiveAgentForClient();
+    syncAgencyClientsWithServer(agencyClients);
   }
   document.getElementById('qrClientPairModal').classList.add('active');
 
   const sessionId = `client_${clientId}`;
   try {
-    await fetch(`/api/wa-session/start?sessionId=${sessionId}`, { method: 'POST' });
+    const startRes = await fetch(`/api/wa-session/start?sessionId=${sessionId}`, { method: 'POST' });
+    if (startRes.ok) {
+      const startData = await startRes.json();
+      updateClientQrModalUI(startData, client);
+    }
   } catch (e) {}
 
   if (clientQrPollInterval) clearInterval(clientQrPollInterval);
@@ -2637,28 +2963,46 @@ async function openQrPairModalForClient(clientId) {
       const res = await fetch(`/api/wa-session/status?sessionId=${sessionId}`);
       if (!res.ok) return;
       const data = await res.json();
-      
-      const container = document.getElementById('qrRealClientImageContainer');
+      updateClientQrModalUI(data, client);
       if (data.connected) {
-        if (client) {
-          client.phone = data.phone ? `+${data.phone}` : client.phone;
-          saveAgencyClients(agencyClients);
-          renderClientsList();
-        }
         clearInterval(clientQrPollInterval);
-        closeModal('qrClientPairModal');
-        showToast(`🎉 ¡WhatsApp de ${client.name} vinculado con éxito! (+${data.phone})`, 'success');
-      } else if (data.qr && container) {
-        container.innerHTML = `
-          <img src="${data.qr}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" alt="Código QR Real de WhatsApp">
-        `;
       }
     } catch (e) {}
-  }, 2000);
+  }, 1500);
+}
+
+async function refreshClientModalQr() {
+  if (!activeQrClientId) return;
+  const sessionId = `client_${activeQrClientId}`;
+  const container = document.getElementById('qrRealClientImageContainer');
+  if (container) {
+    container.innerHTML = `<div style="color:#0f172a;font-size:13px;font-weight:600;text-align:center;"><i class="fa-solid fa-spinner fa-spin" style="font-size:28px;color:#10b981;margin-bottom:10px;display:block;"></i>Regenerando código QR...</div>`;
+  }
+  try {
+    await fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' });
+  } catch (e) {}
+  openQrPairModalForClient(activeQrClientId);
+}
+
+async function disconnectClientWhatsAppSession() {
+  if (!activeQrClientId) return;
+  const client = agencyClients.find(c => c.id === activeQrClientId);
+  const sessionId = `client_${activeQrClientId}`;
+  try {
+    await fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' });
+    await fetch(`/api/wa-session/logout?sessionId=agency_${currentAgencyId}`, { method: 'POST' });
+  } catch (e) {}
+  window.liveWaConnectedPhone = null;
+  if (client) {
+    client.waConnected = false;
+    saveAgencyClients(agencyClients);
+    renderClientsList();
+  }
+  showToast('Sesión desvinculada. Generando nuevo QR...', 'info');
+  openQrPairModalForClient(activeQrClientId);
 }
 
 function confirmClientQrPair() {
-  if (clientQrPollInterval) clearInterval(clientQrPollInterval);
   closeModal('qrClientPairModal');
 }
 
