@@ -637,12 +637,23 @@ function getIndustryDomainIntelligence(industry = '', companyName = 'nuestra emp
     };
   }
 
+  if (ind.includes('automatizac') || ind.includes('inteligencia artificial') || ind.includes('agencia de ia')) {
+    return {
+      roleTitle: 'Director Comercial y Consultor de Automatización con IA',
+      clientTerm: 'cliente corporativo',
+      triageQuestion: 'Para darte un diagnóstico preciso de impacto: ¿cuántas consultas reciben aproximadamente por semana en WhatsApp y cuál es el principal cuello de botella comercial que buscan resolver este mes?',
+      valueJustification: 'Implementamos sistemas de IA llave en mano en menos de 48 horas que atienden y venden 24/7, recuperando la inversión en la primera semana.',
+      closingCapturePrompt: 'Para avanzar con tu implementación prioritaria o agendar tu demo de 10 minutos, confírmame:\n1. *Tu Nombre y el de tu Empresa*\n2. *El plan de tu interés o volumen de consultas*\n3. *Si prefieres activar hoy mismo o coordinar llamada por la mañana/tarde*',
+      ethicalNote: ''
+    };
+  }
+
   return {
-    roleTitle: 'Director Comercial y Consultor Estratégico B2B',
-    clientTerm: 'cliente corporativo',
-    triageQuestion: 'Para darte un diagnóstico preciso de impacto: ¿cuántas consultas reciben aproximadamente por semana en WhatsApp y cuál es el principal cuello de botella comercial que buscan resolver este mes?',
-    valueJustification: 'Implementamos sistemas de IA llave en mano en menos de 48 horas que atienden y venden 24/7, recuperando la inversión en la primera semana.',
-    closingCapturePrompt: 'Para avanzar con tu implementación prioritaria o agendar tu demo de 10 minutos, confírmame:\n1. *Tu Nombre y el de tu Empresa*\n2. *El plan de tu interés o volumen de consultas*\n3. *Si prefieres activar hoy mismo o coordinar llamada por la mañana/tarde*',
+    roleTitle: 'Director Comercial y Consultor Estratégico Corporativo',
+    clientTerm: 'cliente / empresa',
+    triageQuestion: 'Para brindarte una propuesta a medida con impacto real: ¿cuál es el objetivo principal o desafío operativo que buscan resolver en este trimestre y en qué etapa se encuentran hoy?',
+    valueJustification: 'Trabajamos con metodologías probadas, entregables medibles por contrato y acompañamiento ejecutivo personalizado en cada etapa.',
+    closingCapturePrompt: 'Para coordinar tu sesión de diagnóstico estratégico o enviarte la propuesta formal, confírmame:\n1. *Tu Nombre y Empresa / Proyecto*\n2. *El servicio o solución de tu interés*\n3. *Si prefieres reunión por la mañana o por la tarde*',
     ethicalNote: ''
   };
 }
@@ -690,9 +701,30 @@ function getNicheSalesPlaybook(industry = '') {
   - Rol y Tono: Eres el ${dom.roleTitle}. Preciso, honesto y enfocado en la seguridad vial.
   - Léxico Obligatorio: Usa "diagnóstico computarizado", "repuestos homologados", "garantía escrita", "mantenimiento preventivo", "inspección multipunto".
   - Triaje Mecánico: Solicita marca, modelo, año y síntoma del vehículo para dar una respuesta técnica impecable.`;
+  } else if (ind.includes('belleza') || ind.includes('barber') || ind.includes('peluquer') || ind.includes('spa') || ind.includes('estetic') || ind.includes('salon') || ind.includes('unas')) {
+    specificRules = `• ESPECIALIDAD BELLEZA, ESTÉTICA, BARBERÍAS & SPAS:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Cálido, estilista experto, detallista y enfocado en resaltar la imagen personal.
+  - Léxico Obligatorio: Usa "diagnóstico capilar/facial", "productos importados de primera línea", "estilo personalizado", "agenda puntual sin esperas".
+  - Diagnóstico de Imagen: Consulta qué servicio desea realizarse y qué día/franja horaria prefiere para asignarle al especialista ideal.`;
+  } else if (ind.includes('restauran') || ind.includes('gastronom') || ind.includes('bar') || ind.includes('bistro') || ind.includes('catering') || ind.includes('comida') || ind.includes('cafe')) {
+    specificRules = `• ESPECIALIDAD GASTRONOMÍA, RESTAURANTES & EVENTOS:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Hospitalario, tentador, ágil y atento a preferencias alimentarias.
+  - Léxico Obligatorio: Usa "comensales", "elaboración en el momento", "materias primas seleccionadas", "mesa prioritaria", "opciones sin TACC / vegetarianas".
+  - Calificación Gastronómica: Distingue rápido entre reserva de mesa en salón/terraza, evento/cumpleaños o pedido de delivery/take-away.`;
+  } else if (ind.includes('fitness') || ind.includes('gym') || ind.includes('gimnasio') || ind.includes('crossfit') || ind.includes('entrenam') || ind.includes('pilates') || ind.includes('yoga')) {
+    specificRules = `• ESPECIALIDAD GIMNASIOS, CROSSFIT & CENTROS DE FITNESS:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Motivador, energético, empático y enfocado en salud y resultados físicos.
+  - Léxico Obligatorio: Usa "plan de entrenamiento personalizado", "seguimiento de coaches en sala", "equipamiento biomecánico", "pase de prueba".
+  - Diagnóstico Deportivo: Indaga objetivo físico principal y disponibilidad semanal para recomendar la membresía ideal e invitar a empezar esta semana.`;
+  } else if (ind.includes('retail') || ind.includes('ecommerce') || ind.includes('tienda') || ind.includes('ropa') || ind.includes('calzado') || ind.includes('moda') || ind.includes('indumentar')) {
+    specificRules = `• ESPECIALIDAD TIENDA ONLINE, E-COMMERCE & RETAIL:
+  - Rol y Tono: Eres el ${dom.roleTitle}. Ágil, resolutivo, atento a talles/medidas y enfocado en cierre inmediato con envío seguro.
+  - Léxico Obligatorio: Usa "stock inmediato", "tabla de talles/calce real", "despacho asegurado en el día", "cambio garantizado sin cargo".
+  - Cierre de Pedido: Consulta artículo/modelo, talle/color y preferencia entre envío rápido a domicilio o retiro en local.`;
   } else {
-    specificRules = `• ESPECIALIDAD CONSULTIVA DE ALTO VALOR (${industry.toUpperCase()}):
-  - Rol y Tono: Eres el ${dom.roleTitle}. Ejecutivo, persuasivo, empático y orientado a resultados medibles.`;
+    specificRules = `• ESPECIALIDAD CONSULTIVA CORPORATIVA & B2B (${industry.toUpperCase()}):
+  - Rol y Tono: Eres el ${dom.roleTitle}. Ejecutivo, persuasivo, analítico y orientado a retorno de inversión (ROI) y resultados medibles.
+  - Léxico Obligatorio: Usa "diagnóstico operativo", "propuesta a medida", "retorno de inversión", "implementación profesional", "indicadores clave".`;
   }
 
   return `${specificRules}
@@ -705,43 +737,53 @@ function getNicheSalesPlaybook(industry = '') {
 }
 
 function findMatchingBlueprintForCompany(industry = '', companyName = '') {
+  const normInd = (industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const combined = `${industry} ${companyName}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (!Array.isArray(AGENCY_BLUEPRINTS) || AGENCY_BLUEPRINTS.length === 0) return null;
 
-  if (combined.includes('salud') || combined.includes('clinic') || combined.includes('dental') || combined.includes('odont') || combined.includes('medic') || combined.includes('consultorio') || combined.includes('hospital') || combined.includes('dr.') || combined.includes('dra.')) {
+  const exactByCategory = AGENCY_BLUEPRINTS.find(b =>
+    (b.category || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === normInd ||
+    (b.id || '').toLowerCase() === normInd
+  );
+  if (exactByCategory && !normInd.includes('otro rubro')) return exactByCategory;
+
+  if (combined.includes('salud') || combined.includes('clinic') || combined.includes('dental') || combined.includes('odont') || combined.includes('medic') || combined.includes('consultorio') || combined.includes('hospital') || combined.includes('psicol') || combined.includes('kinesi') || combined.includes('veterin') || combined.includes('dr.') || combined.includes('dra.')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'salud_clinicas') || AGENCY_BLUEPRINTS[0];
   }
-  if (combined.includes('inmobili') || combined.includes('propiedad') || combined.includes('bienes raic') || combined.includes('real estate') || combined.includes('lote') || combined.includes('construct')) {
-    if (combined.includes('construc') || combined.includes('arquitec') || combined.includes('reforma') || combined.includes('piscin')) {
-      return AGENCY_BLUEPRINTS.find(b => b.id === 'construccion_reformas');
-    }
+  if (combined.includes('construc') || combined.includes('arquitec') || combined.includes('reforma') || combined.includes('piscin') || combined.includes('obra') || combined.includes('ampliacion')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'construccion_reformas');
+  }
+  if (combined.includes('inmobili') || combined.includes('propiedad') || combined.includes('bienes raic') || combined.includes('real estate') || combined.includes('lote') || combined.includes('desarrollo')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'inmobiliarias');
   }
-  if (combined.includes('juridic') || combined.includes('abogad') || combined.includes('legal') || combined.includes('contabl') || combined.includes('notar')) {
+  if (combined.includes('juridic') || combined.includes('abogad') || combined.includes('legal') || combined.includes('contabl') || combined.includes('contador') || combined.includes('notar') || combined.includes('escriban')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'legal_contable');
   }
-  if (combined.includes('hotel') || combined.includes('caban') || combined.includes('turism') || combined.includes('resort') || combined.includes('posada')) {
+  if (combined.includes('hotel') || combined.includes('caban') || combined.includes('turism') || combined.includes('resort') || combined.includes('posada') || combined.includes('alojamient') || combined.includes('hospedaj')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'hoteleria_turismo');
   }
-  if (combined.includes('educac') || combined.includes('academi') || combined.includes('curso') || combined.includes('instituto') || combined.includes('colegio')) {
+  if (combined.includes('educac') || combined.includes('academi') || combined.includes('curso') || combined.includes('instituto') || combined.includes('colegio') || combined.includes('universid') || combined.includes('escuela')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'educacion_academias');
   }
-  if (combined.includes('belleza') || combined.includes('barber') || combined.includes('peluquer') || combined.includes('spa') || combined.includes('salon') || combined.includes('estetic')) {
+  if (combined.includes('belleza') || combined.includes('barber') || combined.includes('peluquer') || combined.includes('spa') || combined.includes('salon') || combined.includes('estetic') || combined.includes('unas')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'belleza_barberias');
   }
-  if (combined.includes('restauran') || combined.includes('gastronom') || combined.includes('comida') || combined.includes('pizz') || combined.includes('sushi') || combined.includes('bistro') || combined.includes('bar ')) {
+  if (combined.includes('restauran') || combined.includes('gastronom') || combined.includes('comida') || combined.includes('pizz') || combined.includes('sushi') || combined.includes('bistro') || combined.includes('parrilla') || combined.includes('catering') || combined.includes('bar ')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'gastronomia');
   }
-  if (combined.includes('tienda') || combined.includes('ecommerce') || combined.includes('retail') || combined.includes('ropa') || combined.includes('calzado') || combined.includes('boutique')) {
+  if (combined.includes('tienda') || combined.includes('ecommerce') || combined.includes('retail') || combined.includes('ropa') || combined.includes('calzado') || combined.includes('boutique') || combined.includes('indumentar') || combined.includes('moda')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'ecommerce_retail');
   }
-  if (combined.includes('gimnasio') || combined.includes('fitness') || combined.includes('gym') || combined.includes('crossfit') || combined.includes('entrenamient')) {
+  if (combined.includes('gimnasio') || combined.includes('fitness') || combined.includes('gym') || combined.includes('crossfit') || combined.includes('entrenam') || combined.includes('pilates') || combined.includes('yoga')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'fitness_gym');
   }
-  if (combined.includes('taller') || combined.includes('mecanic') || combined.includes('automot') || combined.includes('concesionar') || combined.includes('autos') || combined.includes('lubricentro')) {
+  if (combined.includes('taller') || combined.includes('mecanic') || combined.includes('automot') || combined.includes('concesionar') || combined.includes('autos') || combined.includes('vehicul') || combined.includes('lubricentr') || combined.includes('neumatic')) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'automotriz');
   }
-  return AGENCY_BLUEPRINTS.find(b => b.category === industry) || null;
+  if (combined.includes('b2b') || combined.includes('consultor') || combined.includes('software') || combined.includes('marketing') || combined.includes('corporativ')) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'servicios_b2b');
+  }
+  return exactByCategory || null;
 }
 
 // Resolver context of specific client / company by session or agency ID
@@ -916,6 +958,7 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     agentName: hydrated.agentName || `Coordinador de ${hydrated.name || 'la empresa'}`,
     tone: hydrated.tone || 'profesional_calido_y_persuasivo',
     systemPrompt: hydrated.systemPrompt || `Eres el especialista y asesor oficial de ${hydrated.name} (${industryStr}). Dialoga con empatía, solvencia profesional y calidez humana. Explica con claridad los beneficios de nuestros servicios/tratamientos, resuelve dudas con seguridad y orienta hacia la reserva de turno o contratación.`,
+    catalogItems: Array.isArray(hydrated.catalog) ? hydrated.catalog : [],
     catalogSummary: catalogSummary,
     knowledgeBase: hydrated.knowledgeBase || `Atención de Lunes a Sábados de 09:00 a 19:00 hs. Consultas y reservas de turnos directas por WhatsApp.`,
     salesFlow: salesFlowStr,
@@ -1083,15 +1126,68 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     reply = `¡Por supuesto! En *${ctx.companyName}* ofrecemos diversas facilidades: aceptamos efectivo, transferencias bancarias, tarjetas de débito y crédito, y emitimos comprobantes oficiales para reintegros.\n\n${dom.closingCapturePrompt}`;
   }
 
-  // 6.B Triaje Clínico de Dolor / Urgencia Odontológica o Médica
-  const isClinicalUrgency = lowerText.includes('dolor') || lowerText.includes('duele') || lowerText.includes('muela') || lowerText.includes('diente') ||
-    lowerText.includes('urgencia') || lowerText.includes('inflam') || lowerText.includes('hincha') || lowerText.includes('sangr') ||
-    lowerText.includes('caries') || lowerText.includes('infeccion') || lowerText.includes('infección') || lowerText.includes('partio') || lowerText.includes('partió');
+  // 6.B Detección Inteligente por Ítem del Catálogo y Triaje Especializado de los 12 Rubros
+  const normInd = (ctx.industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normUser = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-  if (!reply && isClinicalUrgency && !isAiAgency) {
-    reply = `🩺 Comprendo perfectamente tu molestia y en *${ctx.companyName}* le damos prioridad absoluta a los casos con dolor o sensibilidad aguda para aliviarte hoy mismo.\n\n` +
-      `Lo indicado es realizar una valoración diagnóstica presencial con nuestro especialista para determinar el origen exacto y brindarte el tratamiento inmediato:\n${ctx.catalogSummary}\n\n` +
-      `${dom.closingCapturePrompt}`;
+  // Coincidencia directa con servicios o productos específicos del catálogo de esta empresa
+  if (!reply && Array.isArray(ctx.catalogItems) && ctx.catalogItems.length > 0) {
+    const stopWords = new Set(['para', 'con', 'por', 'sin', 'del', 'las', 'los', 'una', 'uno', 'unos', 'unas', 'que', 'como', 'mas', 'muy', 'este', 'esta', 'todo', 'toda', 'plan', 'pack', 'servicio', 'consulta', 'general', 'integral', 'completo', 'completa', 'premium', 'basico', 'basica']);
+    const matchedItems = ctx.catalogItems.filter(it => {
+      const words = String(it.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(w => w.length >= 4 && !stopWords.has(w));
+      return words.some(w => normUser.includes(w));
+    });
+
+    if (matchedItems.length > 0 && !normUser.includes('dolor') && !normUser.includes('urgencia')) {
+      const itemsDetail = matchedItems.map(it => {
+        const parts = [`• *${it.name}*: *$${it.price} USD*`];
+        if (it.duration) parts.push(`(${it.duration})`);
+        if (it.description || it.benefits) parts.push(`— ${it.description || it.benefits}`);
+        return parts.join(' ');
+      }).join('\n');
+      reply = `✨ ¡Excelente elección! En *${ctx.companyName}* contamos con la opción exacta para lo que buscas:\n\n${itemsDetail}\n\n💡 ${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
+    }
+  }
+
+  // Triaje especializado según necesidad puntual de cada uno de los 12 rubros
+  if (!reply && !isAiAgency) {
+    if ((normInd.includes('salud') || normInd.includes('clinic') || normInd.includes('dental') || normInd.includes('odont')) &&
+        /dolor|duele|muela|diente|urgencia|inflam|hincha|sangr|caries|infeccion|partio|sensibil/.test(normUser)) {
+      reply = `🩺 Comprendo perfectamente tu molestia y en *${ctx.companyName}* le damos prioridad absoluta a los casos con dolor o sensibilidad aguda para aliviarte hoy mismo.\n\nLo indicado es realizar una valoración diagnóstica presencial con nuestro especialista para determinar el origen exacto y brindarte el tratamiento inmediato:\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
+    } else if ((normInd.includes('inmobili') || normInd.includes('bienes raic') || normInd.includes('propiedad')) &&
+               /departament|casa|lote|terreno|alquil|compr|invertir|inversion|tasacion|tasar|ambiente|dormitorio|credito|apto/.test(normUser)) {
+      reply = `🏢 ¡Excelente búsqueda! En *${ctx.companyName}* contamos con opciones seleccionadas con títulos perfectos y asesoramiento patrimonial integral:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('juridic') || normInd.includes('abogad') || normInd.includes('legal') || normInd.includes('contabl') || normInd.includes('notar')) &&
+               /despido|indemnizaci|divorcio|sucesion|herencia|contrato|carta documento|intimacion|juicio|demanda|impuesto|monotributo|balance|sociedad|escritura/.test(normUser)) {
+      reply = `⚖️ Gracias por contactarte con *${ctx.companyName}*. Tratamos tu consulta bajo estricto secreto profesional para resguardar tus derechos y plazos legales.\n\nNuestras instancias de atención profesional son:\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('belleza') || normInd.includes('barber') || normInd.includes('peluquer') || normInd.includes('spa') || normInd.includes('estetic')) &&
+               /corte|barba|color|tintur|mechas|balayage|alisado|keratina|unas|manicur|facial|limpieza|masaje|depilaci|cejas|pestanas/.test(normUser)) {
+      reply = `✂️ ¡Nos encantará recibirte en *${ctx.companyName}*! Trabajamos cada detalle de forma personalizada para lograr el resultado exacto que buscas:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
+    } else if ((normInd.includes('restauran') || normInd.includes('gastronom') || normInd.includes('comida') || normInd.includes('bar')) &&
+               /mesa|carta|menu|plato|delivery|envio|pedido|celiac|tacc|vegan|vegetarian|cumpleanos|evento|cena|almuerzo/.test(normUser)) {
+      reply = `🍽️ ¡Será un placer agasajarte en *${ctx.companyName}*! Aquí tienes nuestras propuestas gastronómicas destacadas:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('tienda') || normInd.includes('retail') || normInd.includes('ecommerce')) &&
+               /stock|talle|talla|color|modelo|envio|despacho|cambio|devoluci|mayorist|prenda|producto|comprar/.test(normUser)) {
+      reply = `🛍️ ¡Qué bueno que nos escribas! En *${ctx.companyName}* contamos con disponibilidad inmediata y despacho asegurado:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('gimnasio') || normInd.includes('fitness') || normInd.includes('gym') || normInd.includes('crossfit')) &&
+               /pase|membresia|musculaci|crossfit|funcional|pilates|bajar de peso|masa muscular|entrenar|clase|prueba|profesor/.test(normUser)) {
+      reply = `🏋️ ¡Excelente iniciativa para empezar a entrenar en *${ctx.companyName}*! Estos son nuestros pases y programas activos:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('taller') || normInd.includes('automot') || normInd.includes('mecanic') || normInd.includes('concesionar')) &&
+               /service|aceite|filtro|freno|embrague|correa|distribuci|ruido|falla|escan|bateria|neumatic|alineaci|balanceo|tren delantero|motor/.test(normUser)) {
+      reply = `🚗 En *${ctx.companyName}* revisamos tu vehículo con equipamiento de diagnóstico computarizado y repuestos homologados:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('hotel') || normInd.includes('caban') || normInd.includes('turism')) &&
+               /habitaci|cabana|suite|noche|estadia|check|huesped|persona|pareja|familia|pileta|piscina|desayuno|vacacion|finde/.test(normUser)) {
+      reply = `🏨 ¡Qué alegría recibir tu consulta en *${ctx.companyName}*! Estas son nuestras opciones y tarifas por reserva directa:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('educac') || normInd.includes('academi') || normInd.includes('curso')) &&
+               /curso|carrera|diplomatur|programa|temario|certificad|inscripci|matricul|vacante|online|vivo|clases|aprender/.test(normUser)) {
+      reply = `🎓 ¡Excelente paso para tu crecimiento profesional! En *${ctx.companyName}* contamos con estos programas de formación:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('construc') || normInd.includes('arquitec') || normInd.includes('reforma') || normInd.includes('piscin')) &&
+               /obra|reforma|remodelaci|ampliaci|piscina|pileta|metros|m2|llave en mano|plano|construir|techo|cocina|bano/.test(normUser)) {
+      reply = `🏗️ En *${ctx.companyName}* ejecutamos tu proyecto con cómputo preciso, dirección técnica y presupuesto cerrado por contrato:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    } else if ((normInd.includes('b2b') || normInd.includes('empresa') || normInd.includes('consultor')) &&
+               /consultor|auditor|estrategi|corporativ|implementaci|empresa|equipo|optimiz|ventas|proceso/.test(normUser)) {
+      reply = `💼 En *${ctx.companyName}* acompañamos a empresas con soluciones ejecutivas orientadas a resultados medibles:\n\n${ctx.catalogSummary}\n\n💡 ${dom.valueJustification}\n\n${dom.triageQuestion}`;
+    }
   }
 
   // 7. Recomendación Consultiva / Por cuál empezar
@@ -1102,7 +1198,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     if (isAiAgency) {
       reply = `Para darte una recomendación honesta y rentable: la mayoría de las empresas comienza con nuestro Plan Starter o Growth Pro, ya que cubren de inmediato el flujo de ventas 24/7.\n\n${dom.triageQuestion}`;
     } else {
-      reply = `Como ${dom.roleTitle} en *${ctx.companyName}*, lo que siempre recomendamos como primer paso es realizar nuestra instancia inicial de diagnóstico/valoración para evaluar tu caso en detalle y darte una solución 100% personalizada:\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
+      reply = `Como ${dom.roleTitle} en *${ctx.companyName}*, te detallo nuestras alternativas principales para recomendarte la ideal según tu caso:\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
     }
   }
 
@@ -1112,7 +1208,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('tengo que hablar') || lowerText.includes('tengo que consultar') || lowerText.includes('con mi socio') || lowerText.includes('con mi pareja') || lowerText.includes('con mi esposa') || lowerText.includes('con mi marido');
 
   if (!reply && isHesitation) {
-    reply = `¡Totalmente comprensible! Es una decisión importante y es fundamental que la tomes con total seguridad y claridad. Para que tengas toda la información sobre la mesa: ¿Hay alguna duda puntual sobre la propuesta o los resultados que te gustaría que aclaremos?\n\nSi te parece bien, puedo guardarte la propuesta o disponibilidad de esta semana sin ningún compromiso para que no pierdas las condiciones mientras lo evalúas. ¿Qué opinas?`;
+    reply = `¡Totalmente comprensible! Es importante que avances con total seguridad y claridad. Para ayudarte a evaluarlo: ¿hay alguna duda puntual sobre nuestras opciones, aranceles o modalidad que te gustaría aclarar?\n\nSi lo deseas, puedo dejarte pre-reservada la disponibilidad de esta semana sin compromiso mientras lo defines.`;
   }
 
   // 9. Comparación con Competencia ("Encontré algo más barato")
@@ -1120,7 +1216,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('más barato en') || lowerText.includes('otro proveedor') || lowerText.includes('otra empresa') || lowerText.includes('otro presupuesto');
 
   if (!reply && isCompetitorComparison) {
-    reply = `Es una muy buena observación. Existen alternativas de menor precio en el mercado, pero en ${ctx.companyName} nos enfocamos en lo que realmente protege tu tiempo y tu dinero: calidad certificada, garantía real, soporte dedicado y resultados que no requieren rehacer el trabajo después.\n\nAl final del día, lo barato suele salir caro. ¿Qué aspecto del servicio es el más indispensable para ti para garantizar que quedes 100% satisfecho?`;
+    reply = `Es una muy buena observación. Existen alternativas de menor valor, pero en *${ctx.companyName}* priorizamos lo que realmente cuida tu tranquilidad y tu inversión: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\n${dom.triageQuestion}`;
   }
 
   // 10. Confianza, Credibilidad y Garantías
@@ -1129,7 +1225,7 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     lowerText.includes('estafa') || lowerText.includes('referencias') || lowerText.includes('seguridad');
 
   if (!reply && isTrustQuestion) {
-    reply = `Es una consulta sumamente válida y nos alegra que la hagas. En ${ctx.companyName} la transparencia y el compromiso con cada cliente son la base de todo: brindamos acompañamiento paso a paso, contratos y comprobantes formales, soporte continuo y total respaldo en cada servicio.\n\n¿Te gustaría coordinar una breve llamada o demo de 10 minutos para conocernos en vivo, ver casos prácticos y despejar cualquier duda antes de avanzar?`;
+    reply = `Es una consulta sumamente válida y nos alegra que la hagas. En *${ctx.companyName}* la transparencia y el respaldo profesional son la base de nuestro trabajo: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\n${dom.closingCapturePrompt}`;
   }
 
   // 11. Preguntas de Continuidad / Mensajes Cortos
@@ -1259,6 +1355,7 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
 
     // If catalog was passed or if we should match the blueprint for the overridden company/industry
     if (Array.isArray(customOverride.customCatalog) && customOverride.customCatalog.length > 0) {
+      ctx.catalogItems = customOverride.customCatalog;
       ctx.catalogSummary = customOverride.customCatalog.map(item => {
         const parts = [`• ${item.name}: $${item.price} USD`];
         if (item.duration) parts.push(`(${item.duration})`);
@@ -1272,6 +1369,7 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
           ctx.industry = bp.category;
         }
         if (Array.isArray(bp.defaultCatalog) && bp.defaultCatalog.length > 0) {
+          ctx.catalogItems = bp.defaultCatalog;
           ctx.catalogSummary = bp.defaultCatalog.map(item => {
             const parts = [`• ${item.name}: $${item.price} USD`];
             if (item.duration) parts.push(`(${item.duration})`);

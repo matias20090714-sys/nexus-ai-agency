@@ -56,47 +56,59 @@ function purgeSimulationClients(arr) {
 
 function findBlueprintForClient(industry, companyName) {
   if (typeof AGENCY_BLUEPRINTS === 'undefined' || !Array.isArray(AGENCY_BLUEPRINTS)) return null;
-  const ind = String(industry || '').toLowerCase();
-  const name = String(companyName || '').toLowerCase();
+  const ind = String(industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const name = String(companyName || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const combined = `${ind} ${name}`;
 
-  const exact = AGENCY_BLUEPRINTS.find(b => String(b.category || '').toLowerCase() === ind);
+  const exact = AGENCY_BLUEPRINTS.find(b =>
+    String(b.category || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === ind ||
+    String(b.id || '').toLowerCase() === ind
+  );
   if (exact && !/otro rubro/i.test(ind)) return exact;
 
-  if (/cl[ií]nica|dental|odont|m[eé]dic|salud|consultorio|hospital|ortodonc|pediatr|psicol|kinesi|veterin/.test(combined)) {
+  if (/clinica|dental|odont|medic|salud|consultorio|hospital|ortodonc|pediatr|psicol|kinesi|veterin|dr\.|dra\./.test(combined)) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'salud_clinicas') || AGENCY_BLUEPRINTS[0];
   }
-  if (/inmobiliari|bienes ra[ií]ces|propiedad|arquitectur|loteo|desarrollo/.test(combined)) {
-    return AGENCY_BLUEPRINTS.find(b => b.id === 'bienes_raices') || AGENCY_BLUEPRINTS[0];
+  if (/construc|arquitec|reforma|piscin|obra|ampliacion|mantenimiento|plomer|electric|climatizaci|hogar/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'construccion_reformas') || AGENCY_BLUEPRINTS[0];
   }
-  if (/abogad|jur[ií]dic|contabl|contador|estudio|legal|notar/.test(combined)) {
+  if (/inmobiliari|bienes raices|propiedad|loteo|desarrollo|alquileres/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'inmobiliarias') || AGENCY_BLUEPRINTS[0];
+  }
+  if (/abogad|juridic|contabl|contador|estudio|legal|notar|escriban/.test(combined)) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'legal_contable') || AGENCY_BLUEPRINTS[0];
   }
-  if (/belleza|barber|sal[oó]n|spa|est[eé]tica|peluquer|u[ñn]as/.test(combined)) {
-    return AGENCY_BLUEPRINTS.find(b => b.id === 'belleza_salones') || AGENCY_BLUEPRINTS[0];
+  if (/belleza|barber|salon|spa|estetica|peluquer|unas|manicur|cosmetolog/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'belleza_barberias') || AGENCY_BLUEPRINTS[0];
   }
-  if (/restauran|gastronom|bar|caf[eé]|pizz|sushi|burger|comida|catering/.test(combined)) {
-    return AGENCY_BLUEPRINTS.find(b => b.id === 'restaurantes_gastronomia') || AGENCY_BLUEPRINTS[0];
+  if (/restauran|gastronom|bar |bistro|cafe|pizz|sushi|burger|comida|catering|parrilla/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'gastronomia') || AGENCY_BLUEPRINTS[0];
   }
-  if (/tienda|retail|ecommerce|ropa|calzado|moda| Ferreter|tecnolog/.test(combined)) {
+  if (/tienda|retail|ecommerce|ropa|calzado|moda|ferreter|tecnolog|boutique|indumentar|mayorist/.test(combined)) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'ecommerce_retail') || AGENCY_BLUEPRINTS[0];
   }
-  if (/gimnasio|fitness|crossfit|pilates|yoga|entrenam|deport/.test(combined)) {
-    return AGENCY_BLUEPRINTS.find(b => b.id === 'gimnasios_fitness') || AGENCY_BLUEPRINTS[0];
+  if (/gimnasio|fitness|gym|crossfit|pilates|yoga|entrenam|deport/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'fitness_gym') || AGENCY_BLUEPRINTS[0];
   }
-  if (/taller|mec[aá]nic|auto|veh[ií]cul|concesionari|detailing|lubricent/.test(combined)) {
-    return AGENCY_BLUEPRINTS.find(b => b.id === 'automotriz_talleres') || AGENCY_BLUEPRINTS[0];
+  if (/taller|mecanic|auto|vehicul|concesionari|detailing|lubricent|neumatic|moto/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'automotriz') || AGENCY_BLUEPRINTS[0];
   }
-  if (/educaci|curso|academia|instituto|colegio|universid|capacitaci/.test(combined)) {
+  if (/educaci|curso|academia|instituto|colegio|universid|capacitaci|escuela|coaching/.test(combined)) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'educacion_academias') || AGENCY_BLUEPRINTS[0];
   }
-  if (/hotel|turismo|caba[ñn]a|alojamiento|hospedaj|resort|apart/.test(combined)) {
+  if (/hotel|turismo|cabana|alojamiento|hospedaj|resort|apart|posada|hoster/.test(combined)) {
     return AGENCY_BLUEPRINTS.find(b => b.id === 'hoteleria_turismo') || AGENCY_BLUEPRINTS[0];
   }
-  if (/construcci|reforma|hogar|obra|mantenimiento|plomer|electric|climatizaci|piscina/.test(combined)) {
-    return AGENCY_BLUEPRINTS.find(b => b.id === 'construccion_hogar') || AGENCY_BLUEPRINTS[0];
+  if (/b2b|consultor|software|marketing|corporativ|agencia|empresa/.test(combined)) {
+    return AGENCY_BLUEPRINTS.find(b => b.id === 'servicios_b2b') || AGENCY_BLUEPRINTS[0];
   }
-  return exact || AGENCY_BLUEPRINTS[0];
+  return exact || AGENCY_BLUEPRINTS.find(b => b.id === 'servicios_b2b') || AGENCY_BLUEPRINTS[0];
+}
+
+function replaceBlueprintCompanyPlaceholders(promptStr, companyName) {
+  if (!promptStr) return '';
+  return String(promptStr)
+    .replace(/la clínica|la empresa constructora\/estudio|el complejo\/hotel|la institución|el Estudio|la firma|la empresa|el salón|el restaurante|la tienda|el gimnasio|el taller/gi, companyName);
 }
 
 function hydrateClientWithBlueprint(client) {
@@ -104,7 +116,6 @@ function hydrateClientWithBlueprint(client) {
   const bp = findBlueprintForClient(client.industry, client.name);
   if (!bp) return client;
 
-  // If industry was "Otro Rubro" or mismatched with clear company name (e.g., "Clínica Rivera"), align category
   if ((!client.industry || client.industry === 'Otro Rubro') && bp.category) {
     client.industry = bp.category;
   }
@@ -125,16 +136,13 @@ function hydrateClientWithBlueprint(client) {
     client.afterSalesFlow = JSON.parse(JSON.stringify(bp.afterSalesFlow || {}));
   }
   if (!client.systemPrompt || /Eres el asistente de inteligencia artificial de la agencia NEXUS AI/i.test(client.systemPrompt)) {
-    client.systemPrompt = (bp.defaultSystemPrompt || '')
-      .replace(/la clínica/gi, client.name)
-      .replace(/la empresa/gi, client.name)
-      .replace(/el salón/gi, client.name);
+    client.systemPrompt = replaceBlueprintCompanyPlaceholders(bp.defaultSystemPrompt, client.name);
   }
   const catSummary = Array.isArray(client.catalog) && client.catalog.length > 0
     ? client.catalog.map(it => `• ${it.name}: $${it.price} USD (${it.duration || 'Estándar'}) - ${it.description || ''}`).join('\n')
     : '';
   if (!client.knowledgeBase || (!client.knowledgeBase.includes('Catálogo') && catSummary)) {
-    client.knowledgeBase = `Información Oficial de ${client.name}:\n- Rubro: ${client.industry}\n- Horario de Atención: Lunes a Sábados de 09:00 a 19:00 hs\n- Políticas: Turnos y citas con confirmación instantánea por este medio.\n\nCatálogo de Servicios y Tratamientos Disponibles:\n${catSummary}`;
+    client.knowledgeBase = `Información Oficial de ${client.name}:\n- Rubro: ${client.industry}\n- Horario de Atención: Lunes a Sábados de 09:00 a 19:00 hs\n- Políticas: Atención personalizada y reservas directas por este medio.\n\nCatálogo Oficial de Servicios / Productos:\n${catSummary}`;
   }
   return client;
 }
@@ -1077,14 +1085,20 @@ function loadBlueprintPrompt(blueprintId) {
 
   const client = agencyClients.find(c => c.id === activeClientId);
   const companyName = client ? client.name : 'nuestra firma';
+  const resolvedPrompt = replaceBlueprintCompanyPlaceholders(bp.defaultSystemPrompt, companyName);
+  const catSummary = Array.isArray(bp.defaultCatalog) && bp.defaultCatalog.length > 0
+    ? bp.defaultCatalog.map(it => `• ${it.name}: $${it.price} USD (${it.duration || 'Estándar'}) - ${it.description || ''}`).join('\n')
+    : '';
+  const resolvedKnowledge = `Información Oficial de ${companyName}:\n- Rubro: ${bp.category}\n- Horario de Atención: Lunes a Sábados de 09:00 a 19:00 hs\n- Políticas: Atención personalizada y reservas directas por este medio.\n\nCatálogo Oficial de Servicios / Productos:\n${catSummary}`;
 
   const nameInput = document.getElementById('agentEditorName');
   if (nameInput) nameInput.value = bp.name;
 
   const promptInput = document.getElementById('agentEditorPrompt');
-  if (promptInput) {
-    promptInput.value = bp.defaultSystemPrompt.replace(/la clínica|la empresa|el salón|la firma|el Estudio|el complejo\/hotel|la institución|la empresa constructora\/estudio/gi, companyName);
-  }
+  if (promptInput) promptInput.value = resolvedPrompt;
+
+  const knowInput = document.getElementById('agentEditorKnowledge');
+  if (knowInput) knowInput.value = resolvedKnowledge;
 
   // Always populate all multi-flow inputs on screen
   if (bp.salesFlow) {
@@ -1105,9 +1119,15 @@ function loadBlueprintPrompt(blueprintId) {
     if (document.getElementById('aftersalesLoyalty')) document.getElementById('aftersalesLoyalty').value = bp.afterSalesFlow.loyaltyDiscount || '';
   }
 
+  testChatSessionId = null;
+  const chatBody = document.getElementById('testAgentChatBody');
+  if (chatBody) chatBody.innerHTML = '';
+
   if (client) {
     client.industry = bp.category;
     client.agentName = bp.name;
+    client.systemPrompt = resolvedPrompt;
+    client.knowledgeBase = resolvedKnowledge;
     client.catalog = JSON.parse(JSON.stringify(bp.defaultCatalog));
     client.salesFlow = JSON.parse(JSON.stringify(bp.salesFlow));
     client.supportFlow = JSON.parse(JSON.stringify(bp.supportFlow));
@@ -1116,7 +1136,7 @@ function loadBlueprintPrompt(blueprintId) {
     loadActiveAgentForClient();
   }
 
-  showToast(`✨ Especialidad '${bp.name}' (${bp.category}) cargada con protocolos profesionales`, 'success');
+  showToast(`✨ Especialidad '${bp.name}' (${bp.category}) cargada con catálogo y protocolos profesionales`, 'success');
 }
 
 function saveActiveAgentConfig() {
