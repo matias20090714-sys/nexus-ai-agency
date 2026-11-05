@@ -841,7 +841,7 @@ function saveNewAgencyClient() {
     phone: phone || (window.liveWaConnectedPhone ? `+${window.liveWaConnectedPhone}` : '+54 9 11 0000-0000'),
     waConnected: !!window.liveWaConnectedPhone,
     monthlyFee: fee,
-    agentName: `Asistente de ${name}`,
+    agentName: `Coordinación de ${name}`,
     systemPrompt: (blueprint.defaultSystemPrompt || '')
       .replace(/la clínica/gi, name)
       .replace(/la empresa/gi, name)
@@ -954,7 +954,7 @@ function loadActiveAgentForClient() {
     hydrateClientWithBlueprint(client);
 
     // Populate Identity & Base
-    document.getElementById('agentEditorName').value = client.agentName || `Asistente de ${client.name}`;
+    document.getElementById('agentEditorName').value = client.agentName || `Coordinación de ${client.name}`;
     if (document.getElementById('agentEditorTone')) document.getElementById('agentEditorTone').value = client.tone || 'profesional_calido';
     document.getElementById('agentEditorPrompt').value = client.systemPrompt || '';
     document.getElementById('agentEditorKnowledge').value = client.knowledgeBase || '';
@@ -1650,13 +1650,14 @@ function resetTestAgentChat() {
 
   const companyName = client ? client.name : 'NEXUS AI Agency HQ';
   const industry = client ? client.industry : 'Agencia de IA & Automatización';
-  const agentName = client ? (client.agentName || `Asistente de ${companyName}`) : 'Asistente Virtual IA';
+  const rawAgentName = client ? (client.agentName || `Coordinación de ${companyName}`) : 'Equipo Comercial';
+  const agentName = /asistente\s*virtual|asistente\s*de/i.test(rawAgentName) ? `Coordinación de ${companyName}` : rawAgentName;
 
   const chatBody = document.getElementById('testAgentChatBody');
   if (chatBody) {
     chatBody.innerHTML = `
       <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
-        Hola, soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o duda que tengas.
+        Hola, qué gusto saludarte. Te damos la bienvenida a <strong>${escapeHtml(companyName)}</strong>. ¿En qué podemos ayudarte hoy?
       </div>
     `;
   }
@@ -1667,7 +1668,8 @@ function testAgentLiveDialog() {
   const client = getLiveClientForSimulator();
   const companyName = client ? client.name : 'NEXUS AI Agency HQ';
   const industry = client ? client.industry : 'Agencia de IA & Automatización';
-  const agentName = client ? (client.agentName || `Asistente de ${companyName}`) : 'Asistente Virtual IA';
+  const rawAgentName = client ? (client.agentName || `Coordinación de ${companyName}`) : 'Equipo Comercial';
+  const agentName = /asistente\s*virtual|asistente\s*de/i.test(rawAgentName) ? `Coordinación de ${companyName}` : rawAgentName;
   const resolvedClientId = client ? client.id : (activeClientId || 'agency_hq');
 
   if (!testChatSessionId || !testChatSessionId.includes(resolvedClientId)) {
@@ -1683,7 +1685,7 @@ function testAgentLiveDialog() {
   if (chatBody && (!chatBody.innerHTML || chatBody.children.length <= 1 || !chatBody.innerHTML.includes(escapeHtml(companyName)))) {
     chatBody.innerHTML = `
       <div style="align-self: flex-start; max-width: 85%; background: rgba(30, 41, 59, 0.95); border: 1px solid rgba(255,255,255,0.08); padding: 10px 14px; border-radius: 12px; color: #f1f5f9; font-size: 13px; line-height: 1.45;">
-        Hola, soy ${escapeHtml(agentName)}, especialista de <strong>${escapeHtml(companyName)}</strong> (${escapeHtml(industry)}). ¿En qué podemos ayudarte hoy? Escríbeme cualquier consulta o toca los botones de abajo.
+        Hola, qué gusto saludarte. Te damos la bienvenida a <strong>${escapeHtml(companyName)}</strong>. ¿En qué podemos ayudarte hoy?
       </div>
     `;
   }

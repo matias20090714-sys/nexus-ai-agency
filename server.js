@@ -16,7 +16,7 @@ if (fs.existsSync(ENV_PATH)) {
         if (key && !process.env[key]) process.env[key] = val;
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 const https = require('https');
@@ -108,8 +108,19 @@ function unwrapBaileysMessage(rawMessage) {
   );
 }
 
+const GEMINI_FAST_MODELS = [
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite'
+];
+
 async function transcribeIncomingAudioBuffer(audioBuffer, mimeType = 'audio/ogg', apiKeyOverride = '') {
   if (!audioBuffer || !Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) return '';
+  if (!customAiKey && typeof hydrateRuntimeFromNeonDB === 'function') {
+    await hydrateRuntimeFromNeonDB().catch(() => { });
+  }
   const effectiveKey = apiKeyOverride || customAiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
   if (!effectiveKey) return '';
 
@@ -139,7 +150,7 @@ async function transcribeIncomingAudioBuffer(audioBuffer, mimeType = 'audio/ogg'
 
     // Path B: Google Gemini Multimodal Audio Understanding (High-Availability Cascade)
     const base64Audio = audioBuffer.toString('base64');
-    const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
+    const candidateModels = GEMINI_FAST_MODELS;
     const prompt = 'Escucha atentamente esta nota de voz enviada por un cliente en WhatsApp y transcribe de forma literal y exacta lo que dice en español. Devuelve únicamente el texto dicho por el cliente, sin comillas, sin introducciones ni comentarios.';
 
     for (const modelName of candidateModels) {
@@ -148,6 +159,7 @@ async function transcribeIncomingAudioBuffer(audioBuffer, mimeType = 'audio/ogg'
         const gRes = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(8000),
           body: JSON.stringify({
             contents: [{
               parts: [
@@ -268,9 +280,9 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
 
   if (forceNew) {
     if (activeSessions[sessionId]?.sock) {
-      try { activeSessions[sessionId].sock.end(); } catch (e) {}
+      try { activeSessions[sessionId].sock.end(); } catch (e) { }
     }
-    try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) {}
+    try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) { }
     fs.mkdirSync(sessionFolder, { recursive: true });
     delete activeSessions[sessionId];
   }
@@ -290,7 +302,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
   }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
-  
+
   // Get latest WhatsApp Web version to prevent 408/401 rejections
   let waVersion = [2, 3000, 1043857760];
   try {
@@ -366,7 +378,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
       sessionData.qrImage = null;
       sessionData.pairingCode = null;
       sessionData.status = 'connected';
-      
+
       const userObj = sock.user || state?.creds?.me || {};
       const userJid = userObj.id || '';
       const cleanPhone = userJid.split(':')[0] || userJid.split('@')[0] || sessionData.phone || '';
@@ -374,7 +386,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
       sessionData.phone = cleanPhone;
       sessionData.lid = userLid;
       sessionData.userName = userObj.name || sessionData.userName || 'WhatsApp Empresa';
-      
+
       console.log(`[Baileys - ${sessionId}] 🎉 ¡WhatsApp Real Vinculado con éxito! Línea: +${cleanPhone}`);
     }
 
@@ -391,7 +403,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
       if (statusCode === DisconnectReason.loggedOut) {
         sessionData.status = 'logged_out';
         sessionData.phone = null;
-        try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) {}
+        try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) { }
       } else {
         sessionData.status = 'reconnecting';
       }
@@ -500,7 +512,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
 
         // Feature 5 & 6: Owner Alerts & Anti-Ghosting Follow-up
         checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
-        registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60)).catch(() => {});
+        registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60)).catch(() => { });
 
         // Simulate natural human typing delay (1.0s)
         await new Promise(r => setTimeout(r, 1000));
@@ -612,6 +624,101 @@ function saveCompaniesToDisk() {
   } catch (e) {
     console.error('Error guardando companies_agents.json:', e.message);
   }
+}
+
+let neonHydratedOnce = false;
+let neonHydrationPromise = null;
+
+async function hydrateRuntimeFromNeonDB(force = false) {
+  if (neonHydratedOnce && !force) return;
+  if (neonHydrationPromise) return neonHydrationPromise;
+
+  neonHydrationPromise = (async () => {
+    try {
+      if (!db || typeof db.query !== 'function') return;
+
+      // 1. Hydrate Agencies & Shared Gemini/OpenAI Key from Neon PostgreSQL
+      const agRes = await db.query('SELECT * FROM agencies');
+      if (agRes && Array.isArray(agRes.rows)) {
+        for (const row of agRes.rows) {
+          const pCfg = row.portal_config && typeof row.portal_config === 'object' ? row.portal_config : {};
+          if (row.id && !memoryPortals[row.id] && Object.keys(pCfg).length > 0) {
+            memoryPortals[row.id] = pCfg;
+          }
+          const candidateKey = String(
+            pCfg.ai_key ||
+            pCfg.agency?.ai_key ||
+            pCfg.portalConfig?.ai_key ||
+            pCfg.geminiApiKey ||
+            ''
+          ).trim();
+          if (!customAiKey && candidateKey.length > 15) {
+            customAiKey = candidateKey;
+            console.log(`[AI Engine] Clave IA activa hidratada automáticamente desde Neon DB (${row.id}).`);
+          }
+        }
+      }
+
+      // 2. Hydrate Client Sub-Accounts (e.g. Clínica Rivera) from Neon PostgreSQL
+      const clRes = await db.query('SELECT * FROM clients');
+      if (clRes && Array.isArray(clRes.rows)) {
+        let restoredCount = 0;
+        for (const row of clRes.rows) {
+          if (!row || !row.id) continue;
+          if (
+            row.id === 'client_dental_1' ||
+            row.id === 'client_resto_1' ||
+            String(row.name || '').includes('San Lucas') ||
+            String(row.name || '').includes('Bistro Gourmet')
+          ) {
+            continue;
+          }
+          const agKey = row.agency_id || 'agency_master_1';
+          if (!Array.isArray(memoryCompanies[agKey])) memoryCompanies[agKey] = [];
+          const exists = memoryCompanies[agKey].some(c => c && c.id === row.id);
+          if (!exists) {
+            let unpacked = {};
+            if (typeof row.notes === 'string' && row.notes.trim().startsWith('{')) {
+              try { unpacked = JSON.parse(row.notes); } catch (e) { }
+            } else if (row.notes && typeof row.notes === 'object') {
+              unpacked = row.notes;
+            }
+            memoryCompanies[agKey].push({
+              ...unpacked,
+              id: row.id,
+              name: row.name,
+              industry: row.industry || unpacked.industry || 'Servicios',
+              phone: row.phone || unpacked.phone || '',
+              notes: typeof row.notes === 'string' ? row.notes : JSON.stringify(unpacked)
+            });
+            restoredCount++;
+          }
+        }
+        if (restoredCount > 0) {
+          console.log(`[AI Engine] ${restoredCount} sub-cuentas de clientes hidratadas desde Neon DB.`);
+        }
+      }
+
+      neonHydratedOnce = true;
+    } catch (err) {
+      console.warn('[Neon Hydration Note]:', err.message);
+    } finally {
+      neonHydrationPromise = null;
+    }
+  })();
+
+  return neonHydrationPromise;
+}
+
+hydrateRuntimeFromNeonDB().catch(() => { });
+
+function sanitizeHumanAgentName(rawName = '', companyName = 'nuestra empresa') {
+  const clean = String(rawName || '').trim();
+  if (!clean) return `Coordinación de ${companyName}`;
+  if (/asistente\s*virtual|agente\s*ia|\bbot\b|inteligencia\s*artificial|ia\s*est[aá]ndar|asistente\s*global|asistente\s*de\b/i.test(clean)) {
+    return `Coordinación de ${companyName}`;
+  }
+  return clean;
 }
 
 // ==================== NICHE SALES PLAYBOOKS & DOMAIN INTELLIGENCE ====================
@@ -890,6 +997,9 @@ function findMatchingBlueprintForCompany(industry = '', companyName = '') {
 
 // Resolver context of specific client / company by session or agency ID
 async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_1') {
+  if (!neonHydratedOnce || !customAiKey || Object.keys(memoryCompanies).length === 0) {
+    await hydrateRuntimeFromNeonDB().catch(() => { });
+  }
   const allCompanies = Object.values(memoryCompanies).flat();
   let matched = null;
 
@@ -928,7 +1038,7 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
     const agencyName = portal.agency?.name || 'NEXUS AI Agency';
     let plansSummary = '';
     if (Array.isArray(portal.plans) && portal.plans.length > 0) {
-      plansSummary = portal.plans.map(p => 
+      plansSummary = portal.plans.map(p =>
         `• ${p.name}: $${p.price} ${p.currency || 'USD'}/${p.period || p.billingPeriod || 'mes'}\n  - Beneficios: ${(p.features || []).join(', ')}`
       ).join('\n\n');
     } else {
@@ -970,7 +1080,7 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
           agentName: parsed.agentName || matched.agentName
         };
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // Auto-hydrate blueprint catalog and flows if company was created without explicit catalog items
@@ -1023,8 +1133,8 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
   // Build support flow string
   let supportStr = '';
   if (hydrated.supportFlow && typeof hydrated.supportFlow === 'object') {
-    const faqs = Array.isArray(hydrated.supportFlow.faq) 
-      ? hydrated.supportFlow.faq.map(f => `P: ${f.q} | R: ${f.a}`).join('\n') 
+    const faqs = Array.isArray(hydrated.supportFlow.faq)
+      ? hydrated.supportFlow.faq.map(f => `P: ${f.q} | R: ${f.a}`).join('\n')
       : (hydrated.supportFlow.faqs || '');
     supportStr = [
       faqs ? `Preguntas Frecuentes:\n${faqs}` : '',
@@ -1052,14 +1162,16 @@ async function getAgentCompanyContext(sessionId = '', agencyId = 'agency_master_
 
   const industryStr = hydrated.industry || 'Servicios Especializados';
   const nichePlaybook = getNicheSalesPlaybook(industryStr);
+  const cleanCompanyName = hydrated.name || 'Empresa';
+  const cleanAgentName = sanitizeHumanAgentName(hydrated.agentName, cleanCompanyName);
 
   return {
     id: hydrated.id,
-    companyName: hydrated.name || 'Empresa',
+    companyName: cleanCompanyName,
     industry: industryStr,
-    agentName: hydrated.agentName || `Coordinador de ${hydrated.name || 'la empresa'}`,
+    agentName: cleanAgentName,
     tone: hydrated.tone || 'profesional_calido_y_persuasivo',
-    systemPrompt: hydrated.systemPrompt || `Eres el especialista y asesor oficial de ${hydrated.name} (${industryStr}). Dialoga con empatía, solvencia profesional y calidez humana. Explica con claridad los beneficios de nuestros servicios/tratamientos, resuelve dudas con seguridad y orienta hacia la reserva de turno o contratación.`,
+    systemPrompt: hydrated.systemPrompt || `Eres parte del equipo profesional de atención y asesoramiento de ${cleanCompanyName}. Dialoga con empatía, criterio humano y solvencia profesional. Comprende la consulta puntual de cada persona, orienta con claridad sobre nuestros servicios y acompaña hacia la reserva de turno o contratación.`,
     catalogItems: Array.isArray(hydrated.catalog) ? hydrated.catalog : [],
     catalogSummary: catalogSummary,
     knowledgeBase: hydrated.knowledgeBase || `Atención de Lunes a Sábados de 09:00 a 19:00 hs. Consultas y reservas de turnos directas por WhatsApp.`,
@@ -1148,100 +1260,224 @@ function stripAiEmojis(str) {
     .trim();
 }
 
+function normalizeQuestionKey(q) {
+  return String(q || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function areQuestionsSemanticallyDuplicate(qA, qB) {
+  const nA = normalizeQuestionKey(qA);
+  const nB = normalizeQuestionKey(qB);
+  if (!nA || !nB) return false;
+  if (nA === nB || nA.includes(nB) || nB.includes(nA)) return true;
+
+  const stop = new Set(['para', 'como', 'cual', 'cuales', 'donde', 'cuando', 'quien', 'este', 'esta', 'estos', 'estas', 'tienes', 'tiene', 'algun', 'alguna', 'buscas', 'prefieres', 'gustaria', 'podemos', 'puedo']);
+  const wordsA = nA.split(' ').filter(w => w.length >= 4 && !stop.has(w));
+  const wordsB = nB.split(' ').filter(w => w.length >= 4 && !stop.has(w));
+  if (wordsA.length < 2 || wordsB.length < 2) return false;
+
+  const setB = new Set(wordsB);
+  const shared = wordsA.filter(w => setB.has(w)).length;
+  const ratio = shared / Math.min(wordsA.length, wordsB.length);
+  return ratio >= 0.65;
+}
+
+function extractQuestionsFromText(text) {
+  const raw = String(text || '');
+  const found = [];
+  const spanishMatches = raw.match(/¿[^?\n]{5,}\?/g) || [];
+  for (const m of spanishMatches) found.push(m.trim());
+
+  // Also capture questions written without opening '¿'
+  const lines = raw.split(/\n+/);
+  for (const line of lines) {
+    if (line.includes('?') && !line.includes('¿')) {
+      const segs = line.match(/[^.!?\n]{8,}\?/g) || [];
+      for (const s of segs) found.push(s.trim());
+    }
+  }
+  return found;
+}
+
+function extractConversationMemoryState(history, dom) {
+  const assistantMsgs = (Array.isArray(history) ? history : [])
+    .filter(h => h && h.role === 'assistant')
+    .map(h => String(h.text || ''));
+  const userMsgs = (Array.isArray(history) ? history : [])
+    .filter(h => h && h.role === 'user')
+    .map(h => String(h.text || ''));
+
+  const askedQuestions = [];
+  for (const msg of assistantMsgs) {
+    for (const q of extractQuestionsFromText(msg)) {
+      if (!askedQuestions.some(existing => areQuestionsSemanticallyDuplicate(existing, q))) {
+        askedQuestions.push(q);
+      }
+    }
+  }
+
+  const triageNorm = normalizeQuestionKey(dom?.triageQuestion || '');
+  const triageSubQ = extractQuestionsFromText(dom?.triageQuestion || '')[0] || dom?.triageQuestion || '';
+  const allAssistantNorm = normalizeQuestionKey(assistantMsgs.join(' '));
+
+  const alreadyAskedTriage =
+    askedQuestions.some(q => triageSubQ && areQuestionsSemanticallyDuplicate(q, triageSubQ)) ||
+    (triageNorm.length > 24 && allAssistantNorm.includes(triageNorm.slice(0, 28))) ||
+    /molestia o dolor agudo|valoracion preventiva|vivienda propia familiar|secreto profesional.*area|check in y check out|primeros pasos desde cero/i.test(allAssistantNorm);
+
+  const alreadyAskedClosing =
+    assistantMsgs.some(m => /1\.\s*\*?tu nombre|1\.\s*\*?nombre|reservarte el turno prioritario|dejar reservado tu/i.test(m)) ||
+    (askedQuestions.some(q => /manana o por la tarde|franja horaria|que dia/i.test(normalizeQuestionKey(q))) &&
+      assistantMsgs.some(m => /nombre/i.test(m)));
+
+  const alreadySharedCatalog = assistantMsgs.some(m => /\$\s*\d+|\busd\b/i.test(m));
+  const lastBotMsg = assistantMsgs[assistantMsgs.length - 1] || '';
+
+  return {
+    assistantMsgs,
+    userMsgs,
+    askedQuestions,
+    alreadyAskedTriage,
+    alreadyAskedClosing,
+    alreadySharedCatalog,
+    lastBotMsg
+  };
+}
+
+function enforceZeroRepeatedQuestionsAndCleanLabels(rawReply, ctx, convMem, dom) {
+  if (!rawReply) return '';
+  let text = stripAiEmojis(rawReply);
+
+  // Strip robotic parenthetical industry tags like "(Salud & Clínicas)" and "Soy Asistente Virtual..."
+  if (ctx?.industry) {
+    const escapedInd = ctx.industry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    text = text.replace(new RegExp(`\\s*\\(${escapedInd}\\)`, 'gi'), '');
+  }
+  text = text
+    .replace(/\s*\((Salud\s*&\s*Cl[ií]nicas|Gastronom[ií]a[^)]*|Inmobiliarias[^)]*|Belleza[^)]*|Educaci[oó]n[^)]*|Construcci[oó]n[^)]*|Hoteler[ií]a[^)]*|Automotriz[^)]*|Fitness[^)]*|E-Commerce[^)]*|Estudios Jur[ií]dicos[^)]*|Servicios B2B[^)]*)\)/gi, '')
+    .replace(/Soy\s+Asistente\s+Virtual[^.,\n]*/gi, `Te escribo del equipo de atención de ${ctx?.companyName || 'nuestro centro'}`)
+    .replace(/Soy\s+Asistente\s+de\s+[^.,\n]*/gi, `Te escribo del equipo de ${ctx?.companyName || 'nuestro centro'}`);
+
+  // Remove any question that was ALREADY asked in previous turns
+  if (convMem && Array.isArray(convMem.askedQuestions) && convMem.askedQuestions.length > 0) {
+    const currentQuestions = extractQuestionsFromText(text);
+    let removedAny = false;
+    for (const cq of currentQuestions) {
+      const isRepeated = convMem.askedQuestions.some(prevQ => areQuestionsSemanticallyDuplicate(prevQ, cq));
+      if (isRepeated) {
+        const escapedCq = cq.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Also strip a preceding lead-in clause ending in ":" right before the repeated question
+        text = text.replace(new RegExp(`(?:[^.!?\\n]{5,75}:\\s*)?${escapedCq}`, 'g'), '').trim();
+        removedAny = true;
+      }
+    }
+
+    if (removedAny) {
+      text = text.replace(/\n{3,}/g, '\n\n').replace(/:\s*$/, '.').trim();
+      const remainingQuestions = extractQuestionsFromText(text);
+      if (remainingQuestions.length === 0 && !convMem.alreadyAskedClosing) {
+        const followUp = '¿Prefieres coordinar tu atención por la mañana o por la tarde?';
+        if (!convMem.askedQuestions.some(prevQ => areQuestionsSemanticallyDuplicate(prevQ, followUp))) {
+          text = `${text}\n\n${followUp}`.trim();
+        }
+      }
+    }
+  }
+
+  return stripAiEmojis(text.replace(/\n{3,}/g, '\n\n').trim());
+}
+
 function generateContextualSalesReply(lowerText, rawText, history, ctx, docContext) {
-  const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
-  const lowerBot = lastBotMsg.toLowerCase();
-  const hadPriceDiscussion = history.some(h => (h.text || '').toLowerCase().includes('precio') || (h.text || '').toLowerCase().includes('$') || (h.text || '').toLowerCase().includes('plan') || (h.text || '').toLowerCase().includes('costo') || (h.text || '').toLowerCase().includes('usd'));
-  const hadTurnDiscussion = history.some(h => (h.text || '').toLowerCase().includes('turno') || (h.text || '').toLowerCase().includes('cita') || (h.text || '').toLowerCase().includes('agenda') || (h.text || '').toLowerCase().includes('horario'));
-  const isConversationOngoing = history.length > 0;
   const dom = getIndustryDomainIntelligence(ctx.industry, ctx.companyName);
+  const convMem = extractConversationMemoryState(history, dom);
+  const lastBotMsg = convMem.lastBotMsg;
+  const lowerBot = lastBotMsg.toLowerCase();
+  const hadPriceDiscussion = convMem.alreadySharedCatalog || history.some(h => /precio|\$|plan|costo|usd|arancel/i.test(h.text || ''));
+  const hadTurnDiscussion = history.some(h => /turno|cita|agenda|horario|visita/i.test(h.text || ''));
+  const isConversationOngoing = history.length > 0;
   const isAiAgency = ctx.id === 'default_agency' || /automatizaci|inteligencia artificial|agencia de ia/i.test(ctx.industry || '');
+
+  const getNextUnaskedStep = () => {
+    if (!convMem.alreadyAskedTriage) return dom.triageQuestion;
+    if (!convMem.alreadyAskedClosing) return dom.closingCapturePrompt;
+    return 'En cuanto me confirmes el día y horario que te quede más cómodo, dejamos tu reserva asentada en agenda.';
+  };
+
+  const normInd = (ctx.industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normUser = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const firstCatalogItem = Array.isArray(ctx.catalogItems) && ctx.catalogItems.length > 0 ? ctx.catalogItems[0] : null;
+  const diagnosticItemLabel = firstCatalogItem
+    ? `*${firstCatalogItem.name}* (*$${firstCatalogItem.price} USD*${firstCatalogItem.duration ? `, ${firstCatalogItem.duration}` : ''})`
+    : 'nuestra consulta inicial de valoración diagnóstica';
 
   let reply = '';
 
-  // 1. RAG Documentation Match
-  if (docContext && (lowerText.includes('precio') || lowerText.includes('catalogo') || lowerText.includes('catálogo') || lowerText.includes('servicio') || lowerText.includes('costo') || lowerText.includes('cuanto') || lowerText.includes('cuánto'))) {
-    reply = `Con gusto. Aquí tienes los detalles oficiales de *${ctx.companyName}*:\n\n${docContext.slice(0, 480)}...\n\n${dom.triageQuestion}`;
+  // 0. If closing capture was ALREADY asked and user is providing their booking details / schedule preference
+  const looksLikeBookingDetails =
+    convMem.alreadyAskedClosing &&
+    (/manana|tarde|lunes|martes|miercoles|jueves|viernes|sabado|particular|obra social|prepaga|osde|swiss|galeno|transferencia|efectivo|tarjeta|contado|presencial|meet|online|\b\d{1,2}\s*(hs|horas|am|pm)\b/i.test(normUser) ||
+      rawText.trim().split(/\s+/).length >= 2);
+
+  if (!reply && looksLikeBookingDetails && !/precio|cuanto|costo|otro|duda/i.test(normUser)) {
+    reply = `Perfecto, ya tomé nota de tus datos ("${rawText.trim()}") en *${ctx.companyName}*. Nuestro equipo deja pre-asignada tu solicitud y te confirmará por este mismo chat el horario exacto disponible. ¿Tienes alguna consulta adicional antes de tu atención?`;
   }
 
-  // 2. Affirmations & Agreements (sii, si, sí, dale, opino que si, claro, etc.)
+  // 1. RAG Documentation Match
+  if (!reply && docContext && /precio|catalogo|servicio|costo|cuanto/.test(normUser)) {
+    reply = `Con gusto. Aquí tienes los detalles de *${ctx.companyName}*:\n\n${docContext.slice(0, 480)}\n\n${getNextUnaskedStep()}`;
+  }
+
+  // 2. Specialized Clinical / Dental Human Reasoning (Brackets, Ortodoncia, Implantes, Conducto, Respuestas de Triaje)
+  if (!reply && !isAiAgency && (normInd.includes('salud') || normInd.includes('clinic') || normInd.includes('dental') || normInd.includes('odont'))) {
+    if (/bracket|ortodonci|alineador|invisalign|frenillo|enderezar|mordida/.test(normUser)) {
+      reply = `Por supuesto, en *${ctx.companyName}* realizamos tratamientos de ortodoncia y colocación de brackets. Para definir qué tipo de aparatología es mejor para tu mordida y darte el presupuesto exacto del tratamiento, el primer paso es realizar la ${diagnosticItemLabel}, que incluye evaluación clínica completa y radiografía digital.\n\n${convMem.alreadyAskedClosing ? '¿Prefieres asistir por la mañana o por la tarde para agendar tu valoración?' : dom.closingCapturePrompt}`;
+    } else if (/implant|protesis|corona|perno|carilla|conducto|endodonci|extracci|cirugia|muela del juicio/.test(normUser)) {
+      reply = `Sí, en *${ctx.companyName}* contamos con especialistas para realizar ese tratamiento. Como cada caso requiere evaluar la pieza y el tejido óseo con precisión, comenzamos con la ${diagnosticItemLabel} (con cámara intraoral y radiografía digital) para entregarte tu plan clínico y presupuesto exacto.\n\n${convMem.alreadyAskedClosing ? '¿Qué día y franja horaria te queda más cómodo para venir?' : dom.closingCapturePrompt}`;
+    } else if (/dolor|duele|muela|diente|urgencia|inflam|hincha|sangr|caries|infeccion|partio|sensibil/.test(normUser)) {
+      reply = `Comprendo tu molestia y en *${ctx.companyName}* priorizamos la atención de casos con dolor agudo para aliviarte cuanto antes. Lo indicado es verte en la ${diagnosticItemLabel} para diagnosticar el origen exacto con radiografía digital y resolverlo.\n\n${convMem.alreadyAskedClosing ? '¿Puedes acercarte hoy por la mañana o por la tarde?' : dom.closingCapturePrompt}`;
+    } else if (/preventiv|estetic|control|chequeo|revision|valoracion/.test(normUser)) {
+      const relevantList = Array.isArray(ctx.catalogItems) && ctx.catalogItems.length > 0
+        ? ctx.catalogItems.slice(0, 3).map(it => `• *${it.name}*: *$${it.price} USD*${it.duration ? ` (${it.duration})` : ''}`).join('\n')
+        : ctx.catalogSummary;
+      reply = `Excelente, hacer una valoración a tiempo es lo ideal. Para tu consulta en *${ctx.companyName}* podemos comenzar con la evaluación general o acompañarla con profilaxis o estética según lo que busques:\n\n${relevantList}\n\n¿Con cuál de estas opciones te gustaría avanzar, o prefieres empezar por la consulta diagnóstica inicial?`;
+    }
+  }
+
+  // 3. Direct Answers to Industry Triage Questions Across the Other 11 Industries
+  if (!reply && !isAiAgency && convMem.alreadyAskedTriage) {
+    if ((normInd.includes('inmobili') || normInd.includes('propiedad')) && /vivienda|mudar|familia|inversion|renta|alquil|compr/.test(normUser)) {
+      reply = `Excelente enfoque. En base a lo que buscas ("${rawText.trim()}"), en *${ctx.companyName}* podemos preseleccionar las unidades que mejor encajan con tu perfil:\n\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
+    } else if ((normInd.includes('juridic') || normInd.includes('abogad') || normInd.includes('legal') || normInd.includes('contabl')) && /laboral|civil|comercial|societari|tributari|familia|penal|urgente|plazo|sin plazo/.test(normUser)) {
+      reply = `Entendido, asignaremos tu caso directamente al especialista de esa área en *${ctx.companyName}* bajo estricto secreto profesional.\n\nNuestras modalidades de consulta son:\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
+    } else if ((normInd.includes('educac') || normInd.includes('academi') || normInd.includes('curso')) && /cero|principiante|empezando|experiencia|avanzad|certific/.test(normUser)) {
+      reply = `Genial, teniendo en cuenta tu nivel actual en *${ctx.companyName}* te recomendamos nuestros programas con acompañamiento práctico:\n\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
+    }
+  }
+
+  // 4. Affirmations & Agreements (sii, si, sí, dale, claro, etc.)
   const isAffirmative = /^(s+i+|s+e+p|s+i+s+i+|clar+o+|obvio|totalmente|de una|dale|bueno|de acuerdo|me parece bien|opino que s+i+|me interesa|está bien|esta bien|por supuesto|vamos)/i.test(lowerText) ||
-    lowerText.includes('opino que si') || lowerText.includes('opino que sí') || lowerText.includes('me parece que si') || lowerText.includes('me parece bien') || lowerText.includes('de acuerdo') || lowerText.includes('totalmente') ||
-    lowerText === 'si' || lowerText.startsWith('si ') || lowerText === 'sí' || lowerText.startsWith('sí ') || lowerText.includes('sii') || lowerText.includes('siii');
+    lowerText === 'si' || lowerText.startsWith('si ') || lowerText === 'sí' || lowerText.startsWith('sí ');
 
   if (!reply && isAffirmative) {
-    if (hadPriceDiscussion || hadTurnDiscussion || lowerBot.includes('turno') || lowerBot.includes('reservar') || lowerBot.includes('agendar') || lowerBot.includes('valoración') || lowerBot.includes('$')) {
-      reply = `Excelente, avanzamos entonces en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
-    } else if (isAiAgency) {
-      reply = `Excelente. Te cuento en concreto cómo te ayudamos en *${ctx.companyName}*:\n\n` +
-        `1. Automatizamos tu atención y ventas en WhatsApp 24/7 para responder al instante.\n` +
-        `2. Calificamos a cada cliente y resolvemos dudas con naturalidad.\n` +
-        `3. Agendamos citas en calendario y enviamos cotizaciones.\n\n` +
-        `Nuestros planes oficiales son:\n${ctx.catalogSummary}\n\n` +
-        `¿Cuál de estas alternativas se ajusta mejor a tu negocio?`;
+    if (hadPriceDiscussion || hadTurnDiscussion || /turno|reservar|agendar|valoraci|\$/.test(lowerBot)) {
+      reply = `Excelente, coordinemos entonces tu atención en *${ctx.companyName}*.\n\n${convMem.alreadyAskedClosing ? 'Indícame tu nombre y qué franja horaria prefieres para dejarlo agendado.' : dom.closingCapturePrompt}`;
     } else {
-      reply = `Excelente. Te comparto las prestaciones y aranceles principales con los que trabajamos en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
+      reply = `Perfecto. Te comparto las opciones principales con las que trabajamos en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
     }
   }
 
-  // 3. Intención de Compra Directa / Reserva de Turno / Contratación
-  const isBuyingSignal = lowerText.includes('me interesa') || lowerText.includes('quiero contratar') || lowerText.includes('como contrato') || lowerText.includes('cómo contrato') ||
-    lowerText.includes('como pago') || lowerText.includes('cómo pago') || lowerText.includes('donde pago') || lowerText.includes('dónde pago') || lowerText.includes('donde transfiero') ||
-    lowerText.includes('dónde transfiero') || lowerText.includes('empecemos') || lowerText.includes('lo quiero') || lowerText.includes('de una') || lowerText.includes('vamos con') ||
-    lowerText.includes('acepto') || lowerText.includes('lo compro') || lowerText.includes('lo tomo') || lowerText.includes('reservamelo') || lowerText.includes('resérvamelo') ||
-    lowerText.includes('agendemos') || lowerText.includes('dame los datos') || lowerText.includes('pasame el link') || lowerText.includes('pásame el link') ||
-    lowerText.includes('quiero empezar') || lowerText.includes('lo cerramos') || lowerText.includes('quiero un turno') || lowerText.includes('reservar turno');
-
+  // 5. Intención de Compra Directa / Reserva de Turno / Contratación
+  const isBuyingSignal = /me interesa|quiero contratar|como contrato|como pago|donde pago|donde transfiero|empecemos|lo quiero|vamos con|acepto|lo compro|lo tomo|reservamelo|agendemos|quiero empezar|lo cerramos|quiero un turno|reservar turno/.test(normUser);
   if (!reply && isBuyingSignal) {
-    reply = `Excelente decisión. Será un gusto atenderte en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
+    reply = `Excelente decisión. Será un gusto recibirte en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
   }
 
-  // 4. Pregunta de Propuesta de Valor, Especialidad y Servicios ("En qué me ayuda", "De qué trata", "Para qué sirve", "Qué hacen", "Qué servicios ofrecen")
-  const isHelpOrValueQuestion = lowerText.includes('ayuda') || lowerText.includes('ayudan') || lowerText.includes('en que me') || lowerText.includes('en qué me') ||
-    lowerText.includes('como me ayuda') || lowerText.includes('cómo me ayuda') || lowerText.includes('de que trata') || lowerText.includes('de qué trata') ||
-    lowerText.includes('para que sirve') || lowerText.includes('para qué sirve') || lowerText.includes('que hacen') || lowerText.includes('qué hacen') ||
-    lowerText.includes('a que se dedican') || lowerText.includes('a qué se dedican') || lowerText.includes('que ofrecen') || lowerText.includes('qué ofrecen') ||
-    lowerText.includes('como funciona') || lowerText.includes('cómo funciona') || lowerText.includes('tratamiento') || lowerText.includes('tratamientos') ||
-    lowerText.includes('especialidad') || lowerText.includes('beneficio') || lowerText.includes('beneficios') ||
-    lowerText.includes('servicio') || lowerText.includes('servicios');
-
-  if (!reply && isHelpOrValueQuestion) {
-    if (isAiAgency) {
-      reply = `En *${ctx.companyName}* somos especialistas en ${ctx.industry}. Ayudamos a empresas y profesionales a multiplicar sus ventas y ahorrar horas operativas:\n\n` +
-        `1. Atención y ventas inmediatas en WhatsApp 24/7.\n` +
-        `2. Calificación comercial de prospectos y manejo de objeciones.\n` +
-        `3. Agendamiento automático en Google Calendar y cobros directos.\n\n` +
-        `Nuestros planes oficiales son:\n${ctx.catalogSummary}\n\n` +
-        `¿Cuál de estos objetivos es el más prioritario para tu negocio hoy?`;
-    } else {
-      reply = `En *${ctx.companyName}* somos especialistas en *${ctx.industry}*. ${dom.valueJustification}\n\n` +
-        `Actualmente nuestras prestaciones y aranceles principales son:\n${ctx.catalogSummary}\n\n` +
-        `${dom.triageQuestion}`;
-    }
-  }
-
-  // 5. Manejo de Objeción de Precio (Reencuadre de Valor, ROI y Presupuesto)
-  const isPriceObjection = lowerText.includes('caro') || lowerText.includes('cara') || lowerText.includes('no tengo plata') || lowerText.includes('no tengo dinero') ||
-    lowerText.includes('no llego') || lowerText.includes('descuento') || lowerText.includes('rebaja') || lowerText.includes('muy costoso') || lowerText.includes('fuera de presupuesto') ||
-    lowerText.includes('algo mas barato') || lowerText.includes('algo más barato') || lowerText.includes('menos plata') || lowerText.includes('muy alto');
-
-  if (!reply && isPriceObjection) {
-    reply = `Te entiendo perfectamente, cuidar tu inversión es muy importante. En *${ctx.companyName}* trabajamos con ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\nAdemás, contamos con facilidades de pago y podemos comenzar por una valoración inicial accesible para definir el plan ideal según tu presupuesto. ${dom.triageQuestion}`;
-  }
-
-  // 6. Facilidades y Métodos de Pago
-  const isPaymentMethods = lowerText.includes('facilidades') || lowerText.includes('formas de pago') || lowerText.includes('metodos de pago') || lowerText.includes('métodos de pago') ||
-    lowerText.includes('como se paga') || lowerText.includes('cómo se paga') || lowerText.includes('tarjeta') || lowerText.includes('transferencia') || lowerText.includes('cuotas') || lowerText.includes('obra social') || lowerText.includes('prepaga');
-
-  if (!reply && isPaymentMethods) {
-    reply = `Por supuesto. En *${ctx.companyName}* ofrecemos diversas facilidades: aceptamos efectivo, transferencias bancarias, tarjetas de débito y crédito, y emitimos comprobantes oficiales para reintegros.\n\n${dom.closingCapturePrompt}`;
-  }
-
-  // 6.B Detección Inteligente por Ítem del Catálogo y Triaje Especializado de los 12 Rubros
-  const normInd = (ctx.industry || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const normUser = lowerText.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-  // Coincidencia directa con servicios o productos específicos del catálogo de esta empresa
+  // 6. Coincidencia directa con servicios o productos específicos del catálogo de esta empresa
   if (!reply && Array.isArray(ctx.catalogItems) && ctx.catalogItems.length > 0) {
     const stopWords = new Set(['para', 'con', 'por', 'sin', 'del', 'las', 'los', 'una', 'uno', 'unos', 'unas', 'que', 'como', 'mas', 'muy', 'este', 'esta', 'todo', 'toda', 'plan', 'pack', 'servicio', 'consulta', 'general', 'integral', 'completo', 'completa', 'premium', 'basico', 'basica']);
     const matchedItems = ctx.catalogItems.filter(it => {
@@ -1249,196 +1485,111 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
       return words.some(w => normUser.includes(w));
     });
 
-    if (matchedItems.length > 0 && !normUser.includes('dolor') && !normUser.includes('urgencia')) {
+    if (matchedItems.length > 0) {
       const itemsDetail = matchedItems.map(it => {
         const parts = [`• *${it.name}*: *$${it.price} USD*`];
         if (it.duration) parts.push(`(${it.duration})`);
-        if (it.description || it.benefits) parts.push(`— ${it.description || it.benefits}`);
+        if (it.description || it.benefits) parts.push(`- ${it.description || it.benefits}`);
         return parts.join(' ');
       }).join('\n');
-      reply = `Excelente elección. En *${ctx.companyName}* contamos con la opción exacta para lo que buscas:\n\n${itemsDetail}\n\n${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
+      reply = `Excelente elección. En *${ctx.companyName}* contamos exactamente con ese servicio:\n\n${itemsDetail}\n\n${convMem.alreadyAskedClosing ? '¿Qué día y horario te queda mejor para agendarlo?' : dom.closingCapturePrompt}`;
     }
   }
 
-  // Triaje especializado según necesidad puntual de cada uno de los 12 rubros
-  if (!reply && !isAiAgency) {
-    if ((normInd.includes('salud') || normInd.includes('clinic') || normInd.includes('dental') || normInd.includes('odont')) &&
-        /dolor|duele|muela|diente|urgencia|inflam|hincha|sangr|caries|infeccion|partio|sensibil/.test(normUser)) {
-      reply = `Comprendo perfectamente tu molestia y en *${ctx.companyName}* le damos prioridad absoluta a los casos con dolor o sensibilidad aguda para aliviarte hoy mismo.\n\nLo indicado es realizar una valoración diagnóstica presencial con nuestro especialista para determinar el origen exacto y brindarte el tratamiento inmediato:\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
-    } else if ((normInd.includes('inmobili') || normInd.includes('bienes raic') || normInd.includes('propiedad')) &&
-               /departament|casa|lote|terreno|alquil|compr|invertir|inversion|tasacion|tasar|ambiente|dormitorio|credito|apto/.test(normUser)) {
-      reply = `Excelente búsqueda. En *${ctx.companyName}* contamos con opciones seleccionadas con títulos perfectos y asesoramiento patrimonial integral:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('juridic') || normInd.includes('abogad') || normInd.includes('legal') || normInd.includes('contabl') || normInd.includes('notar')) &&
-               /despido|indemnizaci|divorcio|sucesion|herencia|contrato|carta documento|intimacion|juicio|demanda|impuesto|monotributo|balance|sociedad|escritura/.test(normUser)) {
-      reply = `Gracias por contactarte con *${ctx.companyName}*. Tratamos tu consulta bajo estricto secreto profesional para resguardar tus derechos y plazos legales.\n\nNuestras instancias de atención profesional son:\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('belleza') || normInd.includes('barber') || normInd.includes('peluquer') || normInd.includes('spa') || normInd.includes('estetic')) &&
-               /corte|barba|color|tintur|mechas|balayage|alisado|keratina|unas|manicur|facial|limpieza|masaje|depilaci|cejas|pestanas/.test(normUser)) {
-      reply = `Nos encantará recibirte en *${ctx.companyName}*. Trabajamos cada detalle de forma personalizada para lograr el resultado exacto que buscas:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.closingCapturePrompt}`;
-    } else if ((normInd.includes('restauran') || normInd.includes('gastronom') || normInd.includes('comida') || normInd.includes('bar')) &&
-               /mesa|carta|menu|plato|delivery|envio|pedido|celiac|tacc|vegan|vegetarian|cumpleanos|evento|cena|almuerzo/.test(normUser)) {
-      reply = `Será un placer agasajarte en *${ctx.companyName}*. Aquí tienes nuestras propuestas gastronómicas destacadas:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('tienda') || normInd.includes('retail') || normInd.includes('ecommerce')) &&
-               /stock|talle|talla|color|modelo|envio|despacho|cambio|devoluci|mayorist|prenda|producto|comprar/.test(normUser)) {
-      reply = `Qué bueno que nos escribas. En *${ctx.companyName}* contamos con disponibilidad inmediata y despacho asegurado:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('gimnasio') || normInd.includes('fitness') || normInd.includes('gym') || normInd.includes('crossfit')) &&
-               /pase|membresia|musculaci|crossfit|funcional|pilates|bajar de peso|masa muscular|entrenar|clase|prueba|profesor/.test(normUser)) {
-      reply = `Excelente iniciativa para empezar a entrenar en *${ctx.companyName}*. Estos son nuestros pases y programas activos:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('taller') || normInd.includes('automot') || normInd.includes('mecanic') || normInd.includes('concesionar')) &&
-               /service|aceite|filtro|freno|embrague|correa|distribuci|ruido|falla|escan|bateria|neumatic|alineaci|balanceo|tren delantero|motor/.test(normUser)) {
-      reply = `En *${ctx.companyName}* revisamos tu vehículo con equipamiento de diagnóstico computarizado y repuestos homologados:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('hotel') || normInd.includes('caban') || normInd.includes('turism')) &&
-               /habitaci|cabana|suite|noche|estadia|check|huesped|persona|pareja|familia|pileta|piscina|desayuno|vacacion|finde/.test(normUser)) {
-      reply = `Qué alegría recibir tu consulta en *${ctx.companyName}*. Estas son nuestras opciones y tarifas por reserva directa:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('educac') || normInd.includes('academi') || normInd.includes('curso')) &&
-               /curso|carrera|diplomatur|programa|temario|certificad|inscripci|matricul|vacante|online|vivo|clases|aprender/.test(normUser)) {
-      reply = `Excelente paso para tu crecimiento profesional. En *${ctx.companyName}* contamos con estos programas de formación:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('construc') || normInd.includes('arquitec') || normInd.includes('reforma') || normInd.includes('piscin')) &&
-               /obra|reforma|remodelaci|ampliaci|piscina|pileta|metros|m2|llave en mano|plano|construir|techo|cocina|bano/.test(normUser)) {
-      reply = `En *${ctx.companyName}* ejecutamos tu proyecto con cómputo preciso, dirección técnica y presupuesto cerrado por contrato:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    } else if ((normInd.includes('b2b') || normInd.includes('empresa') || normInd.includes('consultor')) &&
-               /consultor|auditor|estrategi|corporativ|implementaci|empresa|equipo|optimiz|ventas|proceso/.test(normUser)) {
-      reply = `En *${ctx.companyName}* acompañamos a empresas con soluciones ejecutivas orientadas a resultados medibles:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-    }
-  }
-
-  // 7. Recomendación Consultiva / Por cuál empezar
-  const isRecommendation = lowerText.includes('que me recomiend') || lowerText.includes('qué me recomiend') || lowerText.includes('cual me recomiend') || lowerText.includes('cuál me recomiend') ||
-    lowerText.includes('por cual empiez') || lowerText.includes('por cuál empiez') || lowerText.includes('cual elijo') || lowerText.includes('cuál elijo') || lowerText.includes('recomiendan para empezar') || lowerText.includes('molestia');
-
-  if (!reply && isRecommendation) {
+  // 7. Pregunta de Propuesta de Valor, Especialidad y Servicios
+  const isHelpOrValueQuestion = /ayuda|en que me|de que trata|para que sirve|que hacen|a que se dedican|que ofrecen|como funciona|tratamiento|especialidad|beneficio|servicio/.test(normUser);
+  if (!reply && isHelpOrValueQuestion) {
     if (isAiAgency) {
-      reply = `Para darte una recomendación honesta y rentable: la mayoría de las empresas comienza con nuestro Plan Starter o Growth Pro, ya que cubren de inmediato el flujo de ventas 24/7.\n\n${dom.triageQuestion}`;
+      reply = `En *${ctx.companyName}* implementamos sistemas de atención y ventas automatizadas en WhatsApp 24/7 para calificar prospectos, responder consultas con criterio humano y agendar citas.\n\nNuestros planes son:\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
     } else {
-      reply = `Como ${dom.roleTitle} en *${ctx.companyName}*, te detallo nuestras alternativas principales para recomendarte la ideal según tu caso:\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
+      reply = `En *${ctx.companyName}* brindamos atención profesional personalizada. ${dom.valueJustification}\n\nNuestras prestaciones principales son:\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
     }
   }
 
-  // 8. Manejo de Indecisión ("Lo voy a pensar", consulta con terceros)
-  const isHesitation = lowerText.includes('lo voy a pensar') || lowerText.includes('lo tengo que pensar') || lowerText.includes('dejame ver') || lowerText.includes('déjame ver') ||
-    lowerText.includes('despues te aviso') || lowerText.includes('después te aviso') || lowerText.includes('despues te escribo') || lowerText.includes('después te escribo') ||
-    lowerText.includes('tengo que hablar') || lowerText.includes('tengo que consultar') || lowerText.includes('con mi socio') || lowerText.includes('con mi pareja') || lowerText.includes('con mi esposa') || lowerText.includes('con mi marido');
-
-  if (!reply && isHesitation) {
-    reply = `Totalmente comprensible. Es importante que avances con total seguridad y claridad. Para ayudarte a evaluarlo: ¿hay alguna duda puntual sobre nuestras opciones, aranceles o modalidad que te gustaría aclarar?\n\nSi lo deseas, puedo dejarte pre-reservada la disponibilidad de esta semana sin compromiso mientras lo defines.`;
+  // 8. Manejo de Objeción de Precio
+  if (!reply && /caro|cara|no tengo plata|no tengo dinero|no llego|descuento|rebaja|muy costoso|fuera de presupuesto|algo mas barato|menos plata|muy alto/.test(normUser)) {
+    reply = `Te entiendo perfectamente, cuidar tu presupuesto es importante. En *${ctx.companyName}* priorizamos calidad y respaldo: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\nAdemás, contamos con facilidades de pago y podemos comenzar por la instancia inicial para evaluar tu caso sin gastos innecesarios. ${getNextUnaskedStep()}`;
   }
 
-  // 9. Comparación con Competencia ("Encontré algo más barato")
-  const isCompetitorComparison = lowerText.includes('la competencia') || lowerText.includes('otro lugar') || lowerText.includes('en otro lado') || lowerText.includes('mas barato en') ||
-    lowerText.includes('más barato en') || lowerText.includes('otro proveedor') || lowerText.includes('otra empresa') || lowerText.includes('otro presupuesto');
-
-  if (!reply && isCompetitorComparison) {
-    reply = `Es una muy buena observación. Existen alternativas de menor valor, pero en *${ctx.companyName}* priorizamos lo que realmente cuida tu tranquilidad y tu inversión: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\n${dom.triageQuestion}`;
+  // 9. Facilidades y Métodos de Pago
+  if (!reply && /facilidades|formas de pago|metodos de pago|como se paga|tarjeta|transferencia|cuotas|obra social|prepaga/.test(normUser)) {
+    reply = `Por supuesto. En *${ctx.companyName}* aceptamos efectivo, transferencias bancarias y tarjetas, además de emitir comprobantes oficiales para reintegros cuando corresponda.\n\n${getNextUnaskedStep()}`;
   }
 
-  // 10. Confianza, Credibilidad y Garantías
-  const isTrustQuestion = lowerText.includes('es seguro') || lowerText.includes('garantia') || lowerText.includes('garantía') || lowerText.includes('confiable') ||
-    lowerText.includes('como se que funciona') || lowerText.includes('cómo sé que funciona') || lowerText.includes('por que confiar') || lowerText.includes('por qué confiar') ||
-    lowerText.includes('estafa') || lowerText.includes('referencias') || lowerText.includes('seguridad');
-
-  if (!reply && isTrustQuestion) {
-    reply = `Es una consulta sumamente válida y nos alegra que la hagas. En *${ctx.companyName}* la transparencia y el respaldo profesional son la base de nuestro trabajo: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\n${dom.closingCapturePrompt}`;
-  }
-
-  // 11. Preguntas de Continuidad / Mensajes Cortos
-  if (!reply && (lowerText === 'cuanto?' || lowerText === 'cuánto?' || lowerText === 'precio?' || lowerText === 'precios?' || lowerText === 'costo?' || lowerText === 'y el costo?')) {
-    reply = `Con gusto. Aquí tienes nuestros servicios y precios oficiales en ${ctx.companyName}:\n\n${ctx.catalogSummary}\n\n¿Cuál de estas opciones se ajusta más a lo que necesitas hoy?`;
-  }
-
-  if (!reply && (lowerText === 'y el otro?' || lowerText === 'que otro?' || lowerText === 'qué otro?' || lowerText === 'hay otro?')) {
-    reply = `En ${ctx.companyName} contamos con distintas alternativas pensadas para cada necesidad y presupuesto:\n\n${ctx.catalogSummary}\n\nCuéntame un poco más sobre tu caso particular y te recomiendo exactamente el más conveniente para ti.`;
-  }
-
-  if (!reply && (lowerText === 'no se' || lowerText === 'no sé' || lowerText === 'dudo' || lowerText === 'no estoy seguro')) {
-    reply = `Es completamente normal tener dudas al inicio. Para poder orientarte con exactitud y sin rodeos: ¿Cuál es el principal problema o resultado que te gustaría resolver en este momento? Con ese dato te digo exactamente qué alternativa es la ideal para ti.`;
-  }
-
-  // 12. Precios y Catálogo Oficial (Técnica del Sándwich Consultivo + Diagnóstico de Especialista)
-  if (!reply && (lowerText.includes('precio') || lowerText.includes('precios') || lowerText.includes('costo') || lowerText.includes('costos') || lowerText.includes('cuanto') || lowerText.includes('cuánto') || lowerText.includes('tarifa') || lowerText.includes('tarifas') || lowerText.includes('planes') || lowerText.includes('cotiza') || lowerText.includes('presupuesto') || lowerText.includes('catalogo') || lowerText.includes('catálogo'))) {
-    reply = `Con gusto. Aquí tienes nuestros aranceles y opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`;
-  }
-
-  // 13. Agendamiento de Turnos o Citas (Captura Proactiva de 3 Datos de Cierre por Rubro)
-  if (!reply && (lowerText.includes('turno') || lowerText.includes('turnos') || lowerText.includes('cita') || lowerText.includes('citas') || lowerText.includes('agendar') || lowerText.includes('reunion') || lowerText.includes('reunión') || lowerText.includes('llamada') || lowerText.includes('reserva') || lowerText.includes('reservar') || lowerText.includes('disponibilidad'))) {
-    reply = `Por supuesto, será un placer coordinar tu atención en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
-  }
-
-  // 14. Ubicación y Oficinas
-  if (!reply && (lowerText.includes('donde estan') || lowerText.includes('dónde están') || lowerText.includes('donde quedan') || lowerText.includes('dónde quedan') || lowerText.includes('direccion') || lowerText.includes('dirección') || lowerText.includes('ubicacion') || lowerText.includes('ubicación') || lowerText.includes('como llego') || lowerText.includes('cómo llego'))) {
-    reply = `Información y ubicación de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\n¿Te gustaría coordinar una visita presencial o prefieres que gestionemos todo directamente por este medio?`;
-  }
-
-  // 15. Horarios de atención
-  if (!reply && (lowerText.includes('horario') || lowerText.includes('horarios') || lowerText.includes('a que hora') || lowerText.includes('a qué hora') || lowerText.includes('atienden hoy') || lowerText.includes('estan abiertos') || lowerText.includes('están abiertos'))) {
-    reply = `Horarios de atención de ${ctx.companyName}:\n\n${ctx.knowledgeBase}\n\nRecuerda que por este chat de WhatsApp te atendemos las 24 horas. ¿En qué podemos ayudarte en este momento?`;
-  }
-
-  // 16. Solicitud de asesor humano (Detección precisa de intención)
-  const isHumanAgentRequest = lowerText.includes('hablar con un') || lowerText.includes('hablar con una') || lowerText.includes('comunicarme con un') || lowerText.includes('comunicarme con una') ||
-    lowerText.includes('atencion humana') || lowerText.includes('atención humana') || lowerText.includes('asesor humano') || lowerText.includes('persona real') || lowerText.includes('alguien real') ||
-    lowerText.includes('un operador') || lowerText.includes('una persona') || lowerText.includes('con un humano') || lowerText.includes('pasame con un') || lowerText.includes('pásame con un') ||
-    lowerText.includes('derivar con un') || lowerText.includes('derivar con una') || lowerText.includes('con el dueño') || lowerText.includes('con la dueña');
-
-  if (!reply && isHumanAgentRequest) {
-    reply = `Por supuesto. Ya he tomado nota para que un especialista de nuestro equipo en ${ctx.companyName} revise tu caso y se comunique contigo a la brevedad por este mismo chat. Mientras tanto, ¿deseas dejarme tu consulta detallada para ir adelantando?`;
-  }
-
-  // 17. Agradecimientos
-  if (!reply && (lowerText.includes('gracia') || lowerText.includes('agradecid') || lowerText.includes('te agradezco') || lowerText.includes('muy amable') || lowerText === 'grx' || lowerText === 'thx')) {
-    reply = `Al contrario, un verdadero placer. En ${ctx.companyName} estamos siempre a tu disposición para ayudarte. Si te gustaría que reservemos tu lugar o avancemos con tu propuesta, solo avísame y lo dejamos listo. Que tengas un excelente día.`;
-  }
-
-  // 18. Despedidas
-  if (!reply && (lowerText.includes('chau') || lowerText.includes('adios') || lowerText.includes('adiós') || lowerText.includes('hasta luego') || lowerText.includes('nos vemos') || lowerText.includes('bye') || lowerText.includes('buenas noches') || lowerText.includes('buen finde'))) {
-    reply = `Hasta luego. Ha sido un gusto hablar contigo. En ${ctx.companyName} quedamos a tu completa disposición para cuando desees retomar. Que tengas un gran día.`;
-  }
-
-  // 19. Confirmaciones cortas (ok, genial, perfecto, entiendo)
-  if (!reply && (lowerText === 'ok' || lowerText === 'genial' || lowerText === 'perfecto' || lowerText === 'buenisimo' || lowerText === 'buenísimo' || lowerText === 'excelente' || lowerText === 'entendido' || lowerText === 'comprendo' || lowerText === 'bien')) {
-    if (hadPriceDiscussion) {
-      reply = `Genial. Dado que estuvimos viendo nuestras opciones en *${ctx.companyName}*, avanzamos cuando gustes.\n\n${dom.closingCapturePrompt}`;
-    } else {
-      reply = `Excelente. En *${ctx.companyName}* estamos listos para ayudarte. ¿Deseas que coordinemos una fecha para tu atención o tienes alguna otra consulta?`;
+  // 10. Triaje especializado según consulta de los demás rubros
+  if (!reply && !isAiAgency) {
+    if (/departament|casa|lote|terreno|alquil|compr|invertir|tasacion|ambiente|dormitorio|credito|apto/.test(normUser) && normInd.includes('inmobili')) {
+      reply = `Muy buena búsqueda. En *${ctx.companyName}* trabajamos propiedades seleccionadas con asesoramiento integral:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/despido|indemnizaci|divorcio|sucesion|herencia|contrato|carta documento|intimacion|juicio|demanda|impuesto|monotributo|balance|sociedad|escritura/.test(normUser) && (normInd.includes('juridic') || normInd.includes('legal') || normInd.includes('contabl'))) {
+      reply = `Gracias por escribirnos a *${ctx.companyName}*. Analizamos tu situación bajo estricto secreto profesional:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/corte|barba|color|tintur|mechas|balayage|alisado|keratina|unas|manicur|facial|limpieza|masaje|depilaci|cejas|pestanas/.test(normUser) && (normInd.includes('belleza') || normInd.includes('barber') || normInd.includes('spa') || normInd.includes('peluquer'))) {
+      reply = `Nos encantará atenderte en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n${dom.closingCapturePrompt}`;
+    } else if (/mesa|carta|menu|plato|delivery|envio|pedido|celiac|tacc|vegan|vegetarian|cumpleanos|evento|cena|almuerzo/.test(normUser) && (normInd.includes('restauran') || normInd.includes('gastronom'))) {
+      reply = `Será un gusto recibirte en *${ctx.companyName}*. Aquí tienes nuestras propuestas destacadas:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/stock|talle|talla|color|modelo|envio|despacho|cambio|devoluci|mayorist|prenda|producto|comprar/.test(normUser) && (normInd.includes('tienda') || normInd.includes('retail') || normInd.includes('ecommerce'))) {
+      reply = `Qué bueno que nos escribas. En *${ctx.companyName}* contamos con stock activo y envío rápido:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/pase|membresia|musculaci|crossfit|funcional|pilates|bajar de peso|masa muscular|entrenar|clase|prueba/.test(normUser) && (normInd.includes('gimnasio') || normInd.includes('fitness') || normInd.includes('gym'))) {
+      reply = `Excelente iniciativa para entrenar en *${ctx.companyName}*. Estos son nuestros pases activos:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/service|aceite|filtro|freno|embrague|correa|distribuci|ruido|falla|escan|bateria|neumatic|alineaci|balanceo|motor/.test(normUser) && (normInd.includes('taller') || normInd.includes('automot') || normInd.includes('mecanic'))) {
+      reply = `En *${ctx.companyName}* revisamos tu vehículo con diagnóstico computarizado y garantía escrita:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/habitaci|cabana|suite|noche|estadia|check|huesped|pareja|familia|pileta|piscina|desayuno|vacacion|finde/.test(normUser) && (normInd.includes('hotel') || normInd.includes('caban') || normInd.includes('turism'))) {
+      reply = `Qué gusto recibir tu consulta en *${ctx.companyName}*. Estas son nuestras opciones por canal directo:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/curso|carrera|diplomatur|programa|temario|certificad|inscripci|matricul|vacante|clases|aprender/.test(normUser) && (normInd.includes('educac') || normInd.includes('academi'))) {
+      reply = `Excelente paso para formarte en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (/obra|reforma|remodelaci|ampliaci|piscina|pileta|metros|m2|llave en mano|plano|construir|techo|cocina|bano/.test(normUser) && (normInd.includes('construc') || normInd.includes('arquitec') || normInd.includes('reforma'))) {
+      reply = `En *${ctx.companyName}* trabajamos con cómputo técnico preciso y presupuesto cerrado:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
     }
   }
 
-  // 20. Saludos iniciales (Solo si la conversación recién empieza - Presentación de Especialista + Triaje del Rubro)
-  if (!reply && !isConversationOngoing && (lowerText.includes('hola') || lowerText.includes('buen dia') || lowerText.includes('buen día') || lowerText.includes('buenas tardes') || lowerText.includes('buenas noches') || lowerText.includes('buenas') || lowerText.includes('que tal') || lowerText.includes('qué tal'))) {
-    reply = `Hola, qué gusto saludarte. Te doy la bienvenida a *${ctx.companyName}* (${ctx.industry}). Soy ${ctx.agentName}, ${dom.roleTitle}.\n\n${dom.triageQuestion}`;
+  // 11. Indecisión, Competencia, Confianza
+  if (!reply && /lo voy a pensar|lo tengo que pensar|dejame ver|despues te aviso|tengo que hablar|tengo que consultar|con mi socio|con mi pareja/.test(normUser)) {
+    reply = `Totalmente comprensible, tómate el tiempo que necesites. ¿Hay algún detalle sobre el procedimiento, valores o disponibilidad que te gustaría aclarar para evaluarlo mejor?`;
+  }
+  if (!reply && /la competencia|otro lugar|en otro lado|mas barato en|otro proveedor|otra empresa|otro presupuesto/.test(normUser)) {
+    reply = `Es válido comparar opciones. En *${ctx.companyName}* nos enfocamos en darte total tranquilidad y respaldo real: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\n${getNextUnaskedStep()}`;
+  }
+  if (!reply && /es seguro|garantia|confiable|como se que funciona|por que confiar|referencias|seguridad/.test(normUser)) {
+    reply = `Es una pregunta muy importante. En *${ctx.companyName}* trabajamos con total transparencia: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\n${getNextUnaskedStep()}`;
   }
 
-  // 21. Multi-Turn Progressive Fallback (NEVER REPEATS)
+  // 12. Precios, Turnos, Ubicación, Horarios, Humano, Saludos y Despedidas
+  if (!reply && /precio|costo|cuanto|tarifa|planes|cotiza|presupuesto|catalogo|arancel/.test(normUser)) {
+    reply = `Con gusto. Estos son nuestros valores principales en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${getNextUnaskedStep()}`;
+  }
+  if (!reply && /turno|cita|agendar|reunion|llamada|reserva|disponibilidad/.test(normUser)) {
+    reply = `Con mucho gusto coordinamos tu lugar en *${ctx.companyName}*.\n\n${dom.closingCapturePrompt}`;
+  }
+  if (!reply && /donde estan|donde quedan|direccion|ubicacion|como llego/.test(normUser)) {
+    reply = `Aquí tienes los datos de atención de *${ctx.companyName}*:\n\n${ctx.knowledgeBase}\n\n${getNextUnaskedStep()}`;
+  }
+  if (!reply && /horario|a que hora|atienden hoy|estan abiertos/.test(normUser)) {
+    reply = `Nuestros horarios en *${ctx.companyName}*:\n\n${ctx.knowledgeBase}\n\n${getNextUnaskedStep()}`;
+  }
+  if (!reply && /hablar con un|comunicarme con un|atencion humana|asesor humano|persona real|alguien real|un operador|con un humano|pasame con un|con el dueno/.test(normUser)) {
+    reply = `Por supuesto. Ya dejé aviso prioritario a un integrante de nuestro equipo en *${ctx.companyName}* para que te contacte personalmente por aquí. Si quieres dejarme algún detalle puntual para adelantarle, te leo.`;
+  }
+  if (!reply && /gracia|agradecid|muy amable|^grx$|^thx$/.test(normUser)) {
+    reply = `Un placer ayudarte desde *${ctx.companyName}*. Quedamos a tu disposición para lo que necesites.`;
+  }
+  if (!reply && /^chau|adios|hasta luego|nos vemos|^bye|buen finde/.test(normUser)) {
+    reply = `Hasta luego, ha sido un gusto conversar contigo. En *${ctx.companyName}* quedamos a tu disposición cuando gustes.`;
+  }
+  if (!reply && !isConversationOngoing && /hola|buen dia|buenas tardes|buenas noches|^buenas|que tal/.test(normUser)) {
+    reply = `Hola, qué gusto saludarte. Te damos la bienvenida a *${ctx.companyName}*.\n\n${dom.triageQuestion}`;
+  }
+
+  // 13. Smart Context-Aware Progressive Continuation (Zero Repetition)
   if (!reply) {
-    const progressiveReplies = [
-      `Excelente consulta. En *${ctx.companyName}* (${ctx.industry}) trabajamos de forma personalizada para brindarte la mejor atención. ${dom.triageQuestion}`,
-      `Comprendo perfectamente. Aquí tienes nuestras prestaciones y valores principales en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${dom.triageQuestion}`,
-      `Con todo gusto. Para coordinar tu atención en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`
-    ];
-
-    for (const pr of progressiveReplies) {
-      if (!lastBotMsg || pr.slice(0, 35).toLowerCase() !== lastBotMsg.slice(0, 35).toLowerCase()) {
-        reply = pr;
-        break;
-      }
-    }
-    if (!reply) reply = progressiveReplies[2];
-  }
-
-  // 22. HARD ANTI-REPETITION GUARANTEE (Zero Duplicates Allowed)
-  const isDuplicate = lastBotMsg && (
-    reply.trim().toLowerCase() === lastBotMsg.trim().toLowerCase() ||
-    reply.slice(0, 30).toLowerCase().trim() === lastBotMsg.slice(0, 30).toLowerCase().trim() ||
-    (lastBotMsg.length > 35 && reply.toLowerCase().includes(lastBotMsg.slice(0, 35).toLowerCase()))
-  );
-
-  if (isDuplicate) {
-    if (hadPriceDiscussion || hadTurnDiscussion) {
-      reply = `Excelente. Para dejar reservado tu lugar en *${ctx.companyName}*:\n\n${dom.closingCapturePrompt}`;
+    if (!convMem.alreadySharedCatalog) {
+      reply = `Entiendo lo que buscas ("${rawText.trim()}"). En *${ctx.companyName}* te acompañamos de forma personalizada con nuestras opciones principales:\n\n${ctx.catalogSummary}\n\n${getNextUnaskedStep()}`;
+    } else if (!convMem.alreadyAskedClosing) {
+      reply = `Perfecto. Teniendo en cuenta tu consulta en *${ctx.companyName}*, podemos coordinar tu atención para verlo en detalle.\n\n${dom.closingCapturePrompt}`;
     } else {
-      reply = `Con gusto. Te detallo nuestras opciones oficiales en *${ctx.companyName}* (${ctx.industry}):\n\n${ctx.catalogSummary}\n\n${dom.triageQuestion}`;
+      reply = `Excelente, tomamos nota de tu mensaje en *${ctx.companyName}*. Confírmame qué día y franja horaria prefieres y lo dejamos reservado.`;
     }
   }
 
-  return stripAiEmojis(reply);
+  return enforceZeroRepeatedQuestionsAndCleanLabels(reply, ctx, convMem, dom);
 }
 
 // ==================== GENERATE AI AGENT RESPONSE ====================
@@ -1446,6 +1597,10 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
   const text = (userText || '').trim();
   if (!text) return null;
   const lowerText = text.toLowerCase();
+
+  if (!customAiKey) {
+    await hydrateRuntimeFromNeonDB().catch(() => { });
+  }
 
   let sessionId = sessionOrAgencyId;
   let agencyId = maybeAgencyId || sessionOrAgencyId || 'agency_master_1';
@@ -1460,7 +1615,9 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
     if (customOverride.customIndustry) {
       ctx.industry = String(customOverride.customIndustry).trim();
     }
-    if (customOverride.customAgentName) ctx.agentName = String(customOverride.customAgentName).trim();
+    if (customOverride.customAgentName) {
+      ctx.agentName = sanitizeHumanAgentName(customOverride.customAgentName, ctx.companyName);
+    }
     if (customOverride.customSystemPrompt) ctx.systemPrompt = String(customOverride.customSystemPrompt).trim();
     if (customOverride.customKnowledgeBase) ctx.knowledgeBase = String(customOverride.customKnowledgeBase).trim();
 
@@ -1495,69 +1652,77 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
     }
     ctx.nichePlaybook = getNicheSalesPlaybook(ctx.industry);
   }
+  ctx.agentName = sanitizeHumanAgentName(ctx.agentName, ctx.companyName);
 
   // 2. Load RAG Knowledge Documents if present
   const docContext = await getAgencyKnowledgeContext(ctx.id || agencyId);
-  const ragInstruction = docContext 
-    ? `\n\nDOCUMENTACIÓN TÉCNICA Y OFICIAL ADICIONAL DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n` 
+  const ragInstruction = docContext
+    ? `\n\nDOCUMENTACIÓN TÉCNICA Y OFICIAL ADICIONAL DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n`
     : '';
 
-  // 3. Multi-turn conversation history for this sender / session
+  // 3. Multi-turn conversation history & question-memory extraction
   const convKey = getConvKey(agencyId, senderPhone);
   const history = getConversationHistory(convKey);
+  const dom = getIndustryDomainIntelligence(ctx.industry, ctx.companyName);
+  const convMem = extractConversationMemoryState(history, dom);
 
-  // 4. Construct Master Cognitive Sales Framework Prompt
-  const systemPrompt = `Eres ${ctx.agentName}, Consultor Comercial Senior y Asesor Especializado que representa oficialmente a "${ctx.companyName}" (${ctx.industry}).
+  const antiRepetitionMemoryBlock = convMem.askedQuestions.length > 0
+    ? `MEMORIA ESTRICTA ANTI-REPETICIÓN (REGLA DE ORO INQUEBRANTABLE):
+En turnos previos de este mismo chat YA REALIZASTE las siguientes preguntas:
+${convMem.askedQuestions.map((q, i) => `  ${i + 1}. "${q}"`).join('\n')}
+ESTÁ TERMINANTEMENTE PROHIBIDO volver a hacer cualquiera de esas preguntas, ni literal ni parafraseada. Tampoco vuelvas a preguntar nada que el cliente ya haya respondido implícita o explícitamente en su mensaje.`
+    : `MEMORIA DE INICIO: Esta conversación recién comienza. Termina como máximo con UNA sola pregunta clara, breve y natural que ayude a entender qué necesita la persona.`;
+
+  const lastExchangeBlock = convMem.lastBotMsg
+    ? `\nCONTEXTO INMEDIATO DEL TURNO ANTERIOR:
+- Tu último mensaje enviado al cliente fue: "${convMem.lastBotMsg}"
+- El cliente acaba de responderte ahora: "${userText}"
+Analiza y razona directamente sobre esa respuesta puntual del cliente como lo haría una persona real, atenta e inteligente.`
+    : '';
+
+  // 4. Construct Master Cognitive & Human Reasoning Prompt
+  const systemPrompt = `Formas parte de ${ctx.agentName} y atiendes por WhatsApp de manera humana, empática y profesional en nombre de "${ctx.companyName}" (rubro interno: ${ctx.industry}).
 Tu tono y estilo son: ${ctx.tone}.
 
-OBJETIVO Y MENTALIDAD COMERCIAL:
-No eres un chatbot pasivo ni un asistente genérico que simplemente contesta preguntas. Eres un profesional altamente capacitado en ventas consultivas, persuasión ética, manejo de objeciones y cierre comercial. Tu misión es comprender a fondo las necesidades y motivaciones del cliente, argumentar con inteligencia basándote en los datos reales de la empresa y conducir cada diálogo con naturalidad y seguridad hacia el siguiente paso comercial (agendar cita, demo, contratación o compra).
+${antiRepetitionMemoryBlock}
+${lastExchangeBlock}
 
-DATOS REALES Y ENTRENAMIENTO DE LA EMPRESA ("${ctx.companyName.toUpperCase()}"):
-- Rubro / Industria: ${ctx.industry}
+DATOS REALES Y ENTRENAMIENTO DE "${ctx.companyName.toUpperCase()}":
 - Pautas del Negocio: ${ctx.systemPrompt}
-- Catálogo Oficial de Productos / Servicios con Precios:
+- Prestaciones / Catálogo de Referencia con Valores:
 ${ctx.catalogSummary}
 - Información Operativa (Horarios, Ubicación, Políticas):
 ${ctx.knowledgeBase}
-- Flujo Comercial, Calificación y Cierre:
+- Flujo Comercial y Cierre:
 ${ctx.salesFlow}
-- Soporte, Preguntas Frecuentes y Políticas:
+- Preguntas Frecuentes y Soporte:
 ${ctx.supportSummary}
-- Post-Venta y Garantías:
+- Respaldo y Garantías:
 ${ctx.afterSalesSummary}
 ${ragInstruction}
 
-PLAYBOOK COMERCIAL ESPECÍFICO DEL NICHO (${ctx.industry.toUpperCase()}):
+PLAYBOOK DEL RUBRO:
 ${ctx.nichePlaybook}
 
-FRAMEWORK COGNITIVO DE VENTA CONSULTIVA (4 PASOS POR TURNO):
-1. DIAGNÓSTICO E INTENCIÓN LATENTE:
-   - Comprende qué busca o qué le preocupa realmente al cliente, incluso cuando formule mensajes breves ("cuánto?", "y el otro?", "no sé"), informales o ambiguos.
-   - Utiliza todo el contexto previo de la conversación para dar continuidad sin reiniciar el diálogo ni pedir datos ya conversados.
-2. RESPUESTA DIRECTA Y ARGUMENTACIÓN DE VALOR:
-   - Responde PRIMERO y de forma clara a la consulta del cliente (cero evasivas).
-   - Relaciona de inmediato su inquietud con el beneficio tangible específico de tu catálogo (tranquilidad, ahorro de tiempo, rentabilidad, salud o imagen).
-3. MANEJO PROFESIONAL DE OBJECIONES (SIN GUIONES RÍGIDOS):
-   - "Es muy caro" / "No llego": Valida con empatía, reencuadra el valor, el retorno de inversión y el costo de no solucionar su problema. Ofrece una opción más accesible del catálogo o facilidades autorizadas.
-   - "Lo voy a pensar" / "Tengo que hablar con mi socio/pareja": Valida su decisión, aísla la duda puntual ("¿Qué aspecto específico te gustaría evaluar mejor?") y ofrece un paso de bajo compromiso (ej: reservar cupo o propuesta por 48h sin compromiso).
-   - "Encontré algo más barato": Explica con elegancia la diferencia en calidad, garantía real, respaldo y durabilidad sin descalificar al competidor.
-   - "No confío" / "¿Cómo sé que funciona?": Transmite seguridad con transparencia, políticas de garantía y ofreciendo una llamada corta o demo en vivo.
-   - Si una estrategia no convence al cliente, cambia de enfoque en el siguiente mensaje en lugar de repetir el mismo argumento.
-4. DETECCIÓN DE SEÑALES DE COMPRA Y CIERRE COMERCIAL (CAPTURA DE 3 DATOS):
-   - Si el cliente muestra intención de compra o reserva ("me interesa", "quiero agendar", "cómo pago", "dale"), pasa al CIERRE EJECUTIVO solicitando en un solo paso amable los 3 datos clave de confirmación de tu rubro (Nombre, requerimiento/modalidad y preferencia horaria o de pago).
-   - Si el cliente está explorando, aplica la TÉCNICA DEL SÁNDWICH CONSULTIVO: 1) Responde su duda o da el precio con transparencia, 2) Justifica brevemente el valor técnico/profesional, y 3) Cierra con una pregunta de triaje/diagnóstico propia de un especialista senior del rubro.
+REGLAS DE RAZONAMIENTO HUMANO REAL Y COMPRENSIÓN CONTEXTUAL (CRÍTICAS):
+1. ESCUCHA ACTIVA Y COMPRENSIÓN REAL:
+   - Razona sobre lo que la persona escribió ("${userText}"). Si tú hiciste una pregunta antes y la persona eligió una opción, dio un dato o cambió de tema hacia una necesidad concreta (por ejemplo: dijo "Quiero colocarme brackets", "Una valoración preventiva", "Busco depto de 2 ambientes", "Por la tarde"), RESPONDE DIRECTAMENTE A ESO con sentido común humano.
+   - Si el cliente ya dijo qué busca (ej: "quiero colocarme brackets"), YA SABES que busca un tratamiento programado y que NO viene por un dolor de urgencia: JAMÁS le preguntes "¿presentas dolor agudo o valoración preventiva?".
+2. CÓMO RAZONAR ANTE TRATAMIENTOS O TRABAJOS PERSONALIZADOS DEL RUBRO:
+   - El catálogo de arriba muestra los aranceles base de referencia. Si el cliente pregunta por un tratamiento, especialidad o proyecto propio del rubro de "${ctx.companyName}" cuyo presupuesto final depende de evaluar su caso (por ejemplo: *brackets / ortodoncia, implantes, conducto, prótesis* en una clínica dental; una *reforma a medida* en construcción; una *falla específica* en taller; un *asunto puntual* en estudio jurídico), NUNCA ignores su pedido ni digas que no existe solo porque no tiene precio fijo en la lista corta.
+   - Explica con total naturalidad que en "${ctx.companyName}" sí atienden esos casos y que, para definir el plan y presupuesto exacto según su caso particular, el primer paso es realizar la consulta/valoración diagnóstica inicial del catálogo (mencionando su nombre y valor real si figura en el catálogo), e invítalo a coordinar turno haciendo UNA pregunta nueva (ej: preferencia de día o franja de mañana/tarde).
+3. NO VOLQUES TODO EL CATÁLOGO A CIEGAS:
+   - Menciona únicamente los servicios/precios que sean pertinentes a lo que el cliente acaba de pedir o consultar. Solo lista el catálogo completo si el cliente pide ver todos los servicios o precios generales.
+4. PROGRESIÓN NATURAL HACIA LA RESERVA (SIN REPETIR):
+   - Avanza la conversación paso a paso como un humano real. Haz como máximo UNA pregunta al final (o pide los datos faltantes para agendar si el cliente ya quiere reservar). Si el cliente ya dio su nombre, horario o cobertura, tómalo en cuenta y no se lo vuelvas a pedir.
 
-REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
-- NUNCA digas que eres una inteligencia artificial, un bot o un modelo de lenguaje. Habla como un especialista humano senior de "${ctx.companyName}".
-- PROHIBICIÓN ABSOLUTA DE EMOJIS: NUNCA uses emojis, emoticones ni íconos gráficos en ningún momento bajo ninguna circunstancia. Responde exclusivamente con texto limpio, sobrio y natural.
-- FORMATO VISUAL ESCANEABLE EN 3 SEGUNDOS: Escribe en 2 o 3 bloques cortos separados por una línea en blanco. Usa *negritas de WhatsApp* únicamente para resaltar importes, horarios o conceptos clave.
-- ÉTICA POR RUBRO: En salud/clínicas jamás recetes medicamentos ni des diagnósticos definitivos sin valoración presencial; en derecho/contabilidad jamás prometas resultados judiciales garantizados ni emitas dictámenes vinculantes sin revisión documental.
-- NUNCA uses menús robóticos ("Opción 1, Opción 2").
-- Si la conversación ya está en curso, NO vuelvas a saludar con "Hola". Responde directamente con fluidez.
-- HONESTIDAD ABSOLUTA: Jamás inventes descuentos no autorizados, garantías inexistentes ni precios falsos.`;
+REGLAS DE IDENTIDAD HUMANA Y FORMATO EN WHATSAPP (ESTRICTAS):
+- IDENTIDAD HUMANA LIMPIA: NUNCA digas "Soy Asistente Virtual", ni que eres una IA o bot. NUNCA escribas el nombre del rubro entre paréntesis al lado de la empresa — por ejemplo, escribe "${ctx.companyName}" y JAMÁS escribas "${ctx.companyName} (${ctx.industry})".
+- PROHIBICIÓN ABSOLUTA DE EMOJIS: NUNCA uses emojis, emoticones ni símbolos gráficos en ningún momento. Solo texto humano limpio y natural.
+- BREVEDAD Y FLUIDEZ DE WHATSAPP: Escribe de forma cálida, directa y concisa (1 a 3 párrafos breves). Usa *negritas* con moderación solo para resaltar un valor o dato puntual. Si la conversación ya empezó, NO vuelvas a saludar con "Hola".
+- HONESTIDAD Y ÉTICA: No inventes precios ni descuentos fuera de los datos provistos. En salud no recetes ni diagnostiques sin evaluación presencial.`;
 
-  // 5. Try Generative LLM with Multi-Turn Memory (Gemini / OpenAI)
+  // 5. Try Generative LLM with Multi-Turn Memory (Gemini 3.x Fast Cascade / OpenAI)
   let generatedReply = null;
   const effectiveAiKey = ctx.apiKey || customAiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
   if (effectiveAiKey) {
@@ -1579,11 +1744,12 @@ REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${effectiveAiKey}`
           },
+          signal: AbortSignal.timeout(9000),
           body: JSON.stringify({
             model: activeAiModel.includes('gpt') ? activeAiModel : 'gpt-4o-mini',
             messages: oaiMessages,
-            temperature: 0.65,
-            max_tokens: 650
+            temperature: 0.55,
+            max_tokens: 550
           })
         });
 
@@ -1594,38 +1760,48 @@ REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
           console.error('[OpenAI API Error]', oaiRes.status, await oaiRes.text());
         }
       } else {
-        // 5.B Google Gemini API with Multi-Turn & Multi-Model High-Availability Cascade
+        // 5.B Google Gemini API with Fast Gemini 3.x / 2.5 High-Availability Cascade
         const formattedContents = buildGeminiContents(history, userText);
-        const preferredModel = (activeAiModel && !activeAiModel.includes('1.5') && !activeAiModel.includes('3.1')) ? activeAiModel : 'gemini-2.5-flash';
-        const candidateModels = [...new Set([preferredModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'])];
+        const preferredModel = (activeAiModel && !activeAiModel.includes('1.5') && !activeAiModel.includes('3.8'))
+          ? activeAiModel
+          : 'gemini-3.5-flash-lite';
+        const candidateModels = [...new Set([preferredModel, ...GEMINI_FAST_MODELS])];
 
         for (const modelName of candidateModels) {
           try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${effectiveAiKey}`;
+            const genConfig = {
+              temperature: 0.55,
+              maxOutputTokens: 800
+            };
+            if (modelName === 'gemini-3.1-flash-lite') {
+              genConfig.thinkingConfig = { thinkingBudget: 0 };
+            }
+
             const gRes = await fetch(url, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(8000),
               body: JSON.stringify({
                 contents: formattedContents,
                 system_instruction: {
                   parts: [{ text: systemPrompt }]
                 },
-                generationConfig: {
-                  temperature: 0.65,
-                  maxOutputTokens: 650
-                }
+                generationConfig: genConfig
               })
             });
 
             if (gRes.ok) {
               const json = await gRes.json();
-              const candidateText = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+              const parts = json?.candidates?.[0]?.content?.parts || [];
+              const textPart = parts.find(p => typeof p.text === 'string' && !p.thought) || parts[0];
+              const candidateText = textPart?.text;
               if (candidateText && candidateText.trim()) {
                 generatedReply = candidateText;
                 break;
               }
             }
-          } catch (innerErr) {}
+          } catch (innerErr) { }
         }
       }
     } catch (llmErr) {
@@ -1633,10 +1809,10 @@ REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
     }
   }
 
-  // If LLM returned a valid response, strip emojis completely and ensure it does not duplicate the previous message
-  const lastBotMsg = history.filter(h => h.role === 'assistant').slice(-1)[0]?.text || '';
+  // Post-process LLM reply: strip emojis, clean robotic labels, and enforce 0% repeated questions
+  const lastBotMsg = convMem.lastBotMsg;
   if (generatedReply && generatedReply.trim()) {
-    const finalReply = stripAiEmojis(generatedReply);
+    const finalReply = enforceZeroRepeatedQuestionsAndCleanLabels(generatedReply, ctx, convMem, dom);
     if (finalReply && (!lastBotMsg || finalReply.trim().toLowerCase() !== lastBotMsg.trim().toLowerCase())) {
       appendToConversationHistory(convKey, 'user', userText);
       appendToConversationHistory(convKey, 'assistant', finalReply);
@@ -1644,8 +1820,8 @@ REGLAS DE ÉTICA PROFESIONAL Y FORMATO VISUAL EN WHATSAPP (ESTRICTAS):
     }
   }
 
-  // 6. High-Converting Consultative Sales Heuristics Engine (Understands Multi-Turn Context & Human Intent)
-  const reply = stripAiEmojis(generateContextualSalesReply(lowerText, userText, history, ctx, docContext));
+  // 6. Context-Aware Consultative Fallback Engine (Zero Repeated Questions & Human Reasoning)
+  const reply = generateContextualSalesReply(lowerText, userText, history, ctx, docContext);
   appendToConversationHistory(convKey, 'user', userText);
   appendToConversationHistory(convKey, 'assistant', reply);
   return reply;
@@ -1874,12 +2050,12 @@ const server = http.createServer(async (req, res) => {
     if (session && session.sock) {
       try {
         session.sock.logout();
-      } catch (e) {}
+      } catch (e) { }
     }
     const sessionFolder = path.join(SESSIONS_DIR, sessionId);
     try {
       fs.rmSync(sessionFolder, { recursive: true, force: true });
-    } catch (e) {}
+    } catch (e) { }
     delete activeSessions[sessionId];
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1958,7 +2134,7 @@ const server = http.createServer(async (req, res) => {
                     const fromNumber = msg.from;
                     const textBody = msg.text.body;
                     console.log(`[Meta Cloud Webhook] 📩 Mensaje entrante de +${fromNumber}: "${textBody}"`);
-                    
+
                     // High intent check
                     checkAndAlertOwner('agency_master_1', fromNumber, textBody, null).catch(e => console.error(e));
 
@@ -1993,18 +2169,19 @@ const server = http.createServer(async (req, res) => {
         // Save to local file so it persists across server restarts
         saveAiConfig(customAiKey, activeAiModel);
 
-        // Also save to Neon PostgreSQL if agencyId is provided
-        if (agencyId) {
-          try {
+        // Also save to Neon PostgreSQL (both target agencyId and agency_master_1 for global fallback)
+        try {
+          const targetIds = [...new Set([agencyId, 'agency_master_1'].filter(Boolean))];
+          for (const tid of targetIds) {
             await db.query(
               `UPDATE agencies 
                SET portal_config = jsonb_set(COALESCE(portal_config, '{}'::jsonb), '{ai_key}', to_jsonb($1::text))
                WHERE id = $2`,
-              [customAiKey, agencyId]
+              [customAiKey, tid]
             );
-          } catch (dbErr) {
-            console.error('[DB Note] No se pudo guardar ai_key en tabla agencies:', dbErr.message);
           }
+        } catch (dbErr) {
+          console.error('[DB Note] No se pudo guardar ai_key en tabla agencies:', dbErr.message);
         }
 
         // Test the AI key with a quick prompt
@@ -2039,6 +2216,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/config/ai' && req.method === 'GET') {
+    if (!customAiKey) {
+      await hydrateRuntimeFromNeonDB().catch(() => { });
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       hasKey: !!customAiKey,
@@ -2078,23 +2258,23 @@ const server = http.createServer(async (req, res) => {
                    phone = EXCLUDED.phone,
                    notes = EXCLUDED.notes`,
                 [
-                  c.id, 
-                  agId, 
-                  c.name, 
-                  c.industry || 'Servicios', 
-                  c.phone || null, 
-                  JSON.stringify({ 
-                    agentName: c.agentName, 
-                    systemPrompt: c.systemPrompt, 
-                    knowledgeBase: c.knowledgeBase, 
-                    catalog: c.catalog, 
+                  c.id,
+                  agId,
+                  c.name,
+                  c.industry || 'Servicios',
+                  c.phone || null,
+                  JSON.stringify({
+                    agentName: c.agentName,
+                    systemPrompt: c.systemPrompt,
+                    knowledgeBase: c.knowledgeBase,
+                    catalog: c.catalog,
                     salesFlow: c.salesFlow,
                     supportFlow: c.supportFlow,
-                    afterSalesFlow: c.afterSalesFlow 
+                    afterSalesFlow: c.afterSalesFlow
                   })
                 ]
               );
-            } catch (cErr) {}
+            } catch (cErr) { }
           }
         }
 
@@ -2109,6 +2289,9 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === '/api/agency/clients/sync' && req.method === 'GET') {
+    if (!neonHydratedOnce || Object.keys(memoryCompanies).length === 0) {
+      await hydrateRuntimeFromNeonDB().catch(() => { });
+    }
     const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
     const rawClients = memoryCompanies[agId] || memoryCompanies['agency_master_1'] || [];
     const clients = (Array.isArray(rawClients) ? rawClients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1' && !c.name?.includes('San Lucas') && !c.name?.includes('Bistro Gourmet'));
@@ -2600,8 +2783,8 @@ const server = http.createServer(async (req, res) => {
       // Strict matching: only match entry if it belongs to this identifier or its slug
       let localEntry = allPortals[identifier];
       if (!localEntry) {
-        const found = Object.values(allPortals).find(entry => 
-          entry?.agency?.id === identifier || 
+        const found = Object.values(allPortals).find(entry =>
+          entry?.agency?.id === identifier ||
           (entry?.agency?.slug && entry.agency.slug.toLowerCase() === identifier.toLowerCase())
         );
         if (found) localEntry = found;
@@ -2684,7 +2867,7 @@ const server = http.createServer(async (req, res) => {
             };
           });
         }
-      } catch (e) {}
+      } catch (e) { }
 
       // If DB had no plans, check if local disk has custom saved plans for THIS agency!
       if (returnPlans.length === 0 && localEntry?.plans && Array.isArray(localEntry.plans) && localEntry.plans.length > 0) {
@@ -3041,6 +3224,9 @@ const server = http.createServer(async (req, res) => {
       try {
         const { agencyId, imageBase64, mimeType, fileName, leadPhone, expectedAmount } = JSON.parse(body || '{}');
         const agId = agencyId || 'agency_master_1';
+        if (!customAiKey) {
+          await hydrateRuntimeFromNeonDB().catch(() => { });
+        }
         const effectiveAiKey = customAiKey || process.env.GEMINI_API_KEY || '';
 
         let analysis = null;
@@ -3048,7 +3234,7 @@ const server = http.createServer(async (req, res) => {
         if (effectiveAiKey && !effectiveAiKey.startsWith('sk-') && imageBase64) {
           const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
           const detectedMime = mimeType || 'image/jpeg';
-          const visionModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
+          const visionModels = GEMINI_FAST_MODELS;
           const promptText = `Analiza esta imagen comercial (comprobante de transferencia, recibo de pago o foto de producto/consulta).
 Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguientes claves:
 {
@@ -3068,6 +3254,7 @@ Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguiente
               const gRes = await fetch(geminiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(8000),
                 body: JSON.stringify({
                   contents: [{
                     parts: [
@@ -3122,7 +3309,7 @@ Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguiente
                VALUES ($1, $2, $3, 'ganado', 290.00, 'whatsapp_vision', $4)`,
               [agId, `Cliente Verificado +${cleanPhone}`, cleanPhone, `Comprobante verificado por IA: ${analysis.operationId} (${analysis.amount})`]
             );
-          } catch (e) {}
+          } catch (e) { }
         }
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
