@@ -21,7 +21,7 @@ if (fs.existsSync(ENV_PATH)) {
 
 const https = require('https');
 const QRCode = require('qrcode');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, fetchLatestBaileysVersion, downloadMediaMessage } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const db = require('./db');
 const { initDatabase, ensureDatabaseSchema } = require('./init-db');
@@ -95,17 +95,89 @@ function recordLiveWaMessage(agencyId, phone, pushName, senderRole, text, compan
   if (lead.history.length > 50) lead.history = lead.history.slice(-50);
 }
 
-function extractIncomingMessageText(rawMessage) {
-  if (!rawMessage || typeof rawMessage !== 'object') return '';
-  // Unwrap ephemeral / viewOnce / edited / documentWithCaption containers
-  const m =
+function unwrapBaileysMessage(rawMessage) {
+  if (!rawMessage || typeof rawMessage !== 'object') return null;
+  return (
     rawMessage.ephemeralMessage?.message ||
     rawMessage.viewOnceMessage?.message ||
     rawMessage.viewOnceMessageV2?.message ||
     rawMessage.viewOnceMessageV2Extension?.message ||
     rawMessage.documentWithCaptionMessage?.message ||
     rawMessage.editedMessage?.message?.protocolMessage?.editedMessage ||
-    rawMessage;
+    rawMessage
+  );
+}
+
+async function transcribeIncomingAudioBuffer(audioBuffer, mimeType = 'audio/ogg', apiKeyOverride = '') {
+  if (!audioBuffer || !Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) return '';
+  const effectiveKey = apiKeyOverride || customAiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
+  if (!effectiveKey) return '';
+
+  const cleanMime = String(mimeType || 'audio/ogg').split(';')[0].trim() || 'audio/ogg';
+
+  try {
+    // Path A: OpenAI Whisper Speech-to-Text
+    if (effectiveKey.startsWith('sk-')) {
+      const extMap = { 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/webm': 'webm' };
+      const ext = extMap[cleanMime] || 'ogg';
+      const formData = new FormData();
+      formData.append('file', new Blob([audioBuffer], { type: cleanMime }), `voice_note.${ext}`);
+      formData.append('model', 'whisper-1');
+      formData.append('language', 'es');
+
+      const oaiRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${effectiveKey}` },
+        body: formData
+      });
+      if (oaiRes.ok) {
+        const oaiData = await oaiRes.json();
+        return String(oaiData.text || '').trim();
+      }
+      return '';
+    }
+
+    // Path B: Google Gemini Multimodal Audio Understanding (High-Availability Cascade)
+    const base64Audio = audioBuffer.toString('base64');
+    const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
+    const prompt = 'Escucha atentamente esta nota de voz enviada por un cliente en WhatsApp y transcribe de forma literal y exacta lo que dice en español. Devuelve únicamente el texto dicho por el cliente, sin comillas, sin introducciones ni comentarios.';
+
+    for (const modelName of candidateModels) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${effectiveKey}`;
+        const gRes = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                { inline_data: { mime_type: cleanMime, data: base64Audio } }
+              ]
+            }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
+          })
+        });
+        if (gRes.ok) {
+          const gData = await gRes.json();
+          const transcript = gData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (transcript && transcript.trim()) {
+            return transcript.trim().replace(/^["«“]|["»”]$/g, '').trim();
+          }
+        }
+      } catch (e) {
+        console.warn(`[Audio Transcriber - ${modelName}] Fallo temporal:`, e.message);
+      }
+    }
+  } catch (err) {
+    console.error('[Audio Transcriber Error]:', err.message);
+  }
+  return '';
+}
+
+function extractIncomingMessageText(rawMessage) {
+  const m = unwrapBaileysMessage(rawMessage);
+  if (!m) return '';
 
   const directText =
     m.conversation ||
@@ -121,7 +193,7 @@ function extractIncomingMessageText(rawMessage) {
     const caption = m.imageMessage.caption || '';
     return caption
       ? `[Imagen/Comprobante enviado con nota: "${caption}"]`
-      : 'Hola, te acabo de enviar una imagen / comprobante por aquí. ¿Me confirmas si lo recibiste?';
+      : 'Hola, te acabo de enviar una imagen o comprobante por aquí. ¿Me confirmas si lo recibiste?';
   }
   if (m.videoMessage) {
     return m.videoMessage.caption || 'Hola, te acabo de enviar un video con mi consulta.';
@@ -366,7 +438,43 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
           }
         }
 
-        const textBody = extractIncomingMessageText(msg.message);
+        const agId = sessionId.startsWith('agency_')
+          ? sessionId.replace('agency_', '')
+          : 'agency_master_1';
+        const ctx = await getAgentCompanyContext(sessionId, agId);
+
+        const unwrapped = unwrapBaileysMessage(msg.message);
+        let textBody = '';
+        let displayInboxText = '';
+
+        // Real Incoming Voice Note Understanding (Speech-to-Text -> Human Text Reply)
+        if (unwrapped && unwrapped.audioMessage) {
+          try {
+            const audioBuf = await downloadMediaMessage(
+              msg,
+              'buffer',
+              {},
+              { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+            );
+            const transcribed = await transcribeIncomingAudioBuffer(
+              audioBuf,
+              unwrapped.audioMessage.mimetype || 'audio/ogg',
+              ctx.apiKey
+            );
+            if (transcribed && transcribed.trim()) {
+              textBody = transcribed.trim();
+              displayInboxText = `[Nota de voz]: ${textBody}`;
+              console.log(`[Baileys - ${sessionId}] Nota de voz transcrita de +${senderNumber}: "${textBody}"`);
+            }
+          } catch (audioErr) {
+            console.warn(`[Baileys - ${sessionId}] No se pudo transcribir audio entrante:`, audioErr.message);
+          }
+        }
+
+        if (!textBody) {
+          textBody = extractIncomingMessageText(msg.message);
+          displayInboxText = textBody;
+        }
         if (!textBody || !textBody.trim()) continue;
 
         if (msgId) {
@@ -378,23 +486,17 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
         }
 
         const pushName = msg.pushName || `Cliente +${senderNumber}`;
-        console.log(`[Baileys - ${sessionId}] 📩 Mensaje entrante de +${senderNumber} (${senderJid}): "${textBody}"`);
-
-        const agId = sessionId.startsWith('agency_')
-          ? sessionId.replace('agency_', '')
-          : 'agency_master_1';
+        console.log(`[Baileys - ${sessionId}] Mensaje entrante de +${senderNumber} (${senderJid}): "${displayInboxText}"`);
 
         // Check manual Human Takeover / Pausa Humana (only when explicitly toggled in dashboard)
         const pauseState = isChatPausedForHuman(sessionId, senderNumber);
         if (pauseState) {
-          console.log(`[Baileys - ${sessionId}] ⏸️ IA en Pausa Humana manual para +${senderNumber}.`);
-          recordLiveWaMessage(agId, senderNumber, pushName, 'user', textBody);
+          console.log(`[Baileys - ${sessionId}] IA en Pausa Humana manual para +${senderNumber}.`);
+          recordLiveWaMessage(agId, senderNumber, pushName, 'user', displayInboxText, ctx.companyName);
           continue;
         }
 
-        // Resolve which client/company this session belongs to
-        const ctx = await getAgentCompanyContext(sessionId, agId);
-        recordLiveWaMessage(agId, senderNumber, pushName, 'user', textBody, ctx.companyName);
+        recordLiveWaMessage(agId, senderNumber, pushName, 'user', displayInboxText, ctx.companyName);
 
         // Feature 5 & 6: Owner Alerts & Anti-Ghosting Follow-up
         checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
@@ -409,7 +511,7 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
           const sentMsg = await sock.sendMessage(senderJid, { text: aiReply });
           if (sentMsg?.key?.id) processedWaMsgIds.add(sentMsg.key.id);
           recordLiveWaMessage(agId, senderNumber, pushName, 'agent', aiReply, ctx.companyName);
-          console.log(`[Baileys - ${sessionId}] 🤖 IA (${ctx.companyName}) respondió a +${senderNumber}: "${aiReply.slice(0, 50)}..."`);
+          console.log(`[Baileys - ${sessionId}] IA (${ctx.companyName}) respondió a +${senderNumber}: "${aiReply.slice(0, 50)}..."`);
         }
       } catch (replyErr) {
         console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
@@ -2944,11 +3046,10 @@ const server = http.createServer(async (req, res) => {
         let analysis = null;
 
         if (effectiveAiKey && !effectiveAiKey.startsWith('sk-') && imageBase64) {
-          try {
-            const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
-            const detectedMime = mimeType || 'image/jpeg';
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${effectiveAiKey}`;
-            const promptText = `Analiza esta imagen comercial (comprobante de transferencia, recibo de pago o foto de producto/consulta).
+          const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+          const detectedMime = mimeType || 'image/jpeg';
+          const visionModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
+          const promptText = `Analiza esta imagen comercial (comprobante de transferencia, recibo de pago o foto de producto/consulta).
 Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguientes claves:
 {
   "isReceipt": true,
@@ -2958,33 +3059,38 @@ Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguiente
   "operationId": "Número de comprobante o referencia",
   "date": "Fecha detectada",
   "summary": "Resumen ejecutivo en 1 oración de lo que muestra la imagen y confirmación de validez.",
-  "suggestedWhatsAppReply": "Mensaje cálido de WhatsApp confirmando la recepción del comprobante y dando la bienvenida."
+  "suggestedWhatsAppReply": "Mensaje cálido y profesional de WhatsApp confirmando la recepción del comprobante y dando la bienvenida, SIN usar ningún emoji."
 }`;
 
-            const gRes = await fetch(geminiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [
-                    { text: promptText },
-                    { inline_data: { mime_type: detectedMime, data: cleanBase64 } }
-                  ]
-                }],
-                generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
-              })
-            });
+          for (const modelName of visionModels) {
+            try {
+              const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${effectiveAiKey}`;
+              const gRes = await fetch(geminiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{
+                    parts: [
+                      { text: promptText },
+                      { inline_data: { mime_type: detectedMime, data: cleanBase64 } }
+                    ]
+                  }],
+                  generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+                })
+              });
 
-            if (gRes.ok) {
-              const gJson = await gRes.json();
-              const rawText = gJson?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                analysis = JSON.parse(jsonMatch[0]);
+              if (gRes.ok) {
+                const gJson = await gRes.json();
+                const rawText = gJson?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                  analysis = JSON.parse(jsonMatch[0]);
+                  break;
+                }
               }
+            } catch (visionErr) {
+              console.warn(`[Gemini Vision - ${modelName}] Usando siguiente modelo o respaldo:`, visionErr.message);
             }
-          } catch (visionErr) {
-            console.warn('[Gemini Vision] Usando verificador heurístico de respaldo:', visionErr.message);
           }
         }
 
@@ -2999,8 +3105,12 @@ Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguiente
             operationId: refCode,
             date: new Date().toLocaleString('es-AR'),
             summary: `Comprobante (${fileName || 'imagen'}) validado por motor de Visión IA. Importe acreditable: ${fallbackAmt}.`,
-            suggestedWhatsAppReply: `✅ ¡Muchas gracias! Hemos recibido y verificado tu comprobante de pago (${refCode}) por *${fallbackAmt}*. Tu cuenta ya se encuentra en proceso de activación prioritaria.`
+            suggestedWhatsAppReply: `Muchas gracias. Hemos recibido y verificado tu comprobante de pago (${refCode}) por *${fallbackAmt}*. Tu cuenta ya se encuentra en proceso de activación prioritaria.`
           };
+        }
+
+        if (analysis.suggestedWhatsAppReply) {
+          analysis.suggestedWhatsAppReply = stripAiEmojis(analysis.suggestedWhatsAppReply);
         }
 
         // Automatically mark lead as "ganado" in DB if phone provided
@@ -3025,33 +3135,59 @@ Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguiente
     return;
   }
 
-  if (pathname === '/api/multimodal/voice-script' && req.method === 'POST') {
+  if (pathname === '/api/multimodal/transcribe-audio' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { topic, companyName, industry, clientName } = JSON.parse(body || '{}');
-        const cName = companyName || 'NEXUS AI Agency';
-        const ind = industry || 'Automatización e IA';
-        const prospect = clientName || 'cómo estás';
+        const {
+          audioBase64,
+          mimeType,
+          simulatedTranscript,
+          agencyId,
+          clientId,
+          companyName,
+          industry,
+          customCatalog,
+          customSystemPrompt,
+          customKnowledgeBase
+        } = JSON.parse(body || '{}');
+
+        const agId = agencyId || 'agency_master_1';
+        const sessId = clientId && clientId !== 'agency_hq' ? `client_${clientId}` : 'agency_hq';
+        const ctx = await getAgentCompanyContext(sessId, agId);
+
+        let transcript = '';
+        if (audioBase64) {
+          const cleanB64 = String(audioBase64).replace(/^data:[^;]+;base64,/, '');
+          const audioBuf = Buffer.from(cleanB64, 'base64');
+          transcript = await transcribeIncomingAudioBuffer(audioBuf, mimeType || 'audio/ogg', ctx.apiKey);
+        }
+
+        if (!transcript) {
+          transcript = String(simulatedTranscript || '').trim() || 'Hola, te mando este audio rápido para saber qué servicios ofrecen, precios y disponibilidad de turnos esta semana.';
+        }
+
+        const override = {};
+        if (companyName) override.customCompanyName = companyName;
+        if (industry) override.customIndustry = industry;
+        if (Array.isArray(customCatalog) && customCatalog.length > 0) override.customCatalog = customCatalog;
+        if (customSystemPrompt) override.customSystemPrompt = customSystemPrompt;
+        if (customKnowledgeBase) override.customKnowledgeBase = customKnowledgeBase;
+
         const reply = await generateAiAgentResponse(
-          topic || 'Cuéntame en un audio breve cómo funciona el servicio y qué beneficios tiene',
-          'voice_sim_session',
-          '',
-          'agency_master_1',
-          { customCompanyName: cName, customIndustry: ind }
+          transcript,
+          `audio_test_${Date.now()}`,
+          sessId,
+          agId,
+          Object.keys(override).length > 0 ? override : null
         );
-        // Clean emojis and markdown for smooth natural TTS voice synthesis
-        const cleanVoiceScript = (reply || '')
-          .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-          .replace(/\*/g, '')
-          .replace(/\n+/g, ' ')
-          .trim();
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
-          script: cleanVoiceScript || `Hola ${prospect}, te hablo del equipo de ${cName}. Te mando este audio rápido para contarte que ya tenemos lista la propuesta de ${ind} para escalar tus ventas las 24 horas. Avísame por aquí si te queda cómodo verlo hoy mismo.`
+          transcript,
+          reply: stripAiEmojis(reply || '')
         }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });

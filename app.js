@@ -4751,7 +4751,7 @@ function applyCustomLandingSimulator() {
   const headerName = document.getElementById('portalSimHeaderName');
   const headerSub = document.getElementById('portalSimHeaderSub');
   if (headerName) headerName.innerText = `Asistente IA • ${companyName}`;
-  if (headerSub) headerSub.innerText = `🟢 Especialista en ${industry} • En línea`;
+  if (headerSub) headerSub.innerText = `Especialista en ${industry} • En línea • Comprende Texto y Audios`;
 
   const container = document.getElementById('portalSimChatBody');
   if (container) {
@@ -4809,7 +4809,7 @@ async function sendPublicSimulatorCustomMessage() {
     const t = document.getElementById('tempSimTypingFree');
     if (t) t.remove();
 
-    const replyText = (data && data.reply) ? data.reply : '¡Excelente consulta! Con gusto te ayudo a coordinar todos los detalles. ¿Prefieres que agendemos una breve llamada hoy o te paso las opciones por aquí?';
+    const replyText = (data && data.reply) ? data.reply : 'Excelente consulta. Con gusto te ayudo a coordinar todos los detalles. ¿Prefieres que agendemos una breve llamada hoy o te paso las opciones por aquí?';
     customLandingDemoState.lastReplyText = replyText;
 
     const agentMsgEl = document.createElement('div');
@@ -4821,31 +4821,6 @@ async function sendPublicSimulatorCustomMessage() {
     const t = document.getElementById('tempSimTypingFree');
     if (t) t.remove();
   }
-}
-
-function speakTextWithWebSpeech(textToSpeak) {
-  if (!('speechSynthesis' in window)) {
-    showToast('Tu navegador no soporta síntesis de voz nativa, pero el guion de audio fue generado.', 'info');
-    return;
-  }
-  window.speechSynthesis.cancel();
-  const clean = String(textToSpeak || '')
-    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-    .replace(/\*/g, '')
-    .trim();
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = 'es-ES';
-  utterance.rate = 1.04;
-  const voices = window.speechSynthesis.getVoices();
-  const spanishVoice = voices.find(v => v.lang && v.lang.toLowerCase().startsWith('es'));
-  if (spanishVoice) utterance.voice = spanishVoice;
-  window.speechSynthesis.speak(utterance);
-  showToast('🔊 Reproduciendo Nota de Voz IA...', 'success');
-}
-
-function speakSimulatorLastReply() {
-  const txt = customLandingDemoState.lastReplyText || 'Hola, bienvenido a nuestro asistente inteligente. ¿En qué podemos ayudarte hoy?';
-  speakTextWithWebSpeech(txt);
 }
 
 // 3. Anti-Ghosting Follow-Up Engine UI (2h / 24h / 72h)
@@ -5051,41 +5026,75 @@ async function analyzePaymentReceiptImage(inputEl, isDemoSimulation = false) {
   }
 }
 
-async function testMultimodalVoiceReply() {
-  const promptInput = document.getElementById('voiceSynthPromptInput');
-  const outBox = document.getElementById('voiceSynthOutputBox');
-  const topic = promptInput ? promptInput.value.trim() : 'Cuéntame cómo funciona el servicio';
+async function testMultimodalAudioComprehension(inputEl = null, isSimulated = false) {
+  const simInput = document.getElementById('voiceComprehensionSimInput');
+  const outBox = document.getElementById('voiceComprehensionOutputBox');
   const client = agencyClients.find(c => c.id === activeClientId);
   const profile = getAgencyProfile();
   const companyName = client ? client.name : (profile ? profile.name : 'NEXUS AI Agency');
   const industry = client ? (client.industry || 'Servicios') : 'Automatización con IA';
 
+  let audioBase64 = '';
+  let mimeType = 'audio/ogg';
+  let fileLabel = 'Simulación de Nota de Voz Entrante';
+
+  if (!isSimulated && inputEl && inputEl.files && inputEl.files[0]) {
+    const file = inputEl.files[0];
+    fileLabel = file.name;
+    mimeType = file.type || 'audio/ogg';
+    audioBase64 = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  }
+
   if (outBox) {
-    outBox.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generando guion de audio natural para <strong>${escapeHtml(companyName)}</strong>...`;
+    outBox.innerHTML = `<div style="padding: 8px; color: #34d399;"><i class="fa-solid fa-spinner fa-spin"></i> Escuchando y transcribiendo nota de voz para <strong>${escapeHtml(companyName)}</strong>...</div>`;
   }
 
   try {
-    const res = await fetch('/api/multimodal/voice-script', {
+    const simulatedTranscript = simInput ? simInput.value.trim() : 'Hola, te mando este audio para consultar precios y disponibilidad de turnos esta semana.';
+    const res = await fetch('/api/multimodal/transcribe-audio', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ topic, companyName, industry })
+      body: JSON.stringify({
+        audioBase64,
+        mimeType,
+        simulatedTranscript,
+        agencyId: currentAgencyId || 'agency_master_1',
+        clientId: activeClientId || 'agency_hq',
+        companyName,
+        industry,
+        customCatalog: Array.isArray(currentCatalog) && currentCatalog.length > 0 ? currentCatalog : (client && Array.isArray(client.catalog) ? client.catalog : []),
+        customSystemPrompt: document.getElementById('agentPromptInput')?.value || (client && client.systemPrompt) || '',
+        customKnowledgeBase: document.getElementById('agentKnowledgeInput')?.value || (client && client.knowledgeBase) || ''
+      })
     });
     const data = await res.json();
-    const script = (data && data.script) ? data.script : `Hola, te hablo del equipo de ${companyName}. Te envío esta nota de voz rápida para contarte que podemos dejar tu asistente activo en menos de 48 horas. ¿Coordinamos una breve llamada hoy?`;
-    if (outBox) {
-      outBox.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-          <strong style="color: #34d399; font-size: 12px;"><i class="fa-solid fa-waveform-lines"></i> Guion de Nota de Voz IA Generado:</strong>
-          <button class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 11px;" onclick="speakTextWithWebSpeech(${JSON.stringify(script).replace(/"/g, '&quot;')})">
-            <i class="fa-solid fa-play"></i> Reproducir de Nuevo
-          </button>
-        </div>
-        <div style="color: #e2e8f0; font-style: italic;">"${escapeHtml(script)}"</div>
-      `;
+    if (data && data.success) {
+      if (outBox) {
+        outBox.innerHTML = `
+          <div style="border-left: 3px solid #34d399; padding-left: 10px;">
+            <div style="font-size: 11.5px; color: #94a3b8; margin-bottom: 4px;">
+              <i class="fa-solid fa-ear-listen" style="color: #34d399;"></i> <strong>Audio Entrante Transcrito (${escapeHtml(fileLabel)}):</strong>
+            </div>
+            <div style="font-size: 12.5px; color: #f8fafc; font-style: italic; margin-bottom: 10px; background: rgba(255,255,255,0.04); padding: 8px; border-radius: 6px;">
+              "${escapeHtml(data.transcript || '')}"
+            </div>
+            <div style="font-size: 11.5px; color: #34d399; font-weight: 700; margin-bottom: 4px;">
+              <i class="fa-solid fa-message"></i> Respuesta en Texto Humano de ${escapeHtml(companyName)} (0% Emojis / 0% Voz Robótica):
+            </div>
+            <div style="font-size: 12.5px; color: #e2e8f0; white-space: pre-line; background: rgba(16, 185, 129, 0.08); padding: 10px; border-radius: 6px;">${escapeHtml(data.reply || '')}</div>
+          </div>
+        `;
+      }
+      showToast('Nota de voz comprendida y respondida en texto humano', 'success');
+    } else {
+      if (outBox) outBox.innerHTML = `<div style="color: #f87171;">Error procesando audio: ${escapeHtml((data && data.error) || 'Respuesta inválida')}</div>`;
     }
-    speakTextWithWebSpeech(script);
   } catch (err) {
-    if (outBox) outBox.innerHTML = `Error generando nota de voz: ${escapeHtml(err.message)}`;
+    if (outBox) outBox.innerHTML = `<div style="color: #f87171;">Error procesando nota de voz: ${escapeHtml(err.message)}</div>`;
   }
 }
 

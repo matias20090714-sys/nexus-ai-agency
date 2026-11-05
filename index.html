@@ -646,13 +646,8 @@
                     </div>
                     <div>
                       <div style="font-size: 14px; font-weight: 700; color: white;" id="portalSimHeaderName">Asistente Virtual IA • Empresa</div>
-                      <div style="font-size: 11px; color: #a7f3d0;" id="portalSimHeaderSub">🟢 En línea • Responde en 1.8s • Texto y Audio IA</div>
+                      <div style="font-size: 11px; color: #a7f3d0;" id="portalSimHeaderSub">En línea • Responde en 1.8s • Comprende Texto y Audios</div>
                     </div>
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <button class="btn btn-secondary btn-sm" onclick="speakSimulatorLastReply()" title="Escuchar última respuesta como Nota de Voz IA" style="padding: 4px 10px; font-size: 11px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #a7f3d0;">
-                      <i class="fa-solid fa-volume-high"></i> Audio IA
-                    </button>
                   </div>
                 </div>
 
@@ -1174,7 +1169,7 @@
                 <i class="fa-solid fa-user-clock" style="color: #fbbf24;"></i> 8. Anti-Ghosting (2h/24h/72h)
               </button>
               <button class="subtab-btn" id="subtabBtn-multimodal" onclick="switchAgentSubtab('multimodal')">
-                <i class="fa-solid fa-eye" style="color: #38bdf8;"></i> 9. Visión Pagos & Voz IA
+                <i class="fa-solid fa-eye" style="color: #38bdf8;"></i> 9. Visión Pagos & Audios IA
               </button>
               <button class="subtab-btn" id="subtabBtn-widget" onclick="switchAgentSubtab('widget')">
                 <i class="fa-solid fa-code" style="color: #34d399;"></i> 10. Widget Web ($150 Upsell)
@@ -1690,31 +1685,35 @@
                   </div>
                 </div>
 
-                <!-- Card 2: Natural Voice Note Synthesizer (Audio IA) -->
+                <!-- Card 2: Incoming Voice Note Comprehension (Speech-to-Text -> Human Text Reply) -->
                 <div style="background: rgba(10, 13, 28, 0.75); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: var(--radius-lg); padding: 22px;">
                   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
                     <strong style="font-size: 15.5px; color: white; display: flex; align-items: center; gap: 8px;">
-                      <i class="fa-solid fa-microphone-lines" style="color: #34d399;"></i> Generador de Notas de Voz IA (Audio Ventas)
+                      <i class="fa-solid fa-ear-listen" style="color: #34d399;"></i> Comprensión de Audios Entrantes (WhatsApp)
                     </strong>
-                    <span class="brand-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 10.5px;">Voz Humana IA</span>
+                    <span class="brand-badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 10.5px;">Escucha IA -> Texto Humano</span>
                   </div>
                   <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 14px;">
-                    Genera guiones hablados ultra naturales adaptados a la empresa activa y reprodúcelos con síntesis de voz para cerrar prospectos indecisos.
+                    Cuando un cliente envía una nota de voz en WhatsApp, el agente escucha y transcribe su consulta en tiempo real y responde en <strong>texto humano limpio</strong> (cero voces robóticas y cero emojis).
                   </p>
 
                   <div class="form-group">
-                    <label class="form-label" style="font-size: 12px;">Situación o Consulta a Responder por Nota de Voz</label>
-                    <input type="text" id="voiceSynthPromptInput" class="form-control" value="Hola, quería saber cómo funciona el servicio y cuánto tarda la instalación" style="font-size: 12.5px;">
+                    <label class="form-label" style="font-size: 12px;">Simular lo que dice el cliente en su Nota de Voz (o sube un audio real abajo)</label>
+                    <input type="text" id="voiceComprehensionSimInput" class="form-control" value="Hola, te mando este audio rápido para saber precios y si tienen disponibilidad de turnos esta semana" style="font-size: 12.5px;">
                   </div>
 
                   <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
-                    <button class="btn btn-emerald btn-sm" onclick="testMultimodalVoiceReply()">
-                      <i class="fa-solid fa-volume-high"></i> Generar y Escuchar Nota de Voz IA
+                    <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;">
+                      <i class="fa-solid fa-file-audio"></i> Subir Nota de Voz Real
+                      <input type="file" id="incomingAudioFileInput" accept="audio/*" style="display: none;" onchange="testMultimodalAudioComprehension(this, false)">
+                    </label>
+                    <button class="btn btn-emerald btn-sm" onclick="testMultimodalAudioComprehension(null, true)">
+                      <i class="fa-solid fa-bolt"></i> Simular Audio Entrante y Ver Respuesta
                     </button>
                   </div>
 
-                  <div id="voiceSynthOutputBox" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12.5px; color: #a7f3d0; line-height: 1.5;">
-                    🎙️ Presiona <strong>"Generar y Escuchar Nota de Voz IA"</strong> para sintetizar el audio comercial en vivo.
+                  <div id="voiceComprehensionOutputBox" style="background: rgba(15, 23, 42, 0.85); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; font-size: 12.5px; color: #cbd5e1; line-height: 1.5;">
+                    Sube un archivo de audio (<code>.ogg</code>, <code>.mp3</code>, <code>.m4a</code>, <code>.wav</code>) o haz clic en <strong>"Simular Audio Entrante"</strong> para probar cómo el agente transcribe y responde en texto humano.
                   </div>
                 </div>
               </div>
