@@ -14,7 +14,7 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <link rel="stylesheet" href="styles.css?v=4.0">
+  <link rel="stylesheet" href="/styles.css?v=5.1">
 </head>
 <body>
 
@@ -498,7 +498,7 @@
                 <!-- Calculator Controls -->
                 <div class="calc-inputs-card">
                   <div class="calc-field-group">
-                    <label style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+                    <label style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
                       <span>💬 Mensajes/Consultas recibidas al mes:</span>
                       <strong id="calcLeadsValue" style="color: #818cf8; font-size: 15px;">200 consultas</strong>
                     </label>
@@ -506,7 +506,7 @@
                   </div>
 
                   <div class="calc-field-group" style="margin-top: 20px;">
-                    <label style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+                    <label style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
                       <span>💵 Valor promedio de tu producto/servicio (USD):</span>
                       <strong id="calcTicketLabel" style="color: #34d399; font-size: 15px;">$120 USD</strong>
                     </label>
@@ -514,7 +514,7 @@
                   </div>
 
                   <div class="calc-field-group" style="margin-top: 20px;">
-                    <label style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
+                    <label style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px; font-size: 13px; font-weight: 700; color: #cbd5e1; margin-bottom: 8px;">
                       <span>⏰ % de consultas fuera de hora o respondidas tarde:</span>
                       <strong id="calcLossPercentValue" style="color: #f87171; font-size: 15px;">35% perdidas</strong>
                     </label>
@@ -616,9 +616,9 @@
               </div>
 
               <!-- 30-Second Customizer Bar -->
-              <div style="max-width: 780px; margin: 0 auto 20px auto; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: var(--radius-lg); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.35);">
-                <input type="text" id="customSimCompanyInput" class="form-control" placeholder="🏢 Nombre de tu Empresa (Ej: Clínica Dental Sonrisas)" style="flex: 1; min-width: 210px; font-size: 13px;">
-                <select id="customSimIndustrySelect" class="form-control" style="width: auto; min-width: 190px; font-size: 13px;">
+              <div class="landing-sim-customizer-bar" style="max-width: 780px; margin: 0 auto 20px auto; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: var(--radius-lg); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.35); box-sizing: border-box;">
+                <input type="text" id="customSimCompanyInput" class="form-control" placeholder="Nombre de tu Empresa (Ej: Clínica Dental Sonrisas)" style="flex: 1 1 200px; min-width: 0; font-size: 13px;">
+                <select id="customSimIndustrySelect" class="form-control" style="flex: 1 1 180px; width: auto; min-width: 0; max-width: 100%; font-size: 13px;">
                   <option value="Clínica Médica / Odontológica">🏥 Clínica / Odontología</option>
                   <option value="Inmobiliaria & Desarrollos">🏢 Inmobiliaria / Bienes Raíces</option>
                   <option value="Estudio Jurídico / Contable">⚖️ Estudio Jurídico / Contable</option>
@@ -632,7 +632,7 @@
                   <option value="E-Commerce & Tienda Online">🛍️ E-Commerce / Mayorista</option>
                   <option value="Consultoría & Software B2B">💼 Consultoría & Empresas B2B</option>
                 </select>
-                <button class="btn btn-primary btn-sm" onclick="applyCustomLandingSimulator()" style="padding: 10px 16px; font-weight: 800; white-space: nowrap;">
+                <button class="btn btn-primary btn-sm" onclick="applyCustomLandingSimulator()" style="padding: 10px 16px; font-weight: 800;">
                   <i class="fa-solid fa-wand-magic-sparkles"></i> Personalizar Demo Ahora
                 </button>
               </div>
@@ -640,13 +640,13 @@
               <div class="portal-chat-simulator">
                 <!-- Phone Header -->
                 <div class="chat-sim-header">
-                  <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background: #128c7e; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;">
+                  <div style="display: flex; align-items: center; gap: 10px; min-width: 0; width: 100%;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: #128c7e; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; flex-shrink: 0;">
                       <i class="fa-solid fa-robot"></i>
                     </div>
-                    <div>
-                      <div style="font-size: 14px; font-weight: 700; color: white;" id="portalSimHeaderName">Asistente Virtual IA • Empresa</div>
-                      <div style="font-size: 11px; color: #a7f3d0;" id="portalSimHeaderSub">En línea • Responde en 1.8s • Comprende Texto y Audios</div>
+                    <div style="min-width: 0; flex: 1;">
+                      <div style="font-size: 14px; font-weight: 700; color: white; overflow-wrap: break-word;" id="portalSimHeaderName">Asistente Virtual IA • Empresa</div>
+                      <div style="font-size: 11px; color: #a7f3d0; overflow-wrap: break-word;" id="portalSimHeaderSub">En línea • Responde en 1.8s • Comprende Texto y Audios</div>
                     </div>
                   </div>
                 </div>
@@ -676,8 +676,8 @@
                 </div>
 
                 <!-- Live Free-Text Input Bar inside Landing Simulator -->
-                <div style="padding: 10px 14px; background: #1f2937; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 8px; align-items: center;">
-                  <input type="text" id="portalSimFreeInput" class="form-control" placeholder="Escribe cualquier pregunta o pon a prueba al agente aquí..." style="background: #111827; border-color: rgba(255,255,255,0.15); font-size: 13px;" onkeydown="if(event.key==='Enter') sendPublicSimulatorCustomMessage()">
+                <div class="chat-sim-free-input-bar" style="padding: 10px 12px; background: #1f2937; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 8px; align-items: center; box-sizing: border-box;">
+                  <input type="text" id="portalSimFreeInput" class="form-control" placeholder="Escribe una pregunta al agente..." style="flex: 1; min-width: 0; background: #111827; border-color: rgba(255,255,255,0.15); font-size: 13px;" onkeydown="if(event.key==='Enter') sendPublicSimulatorCustomMessage()">
                   <button class="btn btn-emerald btn-sm" onclick="sendPublicSimulatorCustomMessage()" style="padding: 9px 14px; flex-shrink: 0;">
                     <i class="fa-solid fa-paper-plane"></i> Enviar
                   </button>
@@ -825,7 +825,7 @@
                     <i class="fa-solid fa-chevron-down faq-icon"></i>
                   </summary>
                   <div class="faq-answer">
-                    Utilizamos modelos avanzados de IA generativa entrenados específicamente con el tono, modismos y catálogo de tu empresa. El agente responde de forma fluida, cálida y con emojis contextuales, ofreciendo una experiencia idéntica o superior a la de un recepcionista humano experto.
+                    Utilizamos modelos avanzados de IA generativa entrenados específicamente con el tono, criterio comercial y catálogo de tu empresa. El agente comprende mensajes escritos y notas de voz, respondiendo de forma fluida, sobria y profesional como un especialista humano senior.
                   </div>
                 </details>
 
@@ -4174,8 +4174,8 @@ Pruébalo 2 minutos y me dices qué te parece.
   </a>
 
   <!-- Scripts -->
-  <script src="agents-data.js?v=2.5"></script>
-  <script src="marketing-studio.js?v=2.5"></script>
-  <script src="app.js?v=2.5"></script>
+  <script src="/agents-data.js?v=5.1"></script>
+  <script src="/marketing-studio.js?v=5.1"></script>
+  <script src="/app.js?v=5.1"></script>
 </body>
 </html>
