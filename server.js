@@ -423,150 +423,341 @@ if (!fs.existsSync(SESSIONS_DIR)) {
   fs.mkdirSync(SESSIONS_DIR, { recursive: true });
 }
 
-// WhatsApp Multi-Device Session Initializer (Baileys)
-async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPairingCode = null, forceNew = false) {
-  const sessionFolder = path.join(SESSIONS_DIR, sessionId);
-  if (!fs.existsSync(sessionFolder)) {
-    fs.mkdirSync(sessionFolder, { recursive: true });
-  }
+const sessionInitLocks = new Map();
+const sessionReconnectTimers = new Map();
+const sessionReconnectAttempts = new Map();
+const sessionDbSyncTimers = new Map();
+const session401Retries = new Map();
 
-  if (forceNew) {
-    if (activeSessions[sessionId]?.sock) {
-      try { activeSessions[sessionId].sock.end(); } catch (e) { }
-    }
-    try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) { }
-    fs.mkdirSync(sessionFolder, { recursive: true });
-    delete activeSessions[sessionId];
-  }
-
-  if (activeSessions[sessionId] && activeSessions[sessionId].sock) {
-    if (phoneForPairingCode && !activeSessions[sessionId].connected) {
-      try {
-        const clean = phoneForPairingCode.replace(/\D/g, '');
-        const code = await activeSessions[sessionId].sock.requestPairingCode(clean);
-        activeSessions[sessionId].pairingCode = code;
-        return activeSessions[sessionId];
-      } catch (e) {
-        console.error(`[Baileys - ${sessionId}] Error solicitando pairing code en sesión activa:`, e.message);
-      }
-    }
-    return activeSessions[sessionId];
-  }
-
-  const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
-
-  // Get latest WhatsApp Web version to prevent 408/401 rejections
-  let waVersion = [2, 3000, 1043857760];
+function hasRegisteredCredsOnDisk(sessionFolder) {
   try {
-    const versionData = await fetchLatestBaileysVersion();
-    if (versionData && versionData.version) {
-      waVersion = versionData.version;
+    const credsPath = path.join(sessionFolder, 'creds.json');
+    if (!fs.existsSync(credsPath)) return false;
+    const raw = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+    return !!(raw && (raw.registered === true || raw.me?.id));
+  } catch (e) {
+    return false;
+  }
+}
+
+async function syncSessionAuthToDB(sessionId, sessionFolder, sessionData = {}) {
+  try {
+    if (!sessionFolder || !fs.existsSync(sessionFolder)) return false;
+    const credsPath = path.join(sessionFolder, 'creds.json');
+    if (!fs.existsSync(credsPath)) return false;
+
+    const credsRaw = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
+    if (!credsRaw || (!credsRaw.registered && !credsRaw.me?.id)) return false;
+
+    const files = fs.readdirSync(sessionFolder).filter(f => f.endsWith('.json') && !f.startsWith('.')).slice(0, 600);
+    const authFiles = {};
+    for (const fileName of files) {
+      try {
+        authFiles[fileName] = fs.readFileSync(path.join(sessionFolder, fileName), 'utf8');
+      } catch (e) { }
     }
+    if (!authFiles['creds.json']) return false;
+
+    const phone = String(sessionData.phone || credsRaw?.me?.id?.split(':')[0]?.split('@')[0] || '').replace(/\D/g, '');
+    const userName = String(sessionData.userName || credsRaw?.me?.name || '');
+
+    await db.query(
+      `INSERT INTO wa_sessions (session_id, auth_files, phone, user_name, status, manual_logout, updated_at)
+       VALUES ($1, $2::jsonb, $3, $4, 'active', FALSE, CURRENT_TIMESTAMP)
+       ON CONFLICT (session_id) DO UPDATE SET
+         auth_files = EXCLUDED.auth_files,
+         phone = COALESCE(NULLIF(EXCLUDED.phone, ''), wa_sessions.phone),
+         user_name = COALESCE(NULLIF(EXCLUDED.user_name, ''), wa_sessions.user_name),
+         status = CASE WHEN wa_sessions.manual_logout = TRUE THEN wa_sessions.status ELSE 'active' END,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE wa_sessions.manual_logout = FALSE`,
+      [sessionId, JSON.stringify(authFiles), phone, userName]
+    );
+    return true;
   } catch (err) {
-    console.log(`[Baileys - ${sessionId}] Usando versión WA fallback.`);
+    return false;
+  }
+}
+
+function scheduleSessionDbSync(sessionId, sessionFolder, sessionData, immediate = false) {
+  if (sessionDbSyncTimers.has(sessionId)) {
+    clearTimeout(sessionDbSyncTimers.get(sessionId));
+    sessionDbSyncTimers.delete(sessionId);
+  }
+  if (immediate) {
+    syncSessionAuthToDB(sessionId, sessionFolder, sessionData).catch(() => { });
+    return;
+  }
+  const timer = setTimeout(() => {
+    sessionDbSyncTimers.delete(sessionId);
+    syncSessionAuthToDB(sessionId, sessionFolder, sessionData).catch(() => { });
+  }, 1500);
+  sessionDbSyncTimers.set(sessionId, timer);
+}
+
+async function hydrateSessionAuthFromDB(sessionId, sessionFolder) {
+  try {
+    const res = await db.query(
+      `SELECT auth_files, manual_logout, phone, user_name FROM wa_sessions WHERE session_id = $1 LIMIT 1`,
+      [sessionId]
+    );
+    const row = res?.rows?.[0];
+    if (!row || row.manual_logout) return { restored: false, manualLogout: !!row?.manual_logout };
+    const authFiles = row.auth_files;
+    if (!authFiles || typeof authFiles !== 'object' || !authFiles['creds.json']) {
+      return { restored: false, manualLogout: false };
+    }
+
+    if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
+    // Restore missing files or hydrate creds if local container disk was wiped
+    const localRegistered = hasRegisteredCredsOnDisk(sessionFolder);
+    if (!localRegistered) {
+      for (const [fileName, fileContent] of Object.entries(authFiles)) {
+        if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) continue;
+        const targetPath = path.join(sessionFolder, fileName);
+        const textVal = typeof fileContent === 'string' ? fileContent : JSON.stringify(fileContent);
+        fs.writeFileSync(targetPath, textVal, 'utf8');
+      }
+      console.log(`[Baileys - ${sessionId}] Sesión restaurada desde respaldo permanente PostgreSQL (+${row.phone || 'activa'}).`);
+      return { restored: true, phone: row.phone, userName: row.user_name, manualLogout: false };
+    }
+    return { restored: false, phone: row.phone, userName: row.user_name, manualLogout: false };
+  } catch (e) {
+    return { restored: false, manualLogout: false };
+  }
+}
+
+async function markSessionManualLogoutInDB(sessionId) {
+  try {
+    await db.query(
+      `INSERT INTO wa_sessions (session_id, auth_files, phone, user_name, status, manual_logout, updated_at)
+       VALUES ($1, '{}'::jsonb, NULL, NULL, 'manual_logout', TRUE, CURRENT_TIMESTAMP)
+       ON CONFLICT (session_id) DO UPDATE SET
+         auth_files = '{}'::jsonb,
+         phone = NULL,
+         status = 'manual_logout',
+         manual_logout = TRUE,
+         updated_at = CURRENT_TIMESTAMP`,
+      [sessionId]
+    );
+  } catch (e) { }
+}
+
+async function clearManualLogoutFlagInDB(sessionId) {
+  try {
+    await db.query(
+      `UPDATE wa_sessions SET manual_logout = FALSE, status = 'active', updated_at = CURRENT_TIMESTAMP WHERE session_id = $1`,
+      [sessionId]
+    );
+  } catch (e) { }
+}
+
+// WhatsApp Multi-Device Session Initializer (Baileys with Mutex + Permanent DB Persistence)
+async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPairingCode = null, forceNew = false) {
+  if (sessionInitLocks.has(sessionId) && !forceNew) {
+    return sessionInitLocks.get(sessionId);
   }
 
-  const sessionData = activeSessions[sessionId] || {
-    sock: null,
-    qr: null,
-    qrImage: null,
-    pairingCode: null,
-    connected: false,
-    phone: null,
-    userName: null,
-    status: 'initializing'
-  };
-  activeSessions[sessionId] = sessionData;
-
-  const sock = makeWASocket({
-    version: waVersion,
-    auth: state,
-    logger: pino({ level: 'silent' }),
-    printQRInTerminal: false,
-    browser: Browsers.windows('Desktop'),
-    syncFullHistory: false,
-    generateHighQualityLinkPreview: false,
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 30000,
-    emitOwnEvents: true
-  });
-  sessionData.sock = sock;
-
-  sock.ev.on('creds.update', async () => {
-    await saveCreds();
-    if (state?.creds?.me?.id) {
-      const mePhone = state.creds.me.id.split(':')[0].split('@')[0];
-      if (mePhone) sessionData.phone = mePhone;
-      if (state.creds.me.name) sessionData.userName = state.creds.me.name;
-    }
-  });
-
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      sessionData.qr = qr;
-      sessionData.status = 'qr_ready';
-      try {
-        sessionData.qrImage = await QRCode.toDataURL(qr, {
-          width: 360,
-          margin: 2,
-          errorCorrectionLevel: 'M',
-          color: {
-            dark: '#000000',
-            light: '#ffffff'
-          }
-        });
-        console.log(`[Baileys - ${sessionId}] ⚡ Código QR de WhatsApp Web Oficial generado (Listo para escanear).`);
-      } catch (err) {
-        console.error('Error generando QR Image:', err);
-      }
+  const initPromise = (async () => {
+    const sessionFolder = path.join(SESSIONS_DIR, sessionId);
+    if (!fs.existsSync(sessionFolder)) {
+      fs.mkdirSync(sessionFolder, { recursive: true });
     }
 
-    if (connection === 'open') {
-      sessionData.connected = true;
-      sessionData.qr = null;
-      sessionData.qrImage = null;
-      sessionData.pairingCode = null;
-      sessionData.status = 'connected';
-
-      const userObj = sock.user || state?.creds?.me || {};
-      const userJid = userObj.id || '';
-      const cleanPhone = userJid.split(':')[0] || userJid.split('@')[0] || sessionData.phone || '';
-      const userLid = (userObj.lid || '').split(':')[0].split('@')[0];
-      sessionData.phone = cleanPhone;
-      sessionData.lid = userLid;
-      sessionData.userName = userObj.name || sessionData.userName || 'WhatsApp Empresa';
-
-      console.log(`[Baileys - ${sessionId}] 🎉 ¡WhatsApp Real Vinculado con éxito! Línea: +${cleanPhone}`);
+    if (sessionReconnectTimers.has(sessionId)) {
+      clearTimeout(sessionReconnectTimers.get(sessionId));
+      sessionReconnectTimers.delete(sessionId);
     }
 
-    if (connection === 'close') {
-      const statusCode = lastDisconnect?.error?.output?.statusCode;
-      sessionData.connected = false;
-
-      console.log(`[Baileys - ${sessionId}] Conexión cerrada (${statusCode || 'unknown'}).`);
-
-      if (activeSessions[sessionId]) {
-        activeSessions[sessionId].sock = null;
-      }
-
-      if (statusCode === DisconnectReason.loggedOut) {
-        sessionData.status = 'logged_out';
-        sessionData.phone = null;
+    // Never wipe an already-registered WhatsApp session unless explicitly logged out manually
+    if (forceNew) {
+      const alreadyRegistered = hasRegisteredCredsOnDisk(sessionFolder);
+      if (!alreadyRegistered) {
+        if (activeSessions[sessionId]?.sock) {
+          try { activeSessions[sessionId].sock.end(); } catch (e) { }
+        }
         try { fs.rmSync(sessionFolder, { recursive: true, force: true }); } catch (e) { }
+        fs.mkdirSync(sessionFolder, { recursive: true });
+        delete activeSessions[sessionId];
       } else {
-        sessionData.status = 'reconnecting';
+        console.log(`[Baileys - ${sessionId}] Protección activa: se ignoró forceNew porque la sesión ya está vinculada.`);
+      }
+    }
+
+    // Restore from Neon PostgreSQL if local disk is empty after redeploy/restart
+    const hydratedMeta = await hydrateSessionAuthFromDB(sessionId, sessionFolder);
+
+    if (activeSessions[sessionId] && activeSessions[sessionId].sock && !forceNew) {
+      if (phoneForPairingCode && !activeSessions[sessionId].connected) {
+        try {
+          const clean = phoneForPairingCode.replace(/\D/g, '');
+          const code = await activeSessions[sessionId].sock.requestPairingCode(clean);
+          activeSessions[sessionId].pairingCode = code;
+          return activeSessions[sessionId];
+        } catch (e) {
+          console.error(`[Baileys - ${sessionId}] Error solicitando pairing code en sesión activa:`, e.message);
+        }
+      }
+      return activeSessions[sessionId];
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
+
+    // Get latest WhatsApp Web version to prevent 408/401 rejections
+    let waVersion = [2, 3000, 1043857760];
+    try {
+      const versionData = await fetchLatestBaileysVersion();
+      if (versionData && versionData.version) {
+        waVersion = versionData.version;
+      }
+    } catch (err) {
+      console.log(`[Baileys - ${sessionId}] Usando versión WA fallback.`);
+    }
+
+    const sessionData = activeSessions[sessionId] || {
+      sock: null,
+      qr: null,
+      qrImage: null,
+      pairingCode: null,
+      connected: false,
+      phone: hydratedMeta.phone || null,
+      userName: hydratedMeta.userName || null,
+      manualLogout: false,
+      status: 'initializing'
+    };
+    sessionData.manualLogout = false;
+    if (hydratedMeta.phone && !sessionData.phone) sessionData.phone = hydratedMeta.phone;
+    if (hydratedMeta.userName && !sessionData.userName) sessionData.userName = hydratedMeta.userName;
+    activeSessions[sessionId] = sessionData;
+
+    const sock = makeWASocket({
+      version: waVersion,
+      auth: state,
+      logger: pino({ level: 'silent' }),
+      printQRInTerminal: false,
+      browser: Browsers.windows('Desktop'),
+      syncFullHistory: false,
+      generateHighQualityLinkPreview: false,
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
+      keepAliveIntervalMs: 20000,
+      retryRequestDelayMs: 350,
+      emitOwnEvents: true
+    });
+    sessionData.sock = sock;
+
+    sock.ev.on('creds.update', async () => {
+      await saveCreds();
+      if (state?.creds?.me?.id) {
+        const mePhone = state.creds.me.id.split(':')[0].split('@')[0];
+        if (mePhone) sessionData.phone = mePhone;
+        if (state.creds.me.name) sessionData.userName = state.creds.me.name;
+      }
+      if (state?.creds?.registered || state?.creds?.me?.id) {
+        await clearManualLogoutFlagInDB(sessionId);
+        scheduleSessionDbSync(sessionId, sessionFolder, sessionData, false);
+      }
+    });
+
+    sock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        sessionData.qr = qr;
+        sessionData.status = 'qr_ready';
+        try {
+          sessionData.qrImage = await QRCode.toDataURL(qr, {
+            width: 360,
+            margin: 2,
+            errorCorrectionLevel: 'M',
+            color: {
+              dark: '#000000',
+              light: '#ffffff'
+            }
+          });
+          console.log(`[Baileys - ${sessionId}] ⚡ Código QR de WhatsApp Web Oficial generado (Listo para escanear).`);
+        } catch (err) {
+          console.error('Error generando QR Image:', err);
+        }
       }
 
-      // Fast reconnect (400ms) on 515 restartRequired right after QR scan, 1500ms otherwise
-      const delayMs = statusCode === DisconnectReason.restartRequired || statusCode === 515 ? 400 : 1500;
-      setTimeout(() => {
-        getOrInitBaileysSession(sessionId).catch(e => console.error('Error reiniciando sesión Baileys:', e.message));
-      }, delayMs);
-    }
-  });
+      if (connection === 'open') {
+        sessionData.connected = true;
+        sessionData.qr = null;
+        sessionData.qrImage = null;
+        sessionData.pairingCode = null;
+        sessionData.manualLogout = false;
+        sessionData.status = 'connected';
+        sessionReconnectAttempts.set(sessionId, 0);
+        session401Retries.set(sessionId, 0);
+
+        const userObj = sock.user || state?.creds?.me || {};
+        const userJid = userObj.id || '';
+        const cleanPhone = userJid.split(':')[0] || userJid.split('@')[0] || sessionData.phone || '';
+        const userLid = (userObj.lid || '').split(':')[0].split('@')[0];
+        sessionData.phone = cleanPhone;
+        sessionData.lid = userLid;
+        sessionData.userName = userObj.name || sessionData.userName || 'WhatsApp Empresa';
+
+        await clearManualLogoutFlagInDB(sessionId);
+        scheduleSessionDbSync(sessionId, sessionFolder, sessionData, true);
+        console.log(`[Baileys - ${sessionId}] 🎉 ¡WhatsApp Real Vinculado y respaldado en PostgreSQL! Línea: +${cleanPhone}`);
+      }
+
+      if (connection === 'close') {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        sessionData.connected = false;
+
+        console.log(`[Baileys - ${sessionId}] Conexión cerrada (${statusCode || 'unknown'}).`);
+
+        if (activeSessions[sessionId] && activeSessions[sessionId].sock === sock) {
+          activeSessions[sessionId].sock = null;
+        }
+
+        // Only halt permanently if the operator explicitly triggered manual logout from the panel
+        if (sessionData.manualLogout) {
+          sessionData.status = 'manual_logout';
+          console.log(`[Baileys - ${sessionId}] Desvinculación manual confirmada. No se reconectará.`);
+          return;
+        }
+
+        const attempts = (sessionReconnectAttempts.get(sessionId) || 0) + 1;
+        sessionReconnectAttempts.set(sessionId, attempts);
+
+        // Never auto-delete credentials on disconnect; keep keys safe unless manual logout is requested
+        let delayMs;
+        if (statusCode === DisconnectReason.restartRequired || statusCode === 515) {
+          delayMs = 500;
+          sessionData.status = 'reconnecting';
+        } else if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) {
+          delayMs = 8000;
+          sessionData.status = 'reconnecting';
+          console.log(`[Baileys - ${sessionId}] Despliegue paralelo detectado (440). Reintentando en ${delayMs}ms sin borrar credenciales...`);
+        } else if (statusCode === DisconnectReason.loggedOut || statusCode === 401) {
+          const count401 = (session401Retries.get(sessionId) || 0) + 1;
+          session401Retries.set(sessionId, count401);
+          if (count401 <= 3) {
+            delayMs = 5000 * count401;
+            sessionData.status = 'reconnecting';
+            console.log(`[Baileys - ${sessionId}] Código 401 detectado (intento ${count401}/3). Conservando sesión y reintentando en ${delayMs}ms...`);
+          } else {
+            // WhatsApp phone-side revocation persists; preserve DB record without spinning in a tight 401 loop
+            sessionData.status = 'phone_logged_out';
+            console.warn(`[Baileys - ${sessionId}] WhatsApp reportó cierre desde el teléfono (401). Credenciales preservadas; reintento pausado hasta reconexión manual.`);
+            return;
+          }
+        } else {
+          delayMs = Math.min(30000, Math.round(1500 * Math.pow(1.45, Math.min(attempts - 1, 7))));
+          sessionData.status = 'reconnecting';
+        }
+
+        const timer = setTimeout(() => {
+          sessionReconnectTimers.delete(sessionId);
+          getOrInitBaileysSession(sessionId).catch(e => console.error('Error reiniciando sesión Baileys:', e.message));
+        }, delayMs);
+        sessionReconnectTimers.set(sessionId, timer);
+      }
+    });
 
   // Listen to Real Incoming Messages & Auto-Respond with AI
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -723,20 +914,30 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
     }
   });
 
-  if (phoneForPairingCode) {
-    setTimeout(async () => {
-      try {
-        const clean = phoneForPairingCode.replace(/\D/g, '');
-        const code = await sock.requestPairingCode(clean);
-        sessionData.pairingCode = code;
-        console.log(`[Baileys - ${sessionId}] 🔢 Código 8-dígitos generado para +${clean}: ${code}`);
-      } catch (e) {
-        console.error(`[Baileys - ${sessionId}] Error solicitando pairing code:`, e.message);
-      }
-    }, 1500);
-  }
+    if (phoneForPairingCode) {
+      setTimeout(async () => {
+        try {
+          const clean = phoneForPairingCode.replace(/\D/g, '');
+          const code = await sock.requestPairingCode(clean);
+          sessionData.pairingCode = code;
+          console.log(`[Baileys - ${sessionId}] 🔢 Código 8-dígitos generado para +${clean}: ${code}`);
+        } catch (e) {
+          console.error(`[Baileys - ${sessionId}] Error solicitando pairing code:`, e.message);
+        }
+      }, 1500);
+    }
 
-  return sessionData;
+    return sessionData;
+  })();
+
+  sessionInitLocks.set(sessionId, initPromise);
+  try {
+    return await initPromise;
+  } finally {
+    if (sessionInitLocks.get(sessionId) === initPromise) {
+      sessionInitLocks.delete(sessionId);
+    }
+  }
 }
 
 // AI Auto-Responder Engine (Supports Google Gemini & OpenAI)
@@ -2380,10 +2581,26 @@ const server = http.createServer(async (req, res) => {
 
   // ==================== BAILEYS REAL QR & SESSION ENDPOINTS ====================
 
-  // 1. Start Session
+  // 1. Start Session (refreshQr=1 ONLY resets an unlinked handshake; never disconnects a paired line)
   if (pathname === '/api/wa-session/start' && req.method === 'POST') {
     const sessionId = urlObj.searchParams.get('sessionId') || 'agency_hq';
-    getOrInitBaileysSession(sessionId)
+    const wantRefreshQr = urlObj.searchParams.get('refreshQr') === '1';
+    const existing = activeSessions[sessionId];
+    if (wantRefreshQr && existing && existing.connected) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        sessionId,
+        status: existing.status,
+        connected: true,
+        phone: existing.phone,
+        qr: null,
+        pairingCode: null
+      }));
+      return;
+    }
+    const safeForceNew = wantRefreshQr && !hasRegisteredCredsOnDisk(path.join(SESSIONS_DIR, sessionId));
+    getOrInitBaileysSession(sessionId, null, safeForceNew)
       .then(session => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
@@ -2537,24 +2754,52 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 4. Logout Session
+  // 4. Logout Session (ONLY when manually confirmed by the user)
   if (pathname === '/api/wa-session/logout' && req.method === 'POST') {
     const sessionId = urlObj.searchParams.get('sessionId') || 'agency_hq';
+    const isManual = urlObj.searchParams.get('manual') !== '0';
+    if (!isManual) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: 'La desvinculación automática está deshabilitada.' }));
+      return;
+    }
+
+    if (sessionReconnectTimers.has(sessionId)) {
+      clearTimeout(sessionReconnectTimers.get(sessionId));
+      sessionReconnectTimers.delete(sessionId);
+    }
+    if (sessionDbSyncTimers.has(sessionId)) {
+      clearTimeout(sessionDbSyncTimers.get(sessionId));
+      sessionDbSyncTimers.delete(sessionId);
+    }
+
     const session = activeSessions[sessionId];
+    if (session) {
+      session.manualLogout = true;
+      session.connected = false;
+      session.status = 'manual_logout';
+    }
 
     if (session && session.sock) {
       try {
-        session.sock.logout();
-      } catch (e) { }
+        await session.sock.logout();
+      } catch (e) {
+        try { session.sock.end(); } catch (e2) { }
+      }
     }
+
+    await markSessionManualLogoutInDB(sessionId);
     const sessionFolder = path.join(SESSIONS_DIR, sessionId);
     try {
       fs.rmSync(sessionFolder, { recursive: true, force: true });
     } catch (e) { }
     delete activeSessions[sessionId];
+    session401Retries.delete(sessionId);
+    sessionReconnectAttempts.delete(sessionId);
 
+    console.log(`[Baileys - ${sessionId}] Dispositivo WhatsApp desvinculado manualmente por el usuario.`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, message: 'Dispositivo WhatsApp desvinculado' }));
+    res.end(JSON.stringify({ success: true, message: 'Dispositivo WhatsApp desvinculado manualmente' }));
     return;
   }
 
@@ -4143,9 +4388,29 @@ Extrae los datos y devuelve ÚNICAMENTE un objeto JSON válido con las siguiente
   });
 });
 
-// Auto-restore and re-initialize ALL saved WhatsApp sessions (agencies & client companies) on start
+// Auto-restore and re-initialize ALL saved WhatsApp sessions (PostgreSQL backup + local disk) on start
 async function restoreAllBaileysSessions() {
+  try {
+    await ensureDatabaseSchema();
+  } catch (e) {
+    console.log('DB schema check on boot note:', e.message);
+  }
+
   const initialSessions = new Set(['agency_master_1', 'agency_hq']);
+
+  // 1. Query ALL permanently linked sessions from Neon PostgreSQL (survives container redeploys)
+  try {
+    const dbRes = await db.query(
+      `SELECT session_id FROM wa_sessions WHERE manual_logout = FALSE AND auth_files IS NOT NULL AND auth_files ? 'creds.json'`
+    );
+    for (const row of (dbRes?.rows || [])) {
+      if (row.session_id) initialSessions.add(row.session_id);
+    }
+  } catch (dbErr) {
+    console.warn('Aviso consultando wa_sessions en PostgreSQL:', dbErr.message);
+  }
+
+  // 2. Also include any valid local sessions on disk
   if (fs.existsSync(SESSIONS_DIR)) {
     try {
       const folders = fs.readdirSync(SESSIONS_DIR);
@@ -4179,9 +4444,6 @@ startAppointmentReminderCron((preferredId, fallbackAg) => getConnectedSock(prefe
 
 // Start Background Anti-Ghosting Follow-Up Cron (2h / 24h / 72h recovery)
 startFollowUpCron((preferredId, fallbackAg) => getConnectedSock(preferredId, fallbackAg));
-
-// Safely ensure DB schema and default agency on boot without dropping tables
-ensureDatabaseSchema().catch(e => console.log('DB schema check on boot note:', e.message));
 
 server.listen(PORT, () => {
   console.log(`NEXUS AI Agency Server running at http://localhost:${PORT}/`);

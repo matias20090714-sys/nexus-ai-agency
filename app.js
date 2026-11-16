@@ -2838,14 +2838,19 @@ async function request8DigitPairingCode() {
 
 function refreshWhatsAppQR() {
   const sessionId = `agency_${currentAgencyId}`;
-  showToast('Regenerando código QR oficial...', 'info');
-  fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' })
+  showToast('Actualizando código QR oficial...', 'info');
+  fetch(`/api/wa-session/start?sessionId=${encodeURIComponent(sessionId)}&refreshQr=1`, { method: 'POST' })
     .then(() => startRealQrListener(sessionId));
 }
 
 function applyGlobalWaConnectedState(data) {
   if (!data) return;
-  const connectedList = Array.isArray(data.connectedSessions) ? data.connectedSessions : [];
+  const rawSessions = data.connectedSessions;
+  const connectedList = Array.isArray(rawSessions)
+    ? rawSessions
+    : (rawSessions && typeof rawSessions === 'object'
+        ? Object.entries(rawSessions).map(([sessionId, info]) => ({ sessionId, ...(info || {}) }))
+        : []);
   const isAnyConnected = !!(data.connected || connectedList.length > 0);
   const resolvedPhone = data.phone || (connectedList[0] && connectedList[0].phone) || null;
 
@@ -2950,14 +2955,15 @@ async function pairWhatsAppQRInstant() {
 }
 
 async function unpairWhatsAppQR() {
+  if (typeof confirm === 'function' && !confirm('¿Confirmas desvincular manualmente este WhatsApp? Mientras no lo hagas, la línea permanecerá vinculada 24/7.')) {
+    return;
+  }
   const sessionId = `agency_${currentAgencyId}`;
   try {
-    await fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' });
+    await fetch(`/api/wa-session/logout?sessionId=${encodeURIComponent(sessionId)}&manual=1`, { method: 'POST' });
   } catch (e) {}
 
   window.liveWaConnectedPhone = null;
-  agencyClients.forEach(c => { c.waConnected = false; });
-  saveAgencyClients(agencyClients);
   renderClientsList();
 
   const unpaired = document.getElementById('qrUnpairedView');
@@ -2970,7 +2976,7 @@ async function unpairWhatsAppQR() {
   if (sidebarPhone) sidebarPhone.innerText = 'Línea: Desconectada';
 
   localStorage.removeItem(`nexus_qr_paired_${currentAgencyId}`);
-  showToast('Dispositivo WhatsApp desvinculado', 'info');
+  showToast('Dispositivo WhatsApp desvinculado manualmente', 'info');
   startRealQrListener(sessionId);
 }
 
@@ -3150,10 +3156,10 @@ async function refreshClientModalQr() {
   const sessionId = `client_${activeQrClientId}`;
   const container = document.getElementById('qrRealClientImageContainer');
   if (container) {
-    container.innerHTML = `<div style="color:#0f172a;font-size:13px;font-weight:600;text-align:center;"><i class="fa-solid fa-spinner fa-spin" style="font-size:28px;color:#10b981;margin-bottom:10px;display:block;"></i>Regenerando código QR...</div>`;
+    container.innerHTML = `<div style="color:#0f172a;font-size:13px;font-weight:600;text-align:center;"><i class="fa-solid fa-spinner fa-spin" style="font-size:28px;color:#10b981;margin-bottom:10px;display:block;"></i>Actualizando código QR...</div>`;
   }
   try {
-    await fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' });
+    await fetch(`/api/wa-session/start?sessionId=${encodeURIComponent(sessionId)}&refreshQr=1`, { method: 'POST' });
   } catch (e) {}
   openQrPairModalForClient(activeQrClientId);
 }
@@ -3161,18 +3167,20 @@ async function refreshClientModalQr() {
 async function disconnectClientWhatsAppSession() {
   if (!activeQrClientId) return;
   const client = agencyClients.find(c => c.id === activeQrClientId);
+  if (typeof confirm === 'function' && !confirm(`¿Confirmas desvincular manualmente el WhatsApp de ${client ? client.name : 'este cliente'}?`)) {
+    return;
+  }
   const sessionId = `client_${activeQrClientId}`;
   try {
-    await fetch(`/api/wa-session/logout?sessionId=${sessionId}`, { method: 'POST' });
-    await fetch(`/api/wa-session/logout?sessionId=agency_${currentAgencyId}`, { method: 'POST' });
+    await fetch(`/api/wa-session/logout?sessionId=${encodeURIComponent(sessionId)}&manual=1`, { method: 'POST' });
   } catch (e) {}
-  window.liveWaConnectedPhone = null;
   if (client) {
     client.waConnected = false;
     saveAgencyClients(agencyClients);
+    syncAgencyClientsWithServer(agencyClients);
     renderClientsList();
   }
-  showToast('Sesión desvinculada. Generando nuevo QR...', 'info');
+  showToast('Sesión desvinculada manualmente. Generando nuevo QR...', 'info');
   openQrPairModalForClient(activeQrClientId);
 }
 

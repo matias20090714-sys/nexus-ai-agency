@@ -422,6 +422,16 @@ CREATE TABLE IF NOT EXISTS followup_sequences (
 
 ALTER TABLE followup_sequences ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
 
+CREATE TABLE IF NOT EXISTS wa_sessions (
+    session_id VARCHAR(128) PRIMARY KEY,
+    auth_files JSONB DEFAULT '{}'::jsonb,
+    phone VARCHAR(64),
+    user_name VARCHAR(255),
+    status VARCHAR(32) DEFAULT 'active',
+    manual_logout BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 INSERT INTO agencies (id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id)
 VALUES (
     'agency_master_1',
