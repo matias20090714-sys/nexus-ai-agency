@@ -337,10 +337,15 @@ CREATE TABLE IF NOT EXISTS knowledge_docs (
     client_id VARCHAR(64),
     filename VARCHAR(255) NOT NULL,
     file_type VARCHAR(64),
+    file_size INT DEFAULT 0,
     extracted_text TEXT NOT NULL,
     char_count INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE knowledge_docs ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+ALTER TABLE knowledge_docs ADD COLUMN IF NOT EXISTS file_size INT DEFAULT 0;
+ALTER TABLE knowledge_docs ADD COLUMN IF NOT EXISTS char_count INT DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS appointments (
     id SERIAL PRIMARY KEY,
@@ -358,30 +363,52 @@ CREATE TABLE IF NOT EXISTS appointments (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS service_name VARCHAR(255) DEFAULT 'Consulta General';
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'confirmed';
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_24h_sent BOOLEAN DEFAULT FALSE;
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS reminder_2h_sent BOOLEAN DEFAULT FALSE;
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS google_event_id VARCHAR(255);
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE leads ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
+ALTER TABLE quotes ADD COLUMN IF NOT EXISTS sent_via_wa BOOLEAN DEFAULT FALSE;
+ALTER TABLE whatsapp_conversations ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+ALTER TABLE whatsapp_conversations ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
+
 CREATE TABLE IF NOT EXISTS broadcast_campaigns (
     id SERIAL PRIMARY KEY,
     agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    client_id VARCHAR(64),
     name VARCHAR(255) NOT NULL,
     message_template TEXT NOT NULL,
     total_recipients INT DEFAULT 0,
+    total_contacts INT DEFAULT 0,
     sent_count INT DEFAULT 0,
     failed_count INT DEFAULT 0,
     status VARCHAR(32) DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE broadcast_campaigns ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
+ALTER TABLE broadcast_campaigns ADD COLUMN IF NOT EXISTS total_contacts INT DEFAULT 0;
+
 CREATE TABLE IF NOT EXISTS broadcast_recipients (
     id SERIAL PRIMARY KEY,
     campaign_id INT REFERENCES broadcast_campaigns(id) ON DELETE CASCADE,
     phone VARCHAR(64) NOT NULL,
     contact_name VARCHAR(255),
+    name VARCHAR(255),
     status VARCHAR(32) DEFAULT 'pending',
     sent_at TIMESTAMP WITH TIME ZONE
 );
 
+ALTER TABLE broadcast_recipients ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+
 CREATE TABLE IF NOT EXISTS followup_sequences (
     id SERIAL PRIMARY KEY,
     agency_id VARCHAR(64) REFERENCES agencies(id) ON DELETE CASCADE,
+    client_id VARCHAR(64),
     contact_phone VARCHAR(64) NOT NULL,
     contact_name VARCHAR(255),
     interest_topic VARCHAR(255) DEFAULT 'Automatización IA',
@@ -392,6 +419,8 @@ CREATE TABLE IF NOT EXISTS followup_sequences (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(agency_id, contact_phone)
 );
+
+ALTER TABLE followup_sequences ADD COLUMN IF NOT EXISTS client_id VARCHAR(64);
 
 INSERT INTO agencies (id, name, slug, brand_color, billing_phone, bank_name, bank_holder, bank_cbu, bank_tax_id)
 VALUES (

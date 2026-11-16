@@ -3,6 +3,15 @@ const path = require('path');
 const crypto = require('crypto');
 const db = require('./db');
 
+function stripCustomerEmojis(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/[\p{Extended_Pictographic}\p{Emoji_Presentation}\uFE0F\u200D\u20E3]/gu, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/^ +/gm, '')
+    .trim();
+}
+
 // Spintax processor: replaces {option1|option2|option3} with random option
 function parseSpintax(text) {
   if (!text) return '';
@@ -14,25 +23,37 @@ function parseSpintax(text) {
 }
 
 // 1. RAG Knowledge Documents Loader with Multi-Tenant Client Support
-async function getAgencyKnowledgeContext(identifier) {
+async function getAgencyKnowledgeContext(identifier, parentAgencyId = '') {
   try {
     const id = identifier || 'agency_master_1';
+    const parentId = parentAgencyId || id;
 
-    // Only query actual uploaded knowledge documents
+    // Query client-specific docs first, then agency-level docs
     const res = await db.query(
-      `SELECT filename, extracted_text FROM knowledge_docs WHERE agency_id = $1 OR client_id = $1 ORDER BY id DESC LIMIT 5`,
-      [id]
+      `SELECT filename, extracted_text
+       FROM knowledge_docs
+       WHERE client_id = $1 OR agency_id = $1 OR ($2 <> '' AND agency_id = $2 AND (client_id IS NULL OR client_id = ''))
+       ORDER BY (CASE WHEN client_id = $1 THEN 0 ELSE 1 END), id DESC
+       LIMIT 6`,
+      [id, parentId]
     );
     if (!res || res.rows.length === 0) return '';
-    const docs = res.rows.map(r => `--- DOCUMENTO OFICIAL: ${r.filename} ---\n${r.extracted_text.slice(0, 3000)}`).join('\n\n');
-    return docs.trim();
+    const seen = new Set();
+    const docs = [];
+    for (const r of res.rows) {
+      const key = `${r.filename}_${(r.extracted_text || '').slice(0, 60)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      docs.push(`--- DOCUMENTO OFICIAL: ${r.filename} ---\n${String(r.extracted_text || '').slice(0, 3000)}`);
+    }
+    return docs.join('\n\n').trim();
   } catch (e) {
     return '';
   }
 }
 
 // 2. High-Intent Lead Detector & Owner Alert
-async function checkAndAlertOwner(agencyId, senderPhone, textBody, activeSock) {
+async function checkAndAlertOwner(agencyId, senderPhone, textBody, activeSock, clientId = null, companyName = '') {
   try {
     const text = (textBody || '').toLowerCase();
     const isHighIntent =
@@ -44,22 +65,41 @@ async function checkAndAlertOwner(agencyId, senderPhone, textBody, activeSock) {
       text.includes('humano') ||
       text.includes('asesor') ||
       text.includes('interesa el plan') ||
-      text.includes('link de pago');
+      text.includes('link de pago') ||
+      text.includes('agendar') ||
+      text.includes('reservar');
 
     if (!isHighIntent) return;
 
-    // 1. Insert/update lead in Neon DB
-    await db.query(
-      `INSERT INTO leads (agency_id, name, phone, status, value, source, notes)
-       VALUES ($1, $2, $3, 'calificado', 290.00, 'whatsapp', $4)
-       ON CONFLICT DO NOTHING`,
-      [agencyId, `Lead WhatsApp +${senderPhone}`, senderPhone, `Detectado por IA: "${textBody.slice(0, 150)}"`]
-    );
+    const agId = agencyId || 'agency_master_1';
+    const cleanPhone = String(senderPhone || '').replace(/\D/g, '') || String(senderPhone || '');
 
-    // 2. Check agency owner alert phone
+    // 1. Upsert lead in Neon DB without duplicates
+    try {
+      const existing = await db.query(
+        `SELECT id FROM leads WHERE agency_id = $1 AND phone = $2 LIMIT 1`,
+        [agId, cleanPhone]
+      );
+      if (existing?.rows?.length > 0) {
+        await db.query(
+          `UPDATE leads SET status = 'calificado', client_id = COALESCE($2, client_id), notes = $3 WHERE id = $1`,
+          [existing.rows[0].id, clientId || null, `Detectado por IA: "${String(textBody || '').slice(0, 150)}"`]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO leads (agency_id, client_id, name, phone, status, value, source, notes)
+           VALUES ($1, $2, $3, $4, 'calificado', 290.00, 'whatsapp', $5)`,
+          [agId, clientId || null, `Lead WhatsApp +${cleanPhone}`, cleanPhone, `Detectado por IA: "${String(textBody || '').slice(0, 150)}"`]
+        );
+      }
+    } catch (leadErr) {
+      console.warn('[Leads Upsert Note]:', leadErr.message);
+    }
+
+    // 2. Check agency owner alert phone (check target agency first, then master fallback)
     const agencyRes = await db.query(
-      `SELECT name, owner_alert_phone, owner_alerts_enabled FROM agencies WHERE id = $1`,
-      [agencyId]
+      `SELECT id, name, owner_alert_phone, owner_alerts_enabled FROM agencies WHERE id = $1 OR id = 'agency_master_1' ORDER BY (CASE WHEN id = $1 THEN 0 ELSE 1 END) LIMIT 1`,
+      [agId]
     );
     const agency = agencyRes?.rows?.[0];
     if (!agency || !agency.owner_alerts_enabled || !agency.owner_alert_phone) return;
@@ -67,17 +107,18 @@ async function checkAndAlertOwner(agencyId, senderPhone, textBody, activeSock) {
     const alertPhone = agency.owner_alert_phone.replace(/\D/g, '');
     if (!alertPhone || alertPhone.length < 8) return;
 
+    const labelEntity = companyName || agency.name || 'Agencia IA';
     const alertJid = `${alertPhone}@s.whatsapp.net`;
     const alertMessage =
-      `🚨 *¡ALERTA DE LEAD CALIFICADO!* (${agency.name})\n\n` +
-      `👤 *Prospecto:* +${senderPhone}\n` +
-      `💬 *Mensaje Recibido:* "${textBody}"\n\n` +
-      `⚡ *Acción recomendada:* Contactar de inmediato para cerrar la venta.\n` +
-      `🕒 *Hora:* ${new Date().toLocaleTimeString()}`;
+      `*ALERTA DE LEAD CALIFICADO* (${labelEntity})\n\n` +
+      `Prospecto: +${cleanPhone}\n` +
+      `Mensaje Recibido: "${textBody}"\n\n` +
+      `Acción recomendada: Revisar seguimiento o confirmar cierre en la Bandeja de Entrada.\n` +
+      `Hora: ${new Date().toLocaleTimeString()}`;
 
     if (activeSock) {
       await activeSock.sendMessage(alertJid, { text: alertMessage });
-      console.log(`[Alertas] 🔔 Alerta enviada al dueño (+${alertPhone}) por lead +${senderPhone}`);
+      console.log(`[Alertas] Alerta enviada al dueño (+${alertPhone}) por lead +${cleanPhone}`);
     }
   } catch (err) {
     console.error('Error al verificar y alertar al dueño:', err.message);
@@ -94,22 +135,26 @@ function startAppointmentReminderCron(getActiveSock) {
       const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000);
 
       const res24h = await db.query(
-        `SELECT a.*, ag.name as agency_name 
+        `SELECT a.*, COALESCE(cl.name, ag.name, 'nuestro equipo') as display_entity
          FROM appointments a
-         JOIN agencies ag ON a.agency_id = ag.id
-         WHERE a.status = 'confirmed' 
-           AND a.reminder_24h_sent = FALSE 
+         LEFT JOIN agencies ag ON a.agency_id = ag.id
+         LEFT JOIN clients cl ON a.client_id = cl.id
+         WHERE a.status = 'confirmed'
+           AND a.reminder_24h_sent = FALSE
            AND a.appointment_date >= $1 AND a.appointment_date <= $2`,
         [in23h.toISOString(), in25h.toISOString()]
       );
 
       for (const appt of (res24h?.rows || [])) {
-        const sock = getActiveSock(appt.agency_id);
+        const sock = getActiveSock(appt.client_id || appt.agency_id, appt.agency_id);
         if (sock) {
-          const cleanPhone = appt.contact_phone.replace(/\D/g, '');
+          const cleanPhone = String(appt.contact_phone || '').replace(/\D/g, '');
+          if (cleanPhone.length < 7) continue;
           const jid = `${cleanPhone}@s.whatsapp.net`;
           const timeStr = new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const msg = `Hola *${appt.contact_name}*, te recordamos tu cita de *${appt.service_name || 'Atención'}* mañana a las *${timeStr} hs* con ${appt.agency_name}.\n\n¿Nos confirmas tu asistencia? (Responde *SI* para confirmar o avísanos si necesitas reprogramar). Muchas gracias.`;
+          const msg = stripCustomerEmojis(
+            `Hola *${appt.contact_name}*, te recordamos tu cita de *${appt.service_name || 'Atención'}* mañana a las *${timeStr} hs* en *${appt.display_entity}*.\n\n¿Nos confirmas tu asistencia? Responde *SI* para confirmar o avísanos si necesitas reprogramar. Muchas gracias.`
+          );
 
           await sock.sendMessage(jid, { text: msg });
           await db.query(`UPDATE appointments SET reminder_24h_sent = TRUE WHERE id = $1`, [appt.id]);
@@ -122,26 +167,30 @@ function startAppointmentReminderCron(getActiveSock) {
       const in2_5h = new Date(now.getTime() + 2.5 * 60 * 60 * 1000);
 
       const res2h = await db.query(
-        `SELECT a.*, ag.name as agency_name 
+        `SELECT a.*, COALESCE(cl.name, ag.name, 'nuestro equipo') as display_entity
          FROM appointments a
-         JOIN agencies ag ON a.agency_id = ag.id
-         WHERE a.status = 'confirmed' 
-           AND a.reminder_2h_sent = FALSE 
+         LEFT JOIN agencies ag ON a.agency_id = ag.id
+         LEFT JOIN clients cl ON a.client_id = cl.id
+         WHERE a.status = 'confirmed'
+           AND a.reminder_2h_sent = FALSE
            AND a.appointment_date >= $1 AND a.appointment_date <= $2`,
         [in1h.toISOString(), in2_5h.toISOString()]
       );
 
       for (const appt of (res2h?.rows || [])) {
-        const sock = getActiveSock(appt.agency_id);
+        const sock = getActiveSock(appt.client_id || appt.agency_id, appt.agency_id);
         if (sock) {
-          const cleanPhone = appt.contact_phone.replace(/\D/g, '');
+          const cleanPhone = String(appt.contact_phone || '').replace(/\D/g, '');
+          if (cleanPhone.length < 7) continue;
           const jid = `${cleanPhone}@s.whatsapp.net`;
           const timeStr = new Date(appt.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const msg = `Hola *${appt.contact_name}*, tu cita de *${appt.service_name || 'Atención'}* es en menos de 2 horas (*${timeStr} hs*). Te esperamos puntual en ${appt.agency_name}. Hasta pronto.`;
+          const msg = stripCustomerEmojis(
+            `Hola *${appt.contact_name}*, tu cita de *${appt.service_name || 'Atención'}* es en menos de 2 horas (*${timeStr} hs*). Te esperamos puntual en *${appt.display_entity}*.`
+          );
 
           await sock.sendMessage(jid, { text: msg });
           await db.query(`UPDATE appointments SET reminder_2h_sent = TRUE WHERE id = $1`, [appt.id]);
-          console.log(`[Recordatorios] 📲 Recordatorio 2h enviado a ${appt.contact_name} (+${cleanPhone})`);
+          console.log(`[Recordatorios] Recordatorio 2h enviado a ${appt.contact_name} (+${cleanPhone})`);
         }
       }
     } catch (e) {
@@ -310,7 +359,7 @@ function getDefaultFollowUpTemplates(contactName = 'Cliente', topic = 'Automatiz
   };
 }
 
-async function registerOrUpdateFollowUp(agencyId, contactPhone, contactName, interestTopic) {
+async function registerOrUpdateFollowUp(agencyId, contactPhone, contactName, interestTopic, clientId = null) {
   const cleanAgency = agencyId || 'agency_master_1';
   const cleanPhone = String(contactPhone || '').replace(/\D/g, '');
   if (!cleanPhone || cleanPhone.length < 6) return null;
@@ -319,15 +368,16 @@ async function registerOrUpdateFollowUp(agencyId, contactPhone, contactName, int
 
   try {
     const res = await db.query(
-      `INSERT INTO followup_sequences (agency_id, contact_phone, contact_name, interest_topic, last_contact_at, stage, status)
-       VALUES ($1, $2, $3, $4, NOW(), 0, 'active')
+      `INSERT INTO followup_sequences (agency_id, client_id, contact_phone, contact_name, interest_topic, last_contact_at, stage, status)
+       VALUES ($1, $2, $3, $4, $5, NOW(), 0, 'active')
        ON CONFLICT (agency_id, contact_phone) DO UPDATE SET
+         client_id = COALESCE(EXCLUDED.client_id, followup_sequences.client_id),
          contact_name = COALESCE(EXCLUDED.contact_name, followup_sequences.contact_name),
          interest_topic = COALESCE(EXCLUDED.interest_topic, followup_sequences.interest_topic),
          last_contact_at = NOW(),
          status = CASE WHEN followup_sequences.status = 'completed' THEN 'active' ELSE followup_sequences.status END
        RETURNING *`,
-      [cleanAgency, cleanPhone, name, topic]
+      [cleanAgency, clientId || null, cleanPhone, name, topic]
     );
     if (res && res.rows && res.rows[0]) return res.rows[0];
   } catch (e) {
@@ -338,6 +388,7 @@ async function registerOrUpdateFollowUp(agencyId, contactPhone, contactName, int
   if (existing) {
     existing.contact_name = name || existing.contact_name;
     existing.interest_topic = topic || existing.interest_topic;
+    existing.client_id = clientId || existing.client_id || null;
     existing.last_contact_at = new Date().toISOString();
     existing.status = 'active';
     return existing;
@@ -345,6 +396,7 @@ async function registerOrUpdateFollowUp(agencyId, contactPhone, contactName, int
     const item = {
       id: Date.now(),
       agency_id: cleanAgency,
+      client_id: clientId || null,
       contact_phone: cleanPhone,
       contact_name: name,
       interest_topic: topic,
@@ -359,16 +411,21 @@ async function registerOrUpdateFollowUp(agencyId, contactPhone, contactName, int
   }
 }
 
-async function getFollowUpsList(agencyId) {
+async function getFollowUpsList(agencyId, clientId = null) {
   const cleanAgency = agencyId || 'agency_master_1';
   try {
-    const res = await db.query(
-      `SELECT * FROM followup_sequences WHERE agency_id = $1 ORDER BY last_contact_at DESC LIMIT 100`,
-      [cleanAgency]
-    );
+    const res = clientId
+      ? await db.query(
+          `SELECT * FROM followup_sequences WHERE agency_id = $1 AND (client_id = $2 OR client_id IS NULL) ORDER BY last_contact_at DESC LIMIT 100`,
+          [cleanAgency, clientId]
+        )
+      : await db.query(
+          `SELECT * FROM followup_sequences WHERE agency_id = $1 ORDER BY last_contact_at DESC LIMIT 100`,
+          [cleanAgency]
+        );
     if (res && res.rows) return res.rows;
   } catch (e) { }
-  return memoryFollowUps.filter(f => f.agency_id === cleanAgency);
+  return memoryFollowUps.filter(f => f.agency_id === cleanAgency && (!clientId || !f.client_id || f.client_id === clientId));
 }
 
 async function triggerFollowUpNow(agencyId, followUpId, customStage, getActiveSock) {
@@ -377,7 +434,11 @@ async function triggerFollowUpNow(agencyId, followUpId, customStage, getActiveSo
 
   try {
     const res = await db.query(
-      `SELECT f.*, ag.name as agency_name FROM followup_sequences f LEFT JOIN agencies ag ON f.agency_id = ag.id WHERE f.id = $1 AND f.agency_id = $2`,
+      `SELECT f.*, COALESCE(cl.name, ag.name, 'Nuestro Equipo') as entity_name
+       FROM followup_sequences f
+       LEFT JOIN agencies ag ON f.agency_id = ag.id
+       LEFT JOIN clients cl ON f.client_id = cl.id
+       WHERE f.id = $1 AND f.agency_id = $2`,
       [followUpId, cleanAgency]
     );
     record = res?.rows?.[0];
@@ -391,14 +452,16 @@ async function triggerFollowUpNow(agencyId, followUpId, customStage, getActiveSo
   }
 
   const nextStage = customStage ? Number(customStage) : Math.min((Number(record.stage) || 0) + 1, 3);
-  const templates = getDefaultFollowUpTemplates(record.contact_name, record.interest_topic, record.agency_name || 'NEXUS AI Agency');
-  const messageText = nextStage === 1 ? templates.stage1_2h : (nextStage === 2 ? templates.stage2_24h : templates.stage3_72h);
+  const templates = getDefaultFollowUpTemplates(record.contact_name, record.interest_topic, record.entity_name || 'Nuestro Equipo');
+  const messageText = stripCustomerEmojis(
+    nextStage === 1 ? templates.stage1_2h : (nextStage === 2 ? templates.stage2_24h : templates.stage3_72h)
+  );
 
   const cleanPhone = String(record.contact_phone || '').replace(/\D/g, '');
   let sentViaWhatsApp = false;
 
   if (typeof getActiveSock === 'function') {
-    const sock = getActiveSock(cleanAgency);
+    const sock = getActiveSock(record.client_id || cleanAgency, cleanAgency);
     if (sock && cleanPhone.length >= 8) {
       try {
         await sock.sendMessage(`${cleanPhone}@s.whatsapp.net`, { text: messageText });
@@ -446,10 +509,7 @@ function startFollowUpCron(getActiveSock) {
   setInterval(async () => {
     try {
       const res = await db.query(
-        `SELECT f.*, ag.name as agency_name
-         FROM followup_sequences f
-         LEFT JOIN agencies ag ON f.agency_id = ag.id
-         WHERE f.status = 'active' AND f.stage < 3`
+        `SELECT f.* FROM followup_sequences f WHERE f.status = 'active' AND f.stage < 3`
       );
       const list = res?.rows || [];
       const now = Date.now();
@@ -465,7 +525,7 @@ function startFollowUpCron(getActiveSock) {
 
         if (shouldSendStage > 0) {
           await triggerFollowUpNow(item.agency_id, item.id, shouldSendStage, getActiveSock);
-          console.log(`[Anti-Ghosting] 🔄 Seguimiento Etapa ${shouldSendStage} enviado automáticamente a ${item.contact_name} (+${item.contact_phone})`);
+          console.log(`[Anti-Ghosting] Seguimiento Etapa ${shouldSendStage} enviado automáticamente a ${item.contact_name} (+${item.contact_phone})`);
         }
       }
     } catch (e) {
@@ -475,6 +535,7 @@ function startFollowUpCron(getActiveSock) {
 }
 
 module.exports = {
+  stripCustomerEmojis,
   parseSpintax,
   getAgencyKnowledgeContext,
   checkAndAlertOwner,

@@ -237,8 +237,21 @@ function saveAgencyProfile(profile) {
 // State variables for currently active agency context
 let agencyClients = getAgencyClients();
 let realLeads = getAgencyLeads();
-let activeClientId = 'agency_hq';
+let activeClientId = localStorage.getItem(`nexus_active_client_id_${currentAgencyId}`) || 'agency_hq';
+if (activeClientId !== 'agency_hq' && !agencyClients.some(c => c.id === activeClientId)) {
+  activeClientId = agencyClients.length > 0 ? agencyClients[0].id : 'agency_hq';
+}
 let activeInboxLeadId = null;
+
+function getScopedTenantParams() {
+  const agId = currentAgencyId || (window.currentUser && window.currentUser.agency_id) || 'agency_master_1';
+  const clId = (activeClientId && activeClientId !== 'agency_hq') ? activeClientId : '';
+  return {
+    agencyId: agId,
+    clientId: clId,
+    queryString: `agencyId=${encodeURIComponent(agId)}${clId ? `&clientId=${encodeURIComponent(clId)}` : ''}`
+  };
+}
 
 // Default Configuration (Loaded from localStorage or User Input)
 const DEFAULT_GEMINI_KEY = localStorage.getItem('nexus_ai_key') || '';
@@ -726,16 +739,16 @@ function renderAgencyDashboard() {
       <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: rgba(10, 13, 28, 0.6); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 10px;">
         <div style="display: flex; align-items: center; gap: 14px;">
           <div style="width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-size: 18px; color: white;">
-            ${c.name[0]}
+            ${escapeHtml((c.name || 'E')[0])}
           </div>
           <div>
-            <strong style="font-size: 14.5px; color: white;">${c.name}</strong>
-            <div style="font-size: 12px; color: var(--text-muted);">${c.industry} • Tel: ${c.phone || 'Sin asignar'}</div>
+            <strong style="font-size: 14.5px; color: white;">${escapeHtml(c.name)}</strong>
+            <div style="font-size: 12px; color: var(--text-muted);">${escapeHtml(c.industry)} • Tel: ${escapeHtml(c.phone || 'Sin asignar')}</div>
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 14px;">
-          <span style="font-size: 13px; font-weight: 800; color: #34d399;">$${c.monthlyFee}/mes</span>
-          <button class="btn btn-secondary btn-sm" onclick="selectAndManageClient('${c.id}')">Administrar Agente</button>
+          <span style="font-size: 13px; font-weight: 800; color: #34d399;">$${escapeHtml(c.monthlyFee)}/mes</span>
+          <button class="btn btn-secondary btn-sm" onclick="selectAndManageClient('${escapeHtml(c.id)}')">Administrar Agente</button>
         </div>
       </div>
     `).join('');
@@ -748,7 +761,7 @@ function renderClientSelector() {
   if (!select) return;
 
   select.innerHTML = `<option value="agency_hq">🏢 Mi Agencia (Vista Global HQ)</option>` + 
-    agencyClients.map(c => `<option value="${c.id}" ${c.id === activeClientId ? 'selected' : ''}>🏢 ${c.name}</option>`).join('');
+    agencyClients.map(c => `<option value="${escapeHtml(c.id)}" ${c.id === activeClientId ? 'selected' : ''}>🏢 ${escapeHtml(c.name)}</option>`).join('');
 }
 
 function renderClientsList() {
@@ -770,9 +783,11 @@ function renderClientsList() {
   container.innerHTML = `
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px;">
       ${agencyClients.map(c => {
-        const isConnected = !!(c.waConnected || (window.liveWaConnectedPhone && (!c.phone || c.phone.includes(window.liveWaConnectedPhone) || agencyClients.length === 1)));
-        const displayPhone = (isConnected && window.liveWaConnectedPhone && (!c.phone || c.phone === '+1 555-658-2385'))
-          ? `+${window.liveWaConnectedPhone}`
+        const cleanClientPhone = String(c.phone || '').replace(/\D/g, '');
+        const cleanLivePhone = String(window.liveWaConnectedPhone || '').replace(/\D/g, '');
+        const isConnected = !!(c.waConnected || (cleanLivePhone && ((cleanClientPhone && cleanClientPhone === cleanLivePhone) || (agencyClients.length === 1 && (!cleanClientPhone || cleanClientPhone === '5491100000000')))));
+        const displayPhone = (isConnected && cleanLivePhone && (!cleanClientPhone || cleanClientPhone === '15556582385' || cleanClientPhone === '5491100000000'))
+          ? `+${cleanLivePhone}`
           : (c.phone || 'Línea no vinculada');
         return `
         <div class="agent-card" style="${isConnected ? 'border-color: rgba(16,185,129,0.45);' : ''}">
@@ -991,9 +1006,11 @@ function loadActiveAgentForClient() {
     renderAgentCatalogTable();
   } else {
     // Global Agency HQ Defaults
-    document.getElementById('agentEditorName').value = 'Asistente Global de Agencia';
-    document.getElementById('agentEditorPrompt').value = 'Eres el asistente de inteligencia artificial de la agencia NEXUS AI. Tu misión es brindar atención profesional y calificar clientes potenciales.';
-    document.getElementById('agentEditorKnowledge').value = 'Servicios de Automatización con IA:\n- Plan Starter: $290 USD/mes\n- Plan Pro: $690 USD/mes\n- Implementación técnica y soporte 24/7.';
+    const prof = getAgencyProfile();
+    const agName = prof?.name || 'NEXUS AI Agency';
+    document.getElementById('agentEditorName').value = `Consultor Comercial - ${agName}`;
+    document.getElementById('agentEditorPrompt').value = `Eres el Consultor Comercial Senior de ${agName}. Tu misión es comprender el negocio del prospecto, explicar el impacto en ventas 24/7 y agendar una breve demostración estratégica.`;
+    document.getElementById('agentEditorKnowledge').value = 'Servicios de Automatización con IA:\n- Plan Starter: $290 USD/mes\n- Plan Growth Pro Multi-Flujo: $690 USD/mes\n- Implementación técnica y soporte 24/7.';
     if (document.getElementById('agentCalendarLink')) document.getElementById('agentCalendarLink').value = localStorage.getItem('nexus_global_cal_link') || '';
     if (document.getElementById('agentGoogleCalendarEmail')) document.getElementById('agentGoogleCalendarEmail').value = localStorage.getItem('nexus_global_cal_email') || '';
     renderAgentCatalogTable();
@@ -1015,12 +1032,12 @@ function renderAgentCatalogTable() {
 
   tbody.innerHTML = catalog.map((item, idx) => `
     <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-      <td style="padding: 12px 16px; font-weight: 700; color: white;">${item.name}</td>
-      <td style="padding: 12px 16px; color: #cbd5e1; max-width: 320px;">${item.description || '--'}</td>
-      <td style="padding: 12px 16px;"><span class="brand-badge" style="background: rgba(6,182,212,0.15); color: #22d3ee;">${item.duration || 'Inmediato'}</span></td>
+      <td style="padding: 12px 16px; font-weight: 700; color: white;">${escapeHtml(item.name)}</td>
+      <td style="padding: 12px 16px; color: #cbd5e1; max-width: 320px;">${escapeHtml(item.description || '--')}</td>
+      <td style="padding: 12px 16px;"><span class="brand-badge" style="background: rgba(6,182,212,0.15); color: #22d3ee;">${escapeHtml(item.duration || 'Inmediato')}</span></td>
       <td style="padding: 12px 16px; font-weight: 800; color: #34d399; font-size: 14px;">$${Number(item.price).toLocaleString()} USD</td>
       <td style="padding: 12px 16px; text-align: right;">
-        <button class="btn btn-secondary btn-sm" onclick="deleteCatalogItem('${item.id || idx}')" style="padding: 4px 8px; font-size: 11px;">
+        <button class="btn btn-secondary btn-sm" onclick="deleteCatalogItem('${escapeHtml(item.id || idx)}')" style="padding: 4px 8px; font-size: 11px;">
           <i class="fa-solid fa-trash" style="color: #f43f5e;"></i>
         </button>
       </td>
@@ -1216,7 +1233,7 @@ function renderQuotesModule() {
   if (compSelect) {
     compSelect.innerHTML = `
       <option value="agency_hq">NEXUS AI Agency HQ</option>
-      ${agencyClients.map(c => `<option value="${c.id}">${c.name} (${c.industry})</option>`).join('')}
+      ${agencyClients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)} (${escapeHtml(c.industry)})</option>`).join('')}
     `;
     compSelect.value = activeClientId !== 'agency_hq' ? activeClientId : 'agency_hq';
   }
@@ -1228,14 +1245,15 @@ function renderQuotesModule() {
   const quotes = getStoredQuotes();
   const nextNum = (quotes.length + 1).toString().padStart(3, '0');
   const quoteNumElem = document.getElementById('quoteNumber');
-  if (quoteNumElem) quoteNumElem.value = `COT-2026-${nextNum}`;
+  if (quoteNumElem) quoteNumElem.value = `COT-${new Date().getFullYear()}-${nextNum}`;
 
   // Render Items & Preview
   renderQuoteItemsBuilder();
   updateQuotePreview();
 
-  // Render Table & Top Stats
+  // Render Table & Top Stats and hydrate latest from Neon DB
   renderQuotesHistoryTable();
+  loadQuotesFromServer();
 }
 
 function populateQuickCatalogDropdown() {
@@ -1396,15 +1414,47 @@ function printQuoteOfficialPDF() {
   window.print();
 }
 
-function saveAndSendCurrentQuote() {
+async function loadQuotesFromServer() {
+  try {
+    const scope = getScopedTenantParams();
+    const res = await fetch(`/api/quotes/list?${scope.queryString}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.success && Array.isArray(data.quotes)) {
+      const serverMapped = data.quotes.map(r => ({
+        id: String(r.id),
+        dbId: r.id,
+        folio: r.folio,
+        companyId: r.client_id || 'agency_hq',
+        companyName: r.company_name || 'NEXUS AI Agency',
+        clientName: r.client_name || 'Cliente',
+        clientPhone: r.client_phone || '',
+        clientEmail: r.client_email || '',
+        validity: r.validity || '15 Días',
+        items: Array.isArray(r.items) ? r.items : (typeof r.items === 'string' ? JSON.parse(r.items || '[]') : []),
+        subtotal: parseFloat(r.subtotal) || 0,
+        total: parseFloat(r.total) || 0,
+        status: r.status || 'Enviada',
+        sentViaWa: r.sent_via_wa !== false,
+        date: r.created_at ? new Date(r.created_at).toLocaleDateString() : new Date().toLocaleDateString()
+      }));
+      const localOnly = getStoredQuotes().filter(lq => !serverMapped.some(sq => sq.folio === lq.folio));
+      const merged = [...serverMapped, ...localOnly];
+      saveQuotes(merged);
+      renderQuotesHistoryTable();
+    }
+  } catch (e) {}
+}
+
+async function saveAndSendCurrentQuote() {
   const compId = document.getElementById('quoteCompanySelector')?.value || activeClientId;
   const client = agencyClients.find(c => c.id === compId);
   const profile = getAgencyProfile();
-  const compName = client ? client.name : profile.name;
+  const compName = client ? client.name : (profile?.name || 'NEXUS AI Agency');
 
-  const folio = document.getElementById('quoteNumber')?.value || `COT-2026-${Date.now().toString().slice(-4)}`;
+  const folio = document.getElementById('quoteNumber')?.value || `COT-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
   const clientName = document.getElementById('quoteClientName')?.value.trim() || 'Cliente';
-  const clientPhone = document.getElementById('quoteClientPhone')?.value.trim();
+  const clientPhone = document.getElementById('quoteClientPhone')?.value.trim() || '';
   const clientEmail = document.getElementById('quoteClientEmail')?.value.trim() || '';
   const validity = document.getElementById('quoteValidity')?.value || '15 Días';
 
@@ -1424,11 +1474,32 @@ function saveAndSendCurrentQuote() {
     validity: validity,
     items: JSON.parse(JSON.stringify(currentQuoteItems)),
     subtotal: subtotal,
+    discountPct: discountPct,
+    taxPct: taxPct,
     total: total,
     status: 'Enviada',
     sentViaWa: true,
     date: new Date().toLocaleDateString()
   };
+
+  // Persist to Neon DB first
+  try {
+    const scope = getScopedTenantParams();
+    const dbRes = await fetch('/api/quotes/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newQuote,
+        agencyId: scope.agencyId,
+        clientId: compId !== 'agency_hq' ? compId : ''
+      })
+    });
+    const dbData = await dbRes.json();
+    if (dbData && dbData.success && dbData.quote && dbData.quote.id) {
+      newQuote.id = String(dbData.quote.id);
+      newQuote.dbId = dbData.quote.id;
+    }
+  } catch (e) {}
 
   const quotes = getStoredQuotes();
   quotes.unshift(newQuote);
@@ -1436,26 +1507,47 @@ function saveAndSendCurrentQuote() {
 
   // Sync to CRM Pipeline
   syncQuoteToCrmPipeline(newQuote);
-
   renderQuotesHistoryTable();
 
-  // Send WhatsApp
+  // Send clean, emoji-free WhatsApp quote (direct Baileys if connected, else wa.me)
   if (clientPhone) {
     const itemsText = currentQuoteItems.map(it => `• ${it.name} (x${it.qty}) -> $${(it.qty * it.price).toFixed(2)} USD`).join('\n');
-    const waMsg = encodeURIComponent(
-      `🧾 *COTIZACIÓN COMERCIAL OFICIAL - ${compName}*\n` +
+    const cleanTextMsg =
+      `*COTIZACIÓN COMERCIAL OFICIAL - ${compName}*\n` +
       `Folio: *#${folio}* | Fecha: ${newQuote.date}\n\n` +
       `Estimado/a *${clientName}*,\n` +
-      `Adjuntamos la propuesta de servicios solicitada:\n\n` +
+      `Adjuntamos el detalle de la propuesta solicitada:\n\n` +
       `${itemsText}\n\n` +
-      `💰 *TOTAL A PAGAR:* $${total.toFixed(2)} USD\n` +
-      `⏳ *Validez de la oferta:* ${validity}\n\n` +
-      `💳 *Para confirmar y activar tu servicio hoy mismo, responde a este mensaje o abona mediante nuestro link oficial.*`
-    );
-    window.open(`https://wa.me/${clientPhone.replace(/\D/g, '')}?text=${waMsg}`, '_blank');
-  }
+      `*TOTAL:* $${total.toFixed(2)} USD\n` +
+      `*Validez de la oferta:* ${validity}\n\n` +
+      `Para confirmar o coordinar tu turno/servicio, responde a este mismo mensaje.`;
 
-  showToast(`¡Cotización #${folio} guardada y enviada por WhatsApp con éxito!`, 'success');
+    let sentDirectly = false;
+    try {
+      const sendRes = await fetch('/api/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: clientPhone,
+          message: cleanTextMsg,
+          sessionId: compId && compId !== 'agency_hq' ? `client_${compId}` : `agency_${currentAgencyId}`,
+          agencyId: currentAgencyId,
+          clientId: compId !== 'agency_hq' ? compId : ''
+        })
+      });
+      const sendData = await sendRes.json();
+      if (sendData && sendData.success && sendData.engine === 'baileys_socket') {
+        sentDirectly = true;
+      }
+    } catch (e) {}
+
+    if (!sentDirectly) {
+      window.open(`https://wa.me/${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(cleanTextMsg)}`, '_blank');
+    }
+    showToast(sentDirectly ? `Cotización #${folio} guardada y enviada directo por WhatsApp conectado` : `Cotización #${folio} guardada en Neon DB y lista para enviar por WhatsApp`, 'success');
+  } else {
+    showToast(`Cotización #${folio} guardada correctamente en Neon DB`, 'success');
+  }
 }
 
 function sendQuoteWhatsAppDirect() {
@@ -1478,7 +1570,7 @@ function syncQuoteToCrmPipeline(quote) {
     leads.unshift({
       id: 'lead_' + Date.now(),
       name: quote.clientName,
-      phone: quote.clientPhone || '+1 555-900-1122',
+      phone: quote.clientPhone || '--',
       stage: 'Cotización Enviada',
       estimatedValue: `$${quote.total.toFixed(2)} USD`,
       lastMessage: `Cotización #${quote.folio} generada`,
@@ -1499,7 +1591,7 @@ function renderQuotesHistoryTable() {
   if (countElem) countElem.innerText = `${quotes.length} cotizaciones registradas`;
 
   // Update Top Stats
-  const totalAmount = quotes.reduce((acc, q) => acc + (q.total || 0), 0);
+  const totalAmount = quotes.reduce((acc, q) => acc + (parseFloat(q.total) || 0), 0);
   const acceptedCount = quotes.filter(q => q.status === 'Aceptada' || q.status === 'Pagada').length;
   const sentWaCount = quotes.filter(q => q.sentViaWa).length;
 
@@ -1517,26 +1609,27 @@ function renderQuotesHistoryTable() {
 
   tbody.innerHTML = quotes.map(q => {
     const statusColor = q.status === 'Pagada' ? '#34d399' : q.status === 'Aceptada' ? '#22d3ee' : q.status === 'Enviada' ? '#fbbf24' : '#94a3b8';
+    const qId = escapeHtml(String(q.id));
     return `
       <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-        <td style="padding: 12px 14px; font-weight: 800; color: #818cf8;">#${q.folio}</td>
-        <td style="padding: 12px 14px; font-weight: 600; color: white;">${q.clientName}<br><span style="font-size: 11px; color: var(--text-dim);">${q.clientPhone || '--'}</span></td>
-        <td style="padding: 12px 14px; color: #cbd5e1;">${q.companyName}</td>
-        <td style="padding: 12px 14px; font-weight: 800; color: #34d399; font-size: 14px;">$${Number(q.total).toFixed(2)} USD</td>
-        <td style="padding: 12px 14px; color: var(--text-muted); font-size: 12px;">${q.date}</td>
+        <td style="padding: 12px 14px; font-weight: 800; color: #818cf8;">#${escapeHtml(q.folio)}</td>
+        <td style="padding: 12px 14px; font-weight: 600; color: white;">${escapeHtml(q.clientName)}<br><span style="font-size: 11px; color: var(--text-dim);">${escapeHtml(q.clientPhone || '--')}</span></td>
+        <td style="padding: 12px 14px; color: #cbd5e1;">${escapeHtml(q.companyName)}</td>
+        <td style="padding: 12px 14px; font-weight: 800; color: #34d399; font-size: 14px;">$${Number(q.total || 0).toFixed(2)} USD</td>
+        <td style="padding: 12px 14px; color: var(--text-muted); font-size: 12px;">${escapeHtml(q.date)}</td>
         <td style="padding: 12px 14px;">
-          <select onchange="changeQuoteStatus('${q.id}', this.value)" style="background: rgba(15,23,42,0.8); color: ${statusColor}; border: 1px solid ${statusColor}; border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
+          <select onchange="changeQuoteStatus('${qId}', this.value)" style="background: rgba(15,23,42,0.8); color: ${statusColor}; border: 1px solid ${statusColor}; border-radius: 6px; padding: 3px 8px; font-size: 12px; font-weight: 700; cursor: pointer;">
             <option value="Borrador" ${q.status === 'Borrador' ? 'selected' : ''}>Borrador</option>
-            <option value="Enviada" ${q.status === 'Enviada' ? 'selected' : ''}>Enviada 📲</option>
-            <option value="Aceptada" ${q.status === 'Aceptada' ? 'selected' : ''}>Aceptada ✅</option>
-            <option value="Pagada" ${q.status === 'Pagada' ? 'selected' : ''}>Pagada 💰</option>
+            <option value="Enviada" ${q.status === 'Enviada' ? 'selected' : ''}>Enviada</option>
+            <option value="Aceptada" ${q.status === 'Aceptada' ? 'selected' : ''}>Aceptada</option>
+            <option value="Pagada" ${q.status === 'Pagada' ? 'selected' : ''}>Pagada</option>
           </select>
         </td>
         <td style="padding: 12px 14px; text-align: right;">
-          <button class="btn btn-secondary btn-sm" onclick="reSendQuoteWhatsApp('${q.id}')" title="Reenviar WhatsApp" style="padding: 4px 8px; font-size: 11px;">
+          <button class="btn btn-secondary btn-sm" onclick="reSendQuoteWhatsApp('${qId}')" title="Reenviar WhatsApp" style="padding: 4px 8px; font-size: 11px;">
             <i class="fa-brands fa-whatsapp" style="color: #25d366;"></i>
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="deleteQuote('${q.id}')" title="Eliminar cotización" style="padding: 4px 8px; font-size: 11px;">
+          <button class="btn btn-secondary btn-sm" onclick="deleteQuote('${qId}')" title="Eliminar cotización" style="padding: 4px 8px; font-size: 11px;">
             <i class="fa-solid fa-trash" style="color: #f43f5e;"></i>
           </button>
         </td>
@@ -1545,44 +1638,78 @@ function renderQuotesHistoryTable() {
   }).join('');
 }
 
-function changeQuoteStatus(quoteId, newStatus) {
+async function changeQuoteStatus(quoteId, newStatus) {
   const quotes = getStoredQuotes();
-  const q = quotes.find(item => item.id === quoteId);
+  const q = quotes.find(item => String(item.id) === String(quoteId));
   if (q) {
     q.status = newStatus;
     saveQuotes(quotes);
     renderQuotesHistoryTable();
+    try {
+      await fetch('/api/quotes/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: q.dbId || q.id, folio: q.folio, status: newStatus, agencyId: currentAgencyId })
+      });
+    } catch (e) {}
     showToast(`Estado de cotización #${q.folio} actualizado a ${newStatus}`, 'success');
   }
 }
 
-function reSendQuoteWhatsApp(quoteId) {
+async function reSendQuoteWhatsApp(quoteId) {
   const quotes = getStoredQuotes();
-  const q = quotes.find(item => item.id === quoteId);
+  const q = quotes.find(item => String(item.id) === String(quoteId));
   if (!q) return;
 
   if (q.clientPhone) {
-    const itemsText = q.items.map(it => `• ${it.name} (x${it.qty}) -> $${(it.qty * it.price).toFixed(2)} USD`).join('\n');
-    const waMsg = encodeURIComponent(
-      `🧾 *RECORDATORIO DE COTIZACIÓN - ${q.companyName}*\n` +
+    const itemsText = (q.items || []).map(it => `• ${it.name} (x${it.qty}) -> $${(it.qty * it.price).toFixed(2)} USD`).join('\n');
+    const cleanTextMsg =
+      `*RECORDATORIO DE COTIZACIÓN - ${q.companyName}*\n` +
       `Folio: *#${q.folio}*\n\n` +
       `Hola *${q.clientName}*, te reenviamos el detalle de tu propuesta:\n\n` +
       `${itemsText}\n\n` +
-      `💰 *TOTAL:* $${q.total.toFixed(2)} USD\n\n` +
-      `¿Deseas que te reservemos el turno / activemos el servicio hoy?`
-    );
-    window.open(`https://wa.me/${q.clientPhone.replace(/\D/g, '')}?text=${waMsg}`, '_blank');
+      `*TOTAL:* $${Number(q.total || 0).toFixed(2)} USD\n\n` +
+      `¿Deseas que te reservemos el turno o activemos el servicio hoy?`;
+
+    let sentDirectly = false;
+    try {
+      const sendRes = await fetch('/api/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: q.clientPhone,
+          message: cleanTextMsg,
+          agencyId: currentAgencyId
+        })
+      });
+      const sendData = await sendRes.json();
+      if (sendData && sendData.success && sendData.engine === 'baileys_socket') sentDirectly = true;
+    } catch (e) {}
+
+    if (!sentDirectly) {
+      window.open(`https://wa.me/${q.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(cleanTextMsg)}`, '_blank');
+    } else {
+      showToast(`Recordatorio de cotización #${q.folio} enviado directo por WhatsApp`, 'success');
+    }
   } else {
     showToast('Esta cotización no tiene teléfono registrado', 'error');
   }
 }
 
-function deleteQuote(quoteId) {
+async function deleteQuote(quoteId) {
   if (!confirm('¿Deseas eliminar este registro de cotización?')) return;
-  let quotes = getStoredQuotes();
-  quotes = quotes.filter(q => q.id !== quoteId);
-  saveQuotes(quotes);
+  const quotes = getStoredQuotes();
+  const target = quotes.find(q => String(q.id) === String(quoteId));
+  const filtered = quotes.filter(q => String(q.id) !== String(quoteId));
+  saveQuotes(filtered);
   renderQuotesHistoryTable();
+  if (target) {
+    fetch('/api/quotes/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: target.dbId || target.id, folio: target.folio, agencyId: currentAgencyId })
+    }).catch(() => {});
+  }
   showToast('Cotización eliminada', 'info');
 }
 
@@ -1796,17 +1923,17 @@ function renderRealInbox() {
   }
 
   listContainer.innerHTML = realLeads.map(lead => `
-    <div class="contact-item ${lead.id === activeInboxLeadId ? 'active' : ''}" onclick="selectRealInboxLead('${lead.id}')">
+    <div class="contact-item ${lead.id === activeInboxLeadId ? 'active' : ''}" onclick="selectRealInboxLead('${escapeHtml(lead.id)}')">
       <div class="contact-avatar-box">
-        <div class="contact-avatar">${lead.phone ? lead.phone.slice(-2) : 'WA'}</div>
+        <div class="contact-avatar">${escapeHtml(lead.phone ? lead.phone.slice(-2) : 'WA')}</div>
         <span class="channel-tag">🟢</span>
       </div>
       <div class="contact-info">
         <div class="contact-top-row">
-          <div class="contact-name">${lead.name || lead.phone}</div>
-          <div class="contact-time">${lead.timestamp || 'Hoy'}</div>
+          <div class="contact-name">${escapeHtml(lead.name || lead.phone)}</div>
+          <div class="contact-time">${escapeHtml(lead.timestamp || 'Hoy')}</div>
         </div>
-        <div class="contact-last-msg">${lead.lastMessage || 'Mensaje de WhatsApp'}</div>
+        <div class="contact-last-msg">${escapeHtml(lead.lastMessage || 'Mensaje de WhatsApp')}</div>
       </div>
     </div>
   `).join('');
@@ -1832,10 +1959,11 @@ function selectRealInboxLead(leadId) {
   const msgContainer = document.getElementById('realMessagesContainer');
   msgContainer.innerHTML = (lead.history || []).map(msg => `
     <div class="msg-bubble ${msg.sender === 'user' ? 'user-msg' : 'agent-msg'}">
-      <div>${msg.text}</div>
-      <span class="msg-time">${msg.time || ''}</span>
+      <div style="white-space: pre-wrap;">${escapeHtml(msg.text)}</div>
+      <span class="msg-time">${escapeHtml(msg.time || '')}</span>
     </div>
   `).join('');
+  msgContainer.scrollTop = msgContainer.scrollHeight;
 
   renderRealInbox();
 }
@@ -2261,28 +2389,26 @@ async function generateMarketingContent() {
   const business = document.getElementById('mktBusiness').value || 'la empresa';
   const niche = document.getElementById('mktNiche').value || 'Negocios';
   const extra = document.getElementById('mktExtra').value || '';
-  const apiKey = localStorage.getItem('nexus_ai_key') || DEFAULT_GEMINI_KEY;
 
   const outputBox = document.getElementById('mktOutputContent');
   const titleBox = document.getElementById('mktOutputTitle');
 
-  outputBox.innerText = 'Generando contenido optimizado con Google Gemini... ⚡';
+  outputBox.innerText = 'Generando contenido optimizado con Google Gemini...';
 
   try {
-    const promptText = `Eres el Director Creativo y Copywriter de una Agencia de Inteligencia Artificial.\nGenera contenido de tipo '${format}' para la empresa '${business}' del rubro '${niche}'.\nDetalle u oferta: '${extra}'.\nRedacta en español con formato estructurado de alta conversión.`;
-
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch('/api/marketing/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: promptText }] }] })
+      body: JSON.stringify({ format, business, niche, extra })
     });
 
-    if (!res.ok) throw new Error('Error al llamar API');
+    if (!res.ok) throw new Error('Error al llamar servidor IA');
     const data = await res.json();
+    if (!data.success || !data.content) throw new Error('Respuesta vacía');
     titleBox.innerText = `Contenido Generado (${format})`;
-    outputBox.innerText = data.candidates[0].content.parts[0].text;
+    outputBox.innerText = data.content;
     showToast('¡Campaña generada con éxito con Gemini IA!', 'success');
-  } catch(e) {
+  } catch (e) {
     // Fallback template
     const res = MARKETING_TEMPLATES.ads.generate(business, niche, extra, '');
     titleBox.innerText = 'Anuncio Generado';
@@ -2864,18 +2990,21 @@ function startGlobalWaLiveSync() {
       const stRes = await fetch(`/api/wa-session/status?sessionId=${encodeURIComponent(sessionId)}`);
       if (stRes.ok) {
         const stData = await stRes.json();
-        if (stData.connected || (Array.isArray(stData.connectedSessions) && stData.connectedSessions.length > 0)) {
+        const hasAnyConn = stData.connected || (stData.connectedSessions && Object.keys(stData.connectedSessions).length > 0);
+        if (hasAnyConn && (stData.connected || !activeQrClientId)) {
           applyGlobalWaConnectedState(stData);
         }
       }
 
       // Sync real incoming/outgoing WhatsApp conversations into Inbox & Leads
-      const msgRes = await fetch(`/api/wa-session/live-messages?agencyId=${encodeURIComponent(currentAgencyId)}`);
+      const scope = getScopedTenantParams();
+      const msgRes = await fetch(`/api/wa-session/live-messages?${scope.queryString}`);
       if (msgRes.ok) {
         const msgData = await msgRes.json();
-        if (msgData.success && Array.isArray(msgData.chats) && msgData.chats.length > 0) {
+        const incomingList = Array.isArray(msgData.chats) ? msgData.chats : (Array.isArray(msgData.leads) ? msgData.leads : []);
+        if (msgData.success && incomingList.length > 0) {
           let updatedInbox = false;
-          msgData.chats.forEach(liveChat => {
+          incomingList.forEach(liveChat => {
             if (!liveChat.phone || !Array.isArray(liveChat.history) || liveChat.history.length === 0) return;
             const cleanPh = String(liveChat.phone).replace(/\D/g, '');
             let existing = realLeads.find(l => String(l.phone || '').replace(/\D/g, '') === cleanPh);
@@ -2885,10 +3014,12 @@ function startGlobalWaLiveSync() {
                 id: 'wa_' + cleanPh,
                 name: liveChat.name || `WhatsApp +${cleanPh}`,
                 phone: `+${cleanPh}`,
-                company: activeComp ? activeComp.name : 'WhatsApp Directo',
-                stage: 'calificado',
+                company: liveChat.company || (activeComp ? activeComp.name : 'WhatsApp Directo'),
+                stage: 'Calificado',
                 value: activeComp ? Number(activeComp.monthlyFee || 150) : 290,
                 source: 'WhatsApp QR Real',
+                timestamp: liveChat.timestamp || 'Hoy',
+                lastMessage: liveChat.lastMessage || liveChat.history[liveChat.history.length - 1]?.text || '',
                 humanTakeover: false,
                 history: []
               };
@@ -2898,11 +3029,32 @@ function startGlobalWaLiveSync() {
             }
             if (liveChat.history.length > (existing.history ? existing.history.length : 0)) {
               existing.history = liveChat.history;
+              existing.lastMessage = liveChat.lastMessage || liveChat.history[liveChat.history.length - 1]?.text || existing.lastMessage;
+              existing.timestamp = liveChat.timestamp || existing.timestamp;
+              if (liveChat.company && liveChat.company !== 'WhatsApp Directo') existing.company = liveChat.company;
+              if (liveChat.name && (!existing.name || existing.name.startsWith('Cliente') || existing.name.startsWith('WhatsApp'))) {
+                existing.name = liveChat.name;
+              }
               updatedInbox = true;
             }
           });
           if (updatedInbox) {
             saveAgencyLeads(realLeads);
+            if (activeInboxLeadId) {
+              const activeLead = realLeads.find(l => l.id === activeInboxLeadId);
+              if (activeLead) {
+                const msgContainer = document.getElementById('realMessagesContainer');
+                if (msgContainer) {
+                  msgContainer.innerHTML = (activeLead.history || []).map(msg => `
+                    <div class="msg-bubble ${msg.sender === 'user' ? 'user-msg' : 'agent-msg'}">
+                      <div style="white-space: pre-wrap;">${escapeHtml(msg.text)}</div>
+                      <span class="msg-time">${escapeHtml(msg.time || '')}</span>
+                    </div>
+                  `).join('');
+                  msgContainer.scrollTop = msgContainer.scrollHeight;
+                }
+              }
+            }
             renderRealInbox();
             renderRealKanban();
             renderAgencyDashboard();
@@ -3630,6 +3782,12 @@ async function loadAiConfigStatus() {
     const feedbackEl = document.getElementById('aiTestFeedback');
 
     if (modelSelect && data.activeModel) {
+      if (!Array.from(modelSelect.options).some(o => o.value === data.activeModel)) {
+        const opt = document.createElement('option');
+        opt.value = data.activeModel;
+        opt.textContent = data.activeModel;
+        modelSelect.appendChild(opt);
+      }
       modelSelect.value = data.activeModel;
     }
     if (keyInput && data.hasKey) {
@@ -4063,10 +4221,10 @@ async function loadKnowledgeDocs() {
   const tbody = document.getElementById('knowledgeDocsTableBody');
   if (!tbody) return;
   
-  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const scope = getScopedTenantParams();
   try {
     tbody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center; color: var(--text-dim);"><i class="fa-solid fa-spinner fa-spin"></i> Cargando documentos desde Neon DB...</td></tr>`;
-    const res = await fetch(`/api/knowledge/list?agencyId=${agId}`);
+    const res = await fetch(`/api/knowledge/list?${scope.queryString}`);
     const data = await res.json();
     
     if (!data.success || !data.docs || data.docs.length === 0) {
@@ -4089,7 +4247,7 @@ async function loadKnowledgeDocs() {
       else if (ext === 'txt') { icon = 'fa-file-alt'; iconColor = '#38bdf8'; }
 
       const dateStr = new Date(doc.created_at).toLocaleDateString() + ' ' + new Date(doc.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const kbSize = (doc.file_size / 1024).toFixed(1) + ' KB';
+      const kbSize = ((Number(doc.file_size) || 0) / 1024).toFixed(1) + ' KB';
 
       return `
         <tr style="border-bottom: 1px solid var(--border-subtle);">
@@ -4112,14 +4270,14 @@ async function loadKnowledgeDocs() {
         </tr>`;
     }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #f87171;">Error cargando documentos: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="padding: 16px; text-align: center; color: #f87171;">Error cargando documentos: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
 async function handleRagFileUpload(input) {
   if (!input.files || input.files.length === 0) return;
   const file = input.files[0];
-  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const scope = getScopedTenantParams();
 
   showToast(`Procesando e indexando ${file.name}...`, 'info');
 
@@ -4131,7 +4289,8 @@ async function handleRagFileUpload(input) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          agencyId: agId,
+          agencyId: scope.agencyId,
+          clientId: scope.clientId,
           filename: file.name,
           fileType: file.type || 'text/plain',
           fileSize: file.size,
@@ -4161,12 +4320,12 @@ async function handleRagFileUpload(input) {
 
 async function deleteKnowledgeDoc(docId) {
   if (!confirm('¿Deseas eliminar este documento de la base de conocimiento de la IA?')) return;
-  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const scope = getScopedTenantParams();
   try {
     const res = await fetch('/api/knowledge/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: docId, agencyId: agId })
+      body: JSON.stringify({ id: docId, agencyId: scope.agencyId, clientId: scope.clientId })
     });
     const data = await res.json();
     if (data.success) {
@@ -4185,10 +4344,10 @@ async function loadLiveAppointments() {
   const tbody = document.getElementById('liveAppointmentsTableBody');
   if (!tbody) return;
 
-  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const scope = getScopedTenantParams();
   try {
     tbody.innerHTML = `<tr><td colspan="7" style="padding: 20px; text-align: center; color: var(--text-dim);"><i class="fa-solid fa-spinner fa-spin"></i> Cargando citas desde Neon DB...</td></tr>`;
-    const res = await fetch(`/api/appointments/list?agencyId=${agId}`);
+    const res = await fetch(`/api/appointments/list?${scope.queryString}`);
     const data = await res.json();
 
     if (!data.success || !data.appointments || data.appointments.length === 0) {
@@ -4267,13 +4426,14 @@ async function saveNewAppointment() {
     return;
   }
 
-  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const scope = getScopedTenantParams();
   try {
     const res = await fetch('/api/appointments/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        agencyId: agId,
+        agencyId: scope.agencyId,
+        clientId: scope.clientId,
         contactName: name,
         contactPhone: phone,
         serviceName: service,
@@ -4386,7 +4546,7 @@ async function executeSafeBroadcast() {
     return;
   }
 
-  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const scope = getScopedTenantParams();
   const btn = document.getElementById('btnStartBroadcast');
   if (btn) {
     btn.disabled = true;
@@ -4398,7 +4558,8 @@ async function executeSafeBroadcast() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        agencyId: agId,
+        agencyId: scope.agencyId,
+        clientId: scope.clientId,
         name,
         messageTemplate: template,
         recipients
@@ -4434,7 +4595,7 @@ function pollBroadcastProgress(campaignId) {
       const totalEl = document.getElementById('bcMetricTotal');
       const sentEl = document.getElementById('bcMetricSent');
 
-      if (totalEl) totalEl.innerText = p.total || p.total_contacts || 0;
+      if (totalEl) totalEl.innerText = p.total || p.total_recipients || p.total_contacts || 0;
       if (sentEl) sentEl.innerText = p.sent || p.sent_count || 0;
 
       if (p.status === 'completed') {
@@ -4454,9 +4615,9 @@ function pollBroadcastProgress(campaignId) {
 
 // ==================== FEATURE 5: OWNER ALERTS SETTINGS ====================
 async function loadOwnerAlertSettings() {
-  const agId = activeClientId || currentAgencyId || 'agency_master_1';
+  const scope = getScopedTenantParams();
   try {
-    const res = await fetch(`/api/agency/owner-settings?agencyId=${agId}`);
+    const res = await fetch(`/api/agency/owner-settings?agencyId=${encodeURIComponent(scope.agencyId)}`);
     const data = await res.json();
     if (data.success && data.agency) {
       const phoneInput = document.getElementById('wlOwnerAlertPhone');
@@ -4830,9 +4991,9 @@ async function loadFollowUpSequences() {
   const tbody = document.getElementById('followUpSequencesTableBody');
   if (!tbody) return;
 
-  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  const scope = getScopedTenantParams();
   try {
-    const res = await fetch(`/api/followups/list?agencyId=${encodeURIComponent(agId)}`);
+    const res = await fetch(`/api/followups/list?${scope.queryString}`);
     const data = await res.json();
     const list = (data && data.sequences) ? data.sequences : [];
 
@@ -4902,16 +5063,17 @@ async function createFollowUpSequence() {
     return;
   }
 
-  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  const scope = getScopedTenantParams();
   try {
     const res = await fetch('/api/followups/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        agencyId: agId,
+        agencyId: scope.agencyId,
+        clientId: scope.clientId,
         contactName: contactName || `Prospecto +${contactPhone}`,
         contactPhone,
-        interestTopic: interestTopic || 'Automatización IA'
+        interestTopic: interestTopic || 'Atención Especializada'
       })
     });
     const data = await res.json();
@@ -4930,12 +5092,12 @@ async function createFollowUpSequence() {
 }
 
 async function triggerFollowUpSequenceNow(followUpId) {
-  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  const scope = getScopedTenantParams();
   try {
     const res = await fetch('/api/followups/trigger-now', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agencyId: agId, followUpId })
+      body: JSON.stringify({ agencyId: scope.agencyId, clientId: scope.clientId, followUpId })
     });
     const data = await res.json();
     if (data && data.success) {
@@ -4956,12 +5118,12 @@ async function triggerFollowUpSequenceNow(followUpId) {
 }
 
 async function deleteFollowUpSequenceItem(followUpId) {
-  const agId = activeClientId && activeClientId !== 'agency_hq' ? activeClientId : (currentAgencyId || 'agency_master_1');
+  const scope = getScopedTenantParams();
   try {
     await fetch('/api/followups/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agencyId: agId, followUpId })
+      body: JSON.stringify({ agencyId: scope.agencyId, clientId: scope.clientId, followUpId })
     });
     loadFollowUpSequences();
     showToast('Secuencia eliminada', 'info');
@@ -5068,9 +5230,9 @@ async function testMultimodalAudioComprehension(inputEl = null, isSimulated = fa
         clientId: activeClientId || 'agency_hq',
         companyName,
         industry,
-        customCatalog: Array.isArray(currentCatalog) && currentCatalog.length > 0 ? currentCatalog : (client && Array.isArray(client.catalog) ? client.catalog : []),
-        customSystemPrompt: document.getElementById('agentPromptInput')?.value || (client && client.systemPrompt) || '',
-        customKnowledgeBase: document.getElementById('agentKnowledgeInput')?.value || (client && client.knowledgeBase) || ''
+        customCatalog: (client && Array.isArray(client.catalog)) ? client.catalog : [],
+        customSystemPrompt: document.getElementById('agentEditorPrompt')?.value || (client && client.systemPrompt) || '',
+        customKnowledgeBase: document.getElementById('agentEditorKnowledge')?.value || (client && client.knowledgeBase) || ''
       })
     });
     const data = await res.json();
@@ -5318,7 +5480,8 @@ function exportLeadsToCsv() {
 
 async function exportAppointmentsToCsv() {
   try {
-    const res = await fetch(`/api/appointments/list?agencyId=${encodeURIComponent(currentAgencyId || 'agency_master_1')}`);
+    const scope = getScopedTenantParams();
+    const res = await fetch(`/api/appointments/list?${scope.queryString}`);
     const data = await res.json();
     const list = (data && Array.isArray(data.appointments)) ? data.appointments : [];
     if (list.length === 0) {

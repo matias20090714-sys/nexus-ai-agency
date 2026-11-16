@@ -58,8 +58,156 @@ const activeSessions = {};
 const activeClientByAgency = {}; // agencyId -> activeClientId selected in UI
 const processedWaMsgIds = new Set(); // prevent duplicate replies
 const liveWaContactsByAgency = {}; // agencyId -> array of live WhatsApp leads/messages
+const ensuredAgenciesSet = new Set();
+const pendingIncomingBuffers = new Map(); // debounce buffer for rapid consecutive WA messages
 
-function recordLiveWaMessage(agencyId, phone, pushName, senderRole, text, companyName = 'WhatsApp Directo') {
+async function ensureAgencyRowExists(agencyId) {
+  const cleanAg = (agencyId && agencyId !== 'agency_hq') ? agencyId : 'agency_master_1';
+  if (ensuredAgenciesSet.has(cleanAg)) return cleanAg;
+  try {
+    await db.query(
+      `INSERT INTO agencies (id, name, slug) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING`,
+      [cleanAg, cleanAg === 'agency_master_1' ? 'NEXUS AI Agency' : `Agencia ${cleanAg.slice(-6)}`, `${cleanAg.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${cleanAg.slice(-4)}`]
+    );
+    ensuredAgenciesSet.add(cleanAg);
+  } catch (e) { }
+  return cleanAg;
+}
+
+function resolveCanonicalTenant(rawAgencyId = '', rawClientId = '') {
+  let agencyId = String(rawAgencyId || '').trim();
+  let clientId = String(rawClientId || '').trim();
+
+  if (clientId === 'agency_hq' || clientId === 'default_agency') clientId = '';
+
+  // Detect if a client ID was mistakenly passed in agencyId
+  if (!clientId && (agencyId.startsWith('client-') || agencyId.startsWith('client_'))) {
+    clientId = agencyId.replace(/^client_/, '');
+    agencyId = '';
+  }
+
+  // Resolve parent agency for clientId using loaded companies
+  if (clientId) {
+    for (const [agKey, list] of Object.entries(memoryCompanies || {})) {
+      if (Array.isArray(list) && list.some(c => c && (c.id === clientId || `client_${c.id}` === clientId))) {
+        if (!agencyId || agencyId === 'agency_hq' || agencyId.startsWith('client')) {
+          agencyId = agKey;
+        }
+        break;
+      }
+    }
+  }
+
+  if (!agencyId || agencyId === 'agency_hq' || agencyId.startsWith('client-') || agencyId.startsWith('client_')) {
+    agencyId = 'agency_master_1';
+  }
+  return { agencyId, clientId: clientId || null };
+}
+
+function getConnectedSock(preferredId = '', fallbackAgencyId = 'agency_master_1') {
+  const candidates = [];
+  if (preferredId) {
+    candidates.push(preferredId, `client_${preferredId}`, `agency_${preferredId}`);
+  }
+  if (fallbackAgencyId) {
+    candidates.push(`agency_${fallbackAgencyId}`, fallbackAgencyId);
+    const agClients = memoryCompanies[fallbackAgencyId] || [];
+    for (const cl of agClients) {
+      if (cl && cl.id) candidates.push(`client_${cl.id}`, cl.id);
+    }
+  }
+  candidates.push('agency_hq', 'agency_master_1');
+
+  for (const key of candidates) {
+    const s = activeSessions[key];
+    if (s && s.connected && s.sock) return s.sock;
+  }
+  const anyConn = Object.values(activeSessions).find(s => s && s.connected && s.sock);
+  return anyConn ? anyConn.sock : null;
+}
+
+async function persistLiveWaMessageToDB(agencyId, clientId, phone, pushName, senderRole, text, companyName) {
+  try {
+    const safeAg = await ensureAgencyRowExists(agencyId);
+    const clean = String(phone || '').replace(/\D/g, '') || String(phone || 'contacto');
+    const convRes = await db.query(
+      `INSERT INTO whatsapp_conversations (agency_id, client_id, company_name, phone, contact_name, last_message, unread_count, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 1, CURRENT_TIMESTAMP)
+       ON CONFLICT (agency_id, phone) DO UPDATE SET
+         client_id = COALESCE(EXCLUDED.client_id, whatsapp_conversations.client_id),
+         company_name = COALESCE(EXCLUDED.company_name, whatsapp_conversations.company_name),
+         contact_name = CASE
+           WHEN whatsapp_conversations.contact_name IS NULL OR whatsapp_conversations.contact_name LIKE 'Cliente%' THEN EXCLUDED.contact_name
+           ELSE whatsapp_conversations.contact_name
+         END,
+         last_message = EXCLUDED.last_message,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING id`,
+      [safeAg, clientId || null, companyName || 'WhatsApp Directo', clean, pushName || `Cliente (+${clean.slice(-4)})`, String(text || '').slice(0, 1000)]
+    );
+    const convId = convRes?.rows?.[0]?.id;
+    if (convId) {
+      await db.query(
+        `INSERT INTO whatsapp_messages (conversation_id, agency_id, sender, recipient, message_text, direction)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          convId,
+          safeAg,
+          senderRole === 'user' ? clean : (companyName || safeAg),
+          senderRole === 'user' ? (companyName || safeAg) : clean,
+          String(text || ''),
+          senderRole === 'user' ? 'incoming' : 'outgoing'
+        ]
+      );
+    }
+  } catch (e) { }
+}
+
+async function hydrateLiveWaContactsFromDB(agencyId) {
+  const agKey = agencyId || 'agency_master_1';
+  if (Array.isArray(liveWaContactsByAgency[agKey]) && liveWaContactsByAgency[agKey].length > 0) {
+    return liveWaContactsByAgency[agKey];
+  }
+  try {
+    const convs = await db.query(
+      `SELECT id, agency_id, client_id, company_name, phone, contact_name, last_message, updated_at
+       FROM whatsapp_conversations WHERE agency_id = $1 ORDER BY updated_at DESC LIMIT 40`,
+      [agKey]
+    );
+    const hydrated = [];
+    for (const c of (convs?.rows || [])) {
+      const msgsRes = await db.query(
+        `SELECT sender, message_text, direction, created_at FROM whatsapp_messages WHERE conversation_id = $1 ORDER BY id DESC LIMIT 30`,
+        [c.id]
+      );
+      const history = (msgsRes?.rows || []).reverse().map(m => ({
+        sender: m.direction === 'incoming' ? 'user' : 'agent',
+        text: m.message_text || '',
+        time: m.created_at ? new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+      }));
+      const clean = String(c.phone || '').replace(/\D/g, '');
+      hydrated.push({
+        id: 'wa_' + clean,
+        phone: clean.startsWith('+') ? clean : `+${clean}`,
+        name: c.contact_name || `Cliente (+${clean.slice(-4)})`,
+        company: c.company_name || 'WhatsApp Directo',
+        clientId: c.client_id || null,
+        stage: 'Calificado',
+        timestamp: c.updated_at ? new Date(c.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        lastMessage: c.last_message || '',
+        history
+      });
+    }
+    if (hydrated.length > 0) {
+      liveWaContactsByAgency[agKey] = hydrated;
+    }
+    return liveWaContactsByAgency[agKey] || [];
+  } catch (e) {
+    return liveWaContactsByAgency[agKey] || [];
+  }
+}
+
+function recordLiveWaMessage(agencyId, phone, pushName, senderRole, text, companyName = 'WhatsApp Directo', clientId = null) {
   const agKey = agencyId || 'agency_master_1';
   if (!liveWaContactsByAgency[agKey]) liveWaContactsByAgency[agKey] = [];
   const clean = String(phone || '').replace(/\D/g, '') || String(phone || 'contacto');
@@ -71,6 +219,7 @@ function recordLiveWaMessage(agencyId, phone, pushName, senderRole, text, compan
       phone: clean.startsWith('+') ? clean : `+${clean}`,
       name: pushName || `Cliente (+${clean.slice(-4)})`,
       company: companyName,
+      clientId: clientId || null,
       stage: 'Calificado',
       timestamp: timeStr,
       lastMessage: text,
@@ -84,6 +233,7 @@ function recordLiveWaMessage(agencyId, phone, pushName, senderRole, text, compan
     if (companyName && companyName !== 'WhatsApp Directo') {
       lead.company = companyName;
     }
+    if (clientId) lead.clientId = clientId;
     lead.timestamp = timeStr;
     lead.lastMessage = text;
   }
@@ -93,6 +243,8 @@ function recordLiveWaMessage(agencyId, phone, pushName, senderRole, text, compan
     time: timeStr
   });
   if (lead.history.length > 50) lead.history = lead.history.slice(-50);
+
+  persistLiveWaMessageToDB(agKey, clientId, clean, lead.name, senderRole, text, companyName).catch(() => { });
 }
 
 function unwrapBaileysMessage(rawMessage) {
@@ -442,18 +594,33 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
         const cleanSenderDigits = senderNumber.replace(/\D/g, '');
         const isSelfChat = (ownPhone && cleanSenderDigits === ownPhone) || (ownLid && cleanSenderDigits === ownLid);
 
-        // If message is fromMe: ignore unless the user is testing in their own "Message Yourself" chat
+        const rawAgHint = sessionId.startsWith('agency_') ? sessionId.replace('agency_', '') : '';
+        const rawClientHint = sessionId.startsWith('client_') ? sessionId.replace('client_', '') : '';
+        const resolvedTenant = resolveCanonicalTenant(rawAgHint, rawClientHint);
+        const agId = resolvedTenant.agencyId;
+        const ctx = await getAgentCompanyContext(sessionId, agId);
+        const targetClientId = resolvedTenant.clientId || (ctx.id !== 'default_agency' ? ctx.id : null);
+
+        // If message is fromMe:
+        // - Inside cooldown: it's the AI's own reply -> ignore
+        // - In non-self chat outside cooldown: the human owner replied manually from WhatsApp -> pause AI for 30 min & record message!
+        // - In self-chat ("Message Yourself") outside cooldown: allow owner live testing!
         if (msg.key.fromMe) {
           const aiCooldownUntil = aiOutgoingCooldowns.get(senderNumber) || aiOutgoingCooldowns.get(senderJid) || 0;
-          if (!isSelfChat || Date.now() <= aiCooldownUntil) {
+          if (Date.now() <= aiCooldownUntil) {
+            continue;
+          }
+          if (!isSelfChat) {
+            const manualText = extractIncomingMessageText(msg.message);
+            if (manualText) {
+              setChatHumanTakeover(sessionId, senderNumber, true, 30, 'Respuesta manual enviada desde WhatsApp del negocio');
+              recordLiveWaMessage(agId, senderNumber, msg.pushName || `Cliente +${senderNumber}`, 'agent', manualText, ctx.companyName, targetClientId);
+              if (msgId) processedWaMsgIds.add(msgId);
+              console.log(`[Baileys - ${sessionId}] Control Humano automático (30m) activado para +${senderNumber}.`);
+            }
             continue;
           }
         }
-
-        const agId = sessionId.startsWith('agency_')
-          ? sessionId.replace('agency_', '')
-          : 'agency_master_1';
-        const ctx = await getAgentCompanyContext(sessionId, agId);
 
         const unwrapped = unwrapBaileysMessage(msg.message);
         let textBody = '';
@@ -500,31 +667,56 @@ async function getOrInitBaileysSession(sessionId = 'agency_master_1', phoneForPa
         const pushName = msg.pushName || `Cliente +${senderNumber}`;
         console.log(`[Baileys - ${sessionId}] Mensaje entrante de +${senderNumber} (${senderJid}): "${displayInboxText}"`);
 
-        // Check manual Human Takeover / Pausa Humana (only when explicitly toggled in dashboard)
+        // Check manual Human Takeover / Pausa Humana
         const pauseState = isChatPausedForHuman(sessionId, senderNumber);
         if (pauseState) {
-          console.log(`[Baileys - ${sessionId}] IA en Pausa Humana manual para +${senderNumber}.`);
-          recordLiveWaMessage(agId, senderNumber, pushName, 'user', displayInboxText, ctx.companyName);
+          console.log(`[Baileys - ${sessionId}] IA en Pausa Humana para +${senderNumber}.`);
+          recordLiveWaMessage(agId, senderNumber, pushName, 'user', displayInboxText, ctx.companyName, targetClientId);
           continue;
         }
 
-        recordLiveWaMessage(agId, senderNumber, pushName, 'user', displayInboxText, ctx.companyName);
+        recordLiveWaMessage(agId, senderNumber, pushName, 'user', displayInboxText, ctx.companyName, targetClientId);
 
         // Feature 5 & 6: Owner Alerts & Anti-Ghosting Follow-up
-        checkAndAlertOwner(agId, senderNumber, textBody, sock).catch(e => console.error(e));
-        registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60)).catch(() => { });
+        checkAndAlertOwner(agId, senderNumber, textBody, sock, targetClientId, ctx.companyName).catch(e => console.error(e));
+        registerOrUpdateFollowUp(agId, senderNumber, pushName, textBody.slice(0, 60), targetClientId).catch(() => { });
 
-        // Simulate natural human typing delay (1.0s)
-        await new Promise(r => setTimeout(r, 1000));
-        const aiReply = await generateAiAgentResponse(textBody, senderNumber, sessionId, agId);
-        if (aiReply && sock) {
-          aiOutgoingCooldowns.set(senderNumber, Date.now() + 10000);
-          aiOutgoingCooldowns.set(senderJid, Date.now() + 10000);
-          const sentMsg = await sock.sendMessage(senderJid, { text: aiReply });
-          if (sentMsg?.key?.id) processedWaMsgIds.add(sentMsg.key.id);
-          recordLiveWaMessage(agId, senderNumber, pushName, 'agent', aiReply, ctx.companyName);
-          console.log(`[Baileys - ${sessionId}] IA (${ctx.companyName}) respondió a +${senderNumber}: "${aiReply.slice(0, 50)}..."`);
+        // Coalesce rapid consecutive messages from the same user within 1.6s so we never spam double replies
+        const debounceKey = `${sessionId}_${cleanSenderDigits || senderJid}`;
+        const existingBuf = pendingIncomingBuffers.get(debounceKey);
+        if (existingBuf && existingBuf.timer) {
+          clearTimeout(existingBuf.timer);
+          existingBuf.texts.push(textBody.trim());
+        } else {
+          pendingIncomingBuffers.set(debounceKey, { texts: [textBody.trim()], timer: null });
         }
+
+        const bufEntry = pendingIncomingBuffers.get(debounceKey);
+        bufEntry.timer = setTimeout(async () => {
+          pendingIncomingBuffers.delete(debounceKey);
+          const mergedUserText = bufEntry.texts.join('\n').trim();
+          if (!mergedUserText || isChatPausedForHuman(sessionId, senderNumber)) return;
+
+          try {
+            if (sock && typeof sock.sendPresenceUpdate === 'function') {
+              await sock.sendPresenceUpdate('composing', senderJid).catch(() => { });
+            }
+            const aiReply = await generateAiAgentResponse(mergedUserText, senderNumber, sessionId, agId);
+            if (sock && typeof sock.sendPresenceUpdate === 'function') {
+              await sock.sendPresenceUpdate('paused', senderJid).catch(() => { });
+            }
+            if (aiReply && sock) {
+              aiOutgoingCooldowns.set(senderNumber, Date.now() + 10000);
+              aiOutgoingCooldowns.set(senderJid, Date.now() + 10000);
+              const sentMsg = await sock.sendMessage(senderJid, { text: aiReply });
+              if (sentMsg?.key?.id) processedWaMsgIds.add(sentMsg.key.id);
+              recordLiveWaMessage(agId, senderNumber, pushName, 'agent', aiReply, ctx.companyName, targetClientId);
+              console.log(`[Baileys - ${sessionId}] IA (${ctx.companyName}) respondió a +${senderNumber}: "${aiReply.slice(0, 50)}..."`);
+            }
+          } catch (debErr) {
+            console.error(`[Baileys - ${sessionId}] Error enviando respuesta IA:`, debErr.message);
+          }
+        }, 1600);
       } catch (replyErr) {
         console.error(`[Baileys - ${sessionId}] Error al auto-responder:`, replyErr.message);
       }
@@ -1204,6 +1396,37 @@ function getConversationHistory(convKey) {
   return entry.history || [];
 }
 
+async function getOrHydrateConversationHistory(convKey, agencyId, senderPhone) {
+  const cached = getConversationHistory(convKey);
+  if (cached && cached.length > 0) return cached;
+
+  const cleanPhone = String(senderPhone || '').replace(/\D/g, '');
+  if (!cleanPhone || cleanPhone.length < 7 || String(senderPhone || '').startsWith('sim_')) {
+    return [];
+  }
+
+  try {
+    const res = await db.query(
+      `SELECT m.direction, m.message_text, m.created_at
+       FROM whatsapp_messages m
+       JOIN whatsapp_conversations c ON m.conversation_id = c.id
+       WHERE c.agency_id = $1 AND c.phone = $2
+       ORDER BY m.id DESC LIMIT $3`,
+      [agencyId || 'agency_master_1', cleanPhone, MAX_CONV_TURNS]
+    );
+    if (res?.rows?.length > 0) {
+      const hydrated = res.rows.reverse().map(r => ({
+        role: r.direction === 'incoming' ? 'user' : 'assistant',
+        text: String(r.message_text || '').trim(),
+        timestamp: r.created_at ? new Date(r.created_at).getTime() : Date.now()
+      })).filter(x => x.text);
+      conversationHistories.set(convKey, { history: hydrated, lastUpdated: Date.now() });
+      return hydrated;
+    }
+  } catch (e) { }
+  return [];
+}
+
 function appendToConversationHistory(convKey, role, text) {
   if (!text) return;
   let entry = conversationHistories.get(convKey);
@@ -1552,6 +1775,14 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
     reply = `Es una pregunta muy importante. En *${ctx.companyName}* trabajamos con total transparencia: ${dom.valueJustification.charAt(0).toLowerCase() + dom.valueJustification.slice(1)}\n\n${getNextUnaskedStep()}`;
   }
 
+  // 11.9 Explicit Appointment Confirmation with concrete date/time in fallback mode
+  const parsedTurnDate = parseSpanishTargetDateTime(rawText);
+  if (!reply && parsedTurnDate && /turno|cita|confirm|reserv|agend/.test(normUser)) {
+    const custName = extractCustomerNameFromContext('', rawText);
+    const friendlyDt = parsedTurnDate.toLocaleString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+    reply = `Perfecto${custName ? ', ' + custName : ''}. Queda confirmado tu turno en *${ctx.companyName}* para el ${friendlyDt} hs. Si necesitas modificar algo antes de tu cita, avisame por este medio.`;
+  }
+
   // 12. Precios, Turnos, Ubicación, Horarios, Humano, Saludos y Despedidas
   if (!reply && /precio|costo|cuanto|tarifa|planes|cotiza|presupuesto|catalogo|arancel/.test(normUser)) {
     reply = `Con gusto. Estos son nuestros valores principales en *${ctx.companyName}*:\n\n${ctx.catalogSummary}\n\n${dom.valueJustification}\n\n${getNextUnaskedStep()}`;
@@ -1592,6 +1823,239 @@ function generateContextualSalesReply(lowerText, rawText, history, ctx, docConte
   return enforceZeroRepeatedQuestionsAndCleanLabels(reply, ctx, convMem, dom);
 }
 
+// ==================== AUTONOMOUS BOOKING & QUOTATION EXECUTOR ====================
+function parseActionKvPairs(payloadStr) {
+  const out = {};
+  for (const seg of String(payloadStr || '').split('|')) {
+    const idx = seg.indexOf('=');
+    if (idx > 0) {
+      const k = seg.slice(0, idx).trim();
+      const v = seg.slice(idx + 1).trim();
+      if (k) out[k] = v;
+    }
+  }
+  return out;
+}
+
+function extractCustomerNameFromContext(cleanText, recentUserCtx) {
+  const stopWords = new Set(['hola', 'buenos', 'buenas', 'gracias', 'perfecto', 'genial', 'claro', 'para', 'quiero', 'necesito', 'estoy', 'consulto']);
+  const userMatch = String(recentUserCtx || '').match(/(?:me llamo|mi nombre es|soy)\s+([A-ZÁÉÍÓÚÑa-záéíóúñ]{2,20}(?:\s+[A-ZÁÉÍÓÚÑa-záéíóúñ]{2,20})?)/i);
+  if (userMatch) {
+    const cleaned = userMatch[1].replace(/\s+(?:y|para|el|la|de|con)$/i, '').trim();
+    const firstWord = cleaned.split(/\s+/)[0].toLowerCase();
+    if (cleaned && !stopWords.has(firstWord)) {
+      return cleaned.replace(/\b\w/g, c => c.toUpperCase());
+    }
+  }
+  const replyMatch = String(cleanText || '').match(/(?:perfecto|genial|listo|excelente|gracias|entendido),\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ]{2,20})\b/);
+  if (replyMatch && !stopWords.has(replyMatch[1].toLowerCase())) {
+    return replyMatch[1];
+  }
+  return '';
+}
+
+function parseSpanishTargetDateTime(textSource) {
+  const lower = String(textSource || '').toLowerCase();
+  const timeMatch = lower.match(/(?:a las|las)\s+(\d{1,2})(?::(\d{2}))?\s*(?:hs|h|horas|am|pm)?\b/)
+    || lower.match(/\b(\d{1,2})(?::(\d{2}))\s*(?:hs|h|horas|am|pm)?\b/)
+    || lower.match(/\b(\d{1,2})\s*(?:hs|horas|am|pm)\b/);
+  if (!timeMatch) return null;
+
+  let hour = parseInt(timeMatch[1], 10);
+  const minute = parseInt(timeMatch[2] || '0', 10);
+  if (Number.isNaN(hour) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  if (/\bpm\b/i.test(timeMatch[0]) && hour < 12) hour += 12;
+
+  const weekdays = ['domingo', 'lunes', 'martes', 'miercoles', 'miércoles', 'jueves', 'viernes', 'sabado', 'sábado'];
+  const weekdayMap = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, miércoles: 3, jueves: 4, viernes: 5, sabado: 6, sábado: 6 };
+
+  const target = new Date();
+  let foundDay = false;
+
+  if (/\bpasado\s+ma[ñn]ana\b/.test(lower)) {
+    target.setDate(target.getDate() + 2);
+    foundDay = true;
+  } else if (/\bma[ñn]ana\b/.test(lower) && !/\bpor la ma[ñn]ana\b|\bde la ma[ñn]ana\b/.test(lower)) {
+    target.setDate(target.getDate() + 1);
+    foundDay = true;
+  } else if (/\bhoy\b/.test(lower)) {
+    foundDay = true;
+  } else {
+    for (const dayName of weekdays) {
+      if (new RegExp(`\\b${dayName}\\b`, 'i').test(lower)) {
+        const wantedDow = weekdayMap[dayName];
+        const currentDow = target.getDay();
+        let diff = (wantedDow - currentDow + 7) % 7;
+        if (diff === 0) diff = 7;
+        target.setDate(target.getDate() + diff);
+        foundDay = true;
+        break;
+      }
+    }
+  }
+
+  if (!foundDay) {
+    const dateMatch = lower.match(/\b(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?\b/);
+    if (dateMatch) {
+      const dd = parseInt(dateMatch[1], 10);
+      const mm = parseInt(dateMatch[2], 10) - 1;
+      const yyyy = dateMatch[3] ? (dateMatch[3].length === 2 ? 2000 + parseInt(dateMatch[3], 10) : parseInt(dateMatch[3], 10)) : target.getFullYear();
+      if (dd >= 1 && dd <= 31 && mm >= 0 && mm <= 11) {
+        target.setFullYear(yyyy, mm, dd);
+        foundDay = true;
+      }
+    }
+  }
+
+  if (!foundDay) return null;
+  target.setHours(hour, minute, 0, 0);
+  return target;
+}
+
+function extractDeterministicAutonomousActions(cleanText, userText, history, ctx) {
+  const actions = [];
+  const replyText = String(cleanText || '');
+  const histUsers = Array.isArray(history) ? history.filter(m => m.role === 'user').map(m => m.content || m.text || '') : [];
+  const recentUserCtxNewestFirst = [userText || '', ...histUsers.slice().reverse()].join(' | ');
+  const combinedSource = `${replyText} | ${recentUserCtxNewestFirst}`;
+  const customerName = extractCustomerNameFromContext(replyText, recentUserCtxNewestFirst);
+
+  const catalogList = Array.isArray(ctx?.catalogItems) ? ctx.catalogItems : (Array.isArray(ctx?.catalog) ? ctx.catalog : []);
+  let matchedCatalogItem = null;
+  if (catalogList.length > 0) {
+    const lowAll = `${recentUserCtxNewestFirst} ${replyText}`.toLowerCase();
+    matchedCatalogItem = catalogList.find(item => item?.name && lowAll.includes(String(item.name).toLowerCase())) || null;
+  }
+
+  // Backup 1: Appointment confirmed in prose when model omits [[ACTION:BOOK_APPOINTMENT|...]]
+  const isBookingConfirmed = /(?:qued[oaó]\s+(?:confirmad[oa]|agendad[oa]|reservad[oa]|registrad[oa]|apartad[oa]|anotad[oa])|confirmad[oa]\s+(?:tu|el)\s+(?:turno|cita|reserva|espacio)|(?:he|dejamos|tienes|ya\s+est[áa])\s+(?:agendad[oa]|reservad[oa]|confirmad[oa]|registrad[oa]|apartad[oa]|anotad[oa])|(?:agend[ée]|reserv[ée]|registr[ée]|confirm[ée]|anot[ée]|apart[ée])\s+(?:tu|el|la)\s+(?:turno|cita|reserva|espacio|solicitud)|te\s+(?:agendo|reservo|confirm[oa])|\b(?:agendad[oa]|reservad[oa])\b|tu\s+(?:turno|cita)\s+(?:queda|para)|te\s+esperamos\b)/i.test(replyText);
+  const notJustAsking = !/(?:confirmas?\s+si\s+te\s+queda|te\s+parece\s+bien\s+ese\s+horario\?|deseas?\s+que\s+(?:proceda|confirm|reserv|agend)|quieres?\s+que\s+(?:lo\s+)?(?:confirm|reserv|agend))/i.test(replyText);
+  if (isBookingConfirmed && notJustAsking) {
+    const parsedDate = parseSpanishTargetDateTime(replyText) || parseSpanishTargetDateTime(userText) || parseSpanishTargetDateTime(recentUserCtxNewestFirst);
+    if (parsedDate) {
+      actions.push({
+        type: 'BOOK_APPOINTMENT',
+        data: {
+          name: customerName || '',
+          service: matchedCatalogItem?.name || (Array.isArray(ctx?.services) && ctx.services[0]) || 'Consulta / Valoración',
+          isoDate: parsedDate.toISOString()
+        }
+      });
+    }
+  }
+
+  // Backup 2: Formal quote / pricing summary requested by user and answered with $ amount
+  const userAskedQuote = /(presupuesto|cotizaci[oó]n|cotiz[aá]|proforma)/i.test(String(userText || ''));
+  const priceMatch = replyText.match(/total[^$\n]*\$\s*([\d.,]+)/i) || replyText.match(/\$\s*([\d.,]+)/);
+  if (userAskedQuote && priceMatch) {
+    const rawNum = String(priceMatch[1]).replace(/\.(?=\d{3}\b)/g, '').replace(',', '.');
+    const numericAmount = parseFloat(rawNum);
+    if (!Number.isNaN(numericAmount) && numericAmount > 0) {
+      actions.push({
+        type: 'CREATE_QUOTE',
+        data: {
+          name: customerName || '',
+          item: matchedCatalogItem?.name || 'Servicio Solicitado',
+          amount: String(matchedCatalogItem?.price || numericAmount)
+        }
+      });
+    }
+  }
+
+  return actions;
+}
+
+async function executeAutonomousActionsAndCleanText(rawReply, ctx, rawAgencyId, senderPhone, userText = '', history = [], explicitClientId = '') {
+  let cleanText = String(rawReply || '');
+  const actions = [];
+  const tagRegex = /\[\[ACTION:(BOOK_APPOINTMENT|CREATE_QUOTE)\|([^\]]+)\]\]/gi;
+
+  cleanText = cleanText.replace(tagRegex, (fullMatch, actionType, payload) => {
+    actions.push({ type: actionType.toUpperCase(), data: parseActionKvPairs(payload) });
+    return '';
+  }).replace(/\n{3,}/g, '\n\n').trim();
+
+  if (actions.length === 0) {
+    actions.push(...extractDeterministicAutonomousActions(cleanText, userText, history, ctx));
+  }
+
+  if (actions.length === 0) return cleanText;
+
+  const fallbackClientId = ctx?.id && ctx.id !== 'default_agency' ? ctx.id : '';
+  const tenant = resolveCanonicalTenant(rawAgencyId, explicitClientId || fallbackClientId);
+  const cleanPhone = String(senderPhone || '').replace(/\D/g, '');
+  const isTrackablePhone = cleanPhone.length >= 7 && !String(senderPhone || '').startsWith('sim_');
+  const displayPhone = isTrackablePhone ? cleanPhone : 'WhatsApp Web';
+
+  for (const act of actions) {
+    try {
+      const safeAg = await ensureAgencyRowExists(tenant.agencyId);
+
+      if (act.type === 'BOOK_APPOINTMENT' && isTrackablePhone) {
+        const contactName = act.data.name || `Paciente +${cleanPhone.slice(-4)}`;
+        const serviceName = act.data.service || 'Consulta Inicial';
+        let apptDate = act.data.isoDate ? new Date(act.data.isoDate) : null;
+        if (!apptDate || Number.isNaN(apptDate.getTime())) {
+          apptDate = new Date(Date.now() + 24 * 60 * 60 * 1000);
+          apptDate.setHours(16, 0, 0, 0);
+        }
+
+        // Prevent duplicate confirmed appointments for the same phone within 6 hours
+        const winStart = new Date(apptDate.getTime() - 6 * 60 * 60 * 1000).toISOString();
+        const winEnd = new Date(apptDate.getTime() + 6 * 60 * 60 * 1000).toISOString();
+        const existingAppt = await db.query(
+          `SELECT id FROM appointments WHERE agency_id = $1 AND contact_phone = $2 AND status = 'confirmed' AND appointment_date BETWEEN $3 AND $4 LIMIT 1`,
+          [safeAg, cleanPhone, winStart, winEnd]
+        ).catch(() => null);
+
+        if (!existingAppt?.rows?.length) {
+          await db.query(
+            `INSERT INTO appointments (agency_id, client_id, contact_name, contact_phone, service_name, appointment_date, status, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, 'confirmed', $7)`,
+            [safeAg, tenant.clientId, contactName, cleanPhone, serviceName, apptDate.toISOString(), `Agendado automáticamente por IA para ${ctx?.companyName || 'la empresa'}`]
+          );
+
+          const endDt = new Date(apptDate.getTime() + 30 * 60 * 1000).toISOString();
+          createGoogleCalendarEvent(null, {
+            summary: `Cita (${ctx?.companyName || 'Agenda'}): ${contactName} - ${serviceName}`,
+            description: `Reserva automática por WhatsApp.\nEmpresa: ${ctx?.companyName || ''}\nCliente: ${contactName}\nWhatsApp: +${displayPhone}\nServicio: ${serviceName}`,
+            startIso: apptDate.toISOString(),
+            endIso: endDt
+          }).catch(() => { });
+
+          console.log(`[IA Auto-Agenda] Cita confirmada y guardada para ${contactName} (+${cleanPhone}) el ${apptDate.toISOString()}`);
+        }
+      }
+
+      if (act.type === 'CREATE_QUOTE' && isTrackablePhone) {
+        const clientName = act.data.name || `Cliente +${cleanPhone.slice(-4)}`;
+        const itemLabel = act.data.item || 'Servicio Especializado';
+        const amountNum = parseFloat(String(act.data.amount || '0').replace(/[^0-9.]/g, '')) || 0;
+        const recentQuote = await db.query(
+          `SELECT id FROM quotes WHERE agency_id = $1 AND client_phone = $2 AND total = $3 AND created_at > NOW() - INTERVAL '5 minutes' LIMIT 1`,
+          [safeAg, cleanPhone, amountNum]
+        ).catch(() => null);
+
+        if (!recentQuote?.rows?.length) {
+          const folio = `COT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+          const itemsJson = JSON.stringify([{ name: itemLabel, qty: 1, price: amountNum }]);
+
+          await db.query(
+            `INSERT INTO quotes (agency_id, client_id, company_name, folio, client_name, client_phone, items, subtotal, total, status, sent_via_wa, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Enviada', TRUE, $10)`,
+            [safeAg, tenant.clientId, ctx?.companyName || 'Agencia IA', folio, clientName, cleanPhone, itemsJson, amountNum, amountNum, 'Cotización generada automáticamente por IA en WhatsApp']
+          );
+          console.log(`[IA Auto-Cotización] Folio ${folio} registrado ($${amountNum} USD) para ${clientName}`);
+        }
+      }
+    } catch (actErr) {
+      console.warn('[Autonomous Action Note]:', actErr.message);
+    }
+  }
+
+  return cleanText;
+}
+
 // ==================== GENERATE AI AGENT RESPONSE ====================
 async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId = '', maybeAgencyId = '', customOverride = null) {
   const text = (userText || '').trim();
@@ -1603,10 +2067,10 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
   }
 
   let sessionId = sessionOrAgencyId;
-  let agencyId = maybeAgencyId || sessionOrAgencyId || 'agency_master_1';
-  if (sessionOrAgencyId && !maybeAgencyId && !sessionOrAgencyId.startsWith('client_') && !sessionOrAgencyId.startsWith('agency_')) {
-    agencyId = sessionOrAgencyId;
-  }
+  const rawAgency = maybeAgencyId || (sessionOrAgencyId && !sessionOrAgencyId.startsWith('client_') && !sessionOrAgencyId.startsWith('agency_') ? sessionOrAgencyId : '');
+  const rawClient = (sessionOrAgencyId && (sessionOrAgencyId.startsWith('client_') || sessionOrAgencyId.startsWith('client-'))) ? sessionOrAgencyId.replace(/^client_/, '') : '';
+  const tenantScope = resolveCanonicalTenant(rawAgency, rawClient);
+  const agencyId = tenantScope.agencyId;
 
   // 1. Resolve company & niche training
   const ctx = await getAgentCompanyContext(sessionId, agencyId);
@@ -1654,17 +2118,28 @@ async function generateAiAgentResponse(userText, senderPhone, sessionOrAgencyId 
   }
   ctx.agentName = sanitizeHumanAgentName(ctx.agentName, ctx.companyName);
 
-  // 2. Load RAG Knowledge Documents if present
-  const docContext = await getAgencyKnowledgeContext(ctx.id || agencyId);
+  // 2. Load RAG Knowledge Documents if present (client-scoped first, then agency fallback)
+  const docContext = await getAgencyKnowledgeContext(ctx.id || tenantScope.clientId || agencyId, agencyId);
   const ragInstruction = docContext
     ? `\n\nDOCUMENTACIÓN TÉCNICA Y OFICIAL ADICIONAL DE ${ctx.companyName.toUpperCase()}:\n${docContext}\n`
     : '';
 
-  // 3. Multi-turn conversation history & question-memory extraction
+  // 3. Multi-turn conversation history & question-memory extraction (hydrates from Neon DB on cold start)
   const convKey = getConvKey(agencyId, senderPhone);
-  const history = getConversationHistory(convKey);
+  const history = await getOrHydrateConversationHistory(convKey, agencyId, senderPhone);
   const dom = getIndustryDomainIntelligence(ctx.industry, ctx.companyName);
   const convMem = extractConversationMemoryState(history, dom);
+
+  const nowDate = new Date();
+  const currentIsoDate = nowDate.toISOString();
+  const currentLocalFriendly = nowDate.toLocaleString('es-AR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 
   const antiRepetitionMemoryBlock = convMem.askedQuestions.length > 0
     ? `MEMORIA ESTRICTA ANTI-REPETICIÓN (REGLA DE ORO INQUEBRANTABLE):
@@ -1683,6 +2158,7 @@ Analiza y razona directamente sobre esa respuesta puntual del cliente como lo ha
   // 4. Construct Master Cognitive & Human Reasoning Prompt
   const systemPrompt = `Formas parte de ${ctx.agentName} y atiendes por WhatsApp de manera humana, empática y profesional en nombre de "${ctx.companyName}" (rubro interno: ${ctx.industry}).
 Tu tono y estilo son: ${ctx.tone}.
+FECHA Y HORA ACTUAL DEL SERVIDOR: ${currentLocalFriendly} (ISO: ${currentIsoDate}).
 
 ${antiRepetitionMemoryBlock}
 ${lastExchangeBlock}
@@ -1715,6 +2191,11 @@ REGLAS DE RAZONAMIENTO HUMANO REAL Y COMPRENSIÓN CONTEXTUAL (CRÍTICAS):
    - Menciona únicamente los servicios/precios que sean pertinentes a lo que el cliente acaba de pedir o consultar. Solo lista el catálogo completo si el cliente pide ver todos los servicios o precios generales.
 4. PROGRESIÓN NATURAL HACIA LA RESERVA (SIN REPETIR):
    - Avanza la conversación paso a paso como un humano real. Haz como máximo UNA pregunta al final (o pide los datos faltantes para agendar si el cliente ya quiere reservar). Si el cliente ya dio su nombre, horario o cobertura, tómalo en cuenta y no se lo vuelvas a pedir.
+5. REGISTRO AUTÓNOMO DE CITAS Y COTIZACIONES EN EL SISTEMA (SOLO CUANDO SE CONFIRME):
+   - Si en este turno el cliente ya confirmó su nombre y un día y horario concretos para su cita/turno/visita, agrega en una última línea separada la etiqueta oculta exacta (el sistema la procesará y la borrará antes de enviarla al cliente):
+     [[ACTION:BOOK_APPOINTMENT|name=Nombre del Cliente|service=Nombre del Servicio|isoDate=YYYY-MM-DDTHH:mm:00]]
+   - Si en este turno el cliente pidió o aceptó una cotización formal de un ítem del catálogo con valor definido, agrega al final en una línea separada:
+     [[ACTION:CREATE_QUOTE|name=Nombre o Prospecto|item=Nombre del Servicio|amount=123]]
 
 REGLAS DE IDENTIDAD HUMANA Y FORMATO EN WHATSAPP (ESTRICTAS):
 - IDENTIDAD HUMANA LIMPIA: NUNCA digas "Soy Asistente Virtual", ni que eres una IA o bot. NUNCA escribas el nombre del rubro entre paréntesis al lado de la empresa — por ejemplo, escribe "${ctx.companyName}" y JAMÁS escribas "${ctx.companyName} (${ctx.industry})".
@@ -1800,8 +2281,13 @@ REGLAS DE IDENTIDAD HUMANA Y FORMATO EN WHATSAPP (ESTRICTAS):
                 generatedReply = candidateText;
                 break;
               }
+            } else {
+              const errSnippet = await gRes.text().catch(() => '');
+              console.warn(`[Gemini Skip ${modelName}] status=${gRes.status}:`, errSnippet.slice(0, 180));
             }
-          } catch (innerErr) { }
+          } catch (innerErr) {
+            console.warn(`[Gemini Timeout/Err ${modelName}]:`, innerErr.message);
+          }
         }
       }
     } catch (llmErr) {
@@ -1809,10 +2295,12 @@ REGLAS DE IDENTIDAD HUMANA Y FORMATO EN WHATSAPP (ESTRICTAS):
     }
   }
 
-  // Post-process LLM reply: strip emojis, clean robotic labels, and enforce 0% repeated questions
+  // Post-process LLM reply: execute autonomous bookings/quotes, strip tags/emojis/robotic labels, and enforce 0% repeated questions
   const lastBotMsg = convMem.lastBotMsg;
+  const resolvedActionClientId = tenantScope.clientId || (ctx?.id && ctx.id !== 'default_agency' ? ctx.id : '');
   if (generatedReply && generatedReply.trim()) {
-    const finalReply = enforceZeroRepeatedQuestionsAndCleanLabels(generatedReply, ctx, convMem, dom);
+    const executedClean = await executeAutonomousActionsAndCleanText(generatedReply, ctx, agencyId, senderPhone, userText, history, resolvedActionClientId);
+    const finalReply = enforceZeroRepeatedQuestionsAndCleanLabels(executedClean, ctx, convMem, dom);
     if (finalReply && (!lastBotMsg || finalReply.trim().toLowerCase() !== lastBotMsg.trim().toLowerCase())) {
       appendToConversationHistory(convKey, 'user', userText);
       appendToConversationHistory(convKey, 'assistant', finalReply);
@@ -1821,7 +2309,8 @@ REGLAS DE IDENTIDAD HUMANA Y FORMATO EN WHATSAPP (ESTRICTAS):
   }
 
   // 6. Context-Aware Consultative Fallback Engine (Zero Repeated Questions & Human Reasoning)
-  const reply = generateContextualSalesReply(lowerText, userText, history, ctx, docContext);
+  const fallbackRaw = generateContextualSalesReply(lowerText, userText, history, ctx, docContext);
+  const reply = await executeAutonomousActionsAndCleanText(fallbackRaw, ctx, agencyId, senderPhone, userText, history, resolvedActionClientId);
   appendToConversationHistory(convKey, 'user', userText);
   appendToConversationHistory(convKey, 'assistant', reply);
   return reply;
@@ -1969,11 +2458,11 @@ const server = http.createServer(async (req, res) => {
   // 3. Query Session Status & QR
   if (pathname === '/api/wa-session/status' && req.method === 'GET') {
     const sessionId = urlObj.searchParams.get('sessionId') || 'agency_hq';
-    const strict = urlObj.searchParams.get('strict') === '1';
+    const strict = urlObj.searchParams.get('strict') === '1' || sessionId.startsWith('client_');
     let session = activeSessions[sessionId];
 
-    // If querying agency session and a client session is already connected (or vice-versa), surface the active connection unless strict mode is requested
-    const anyConnectedEntry = Object.entries(activeSessions).find(([, s]) => s && s.connected && s.phone);
+    // Cross-fallback ONLY when querying generic agency sessions, never when querying a specific client_<id>
+    const anyConnectedEntry = !strict ? Object.entries(activeSessions).find(([, s]) => s && s.connected && s.phone) : null;
     const connectedMap = {};
     for (const [k, s] of Object.entries(activeSessions)) {
       if (s && s.connected) {
@@ -2035,10 +2524,16 @@ const server = http.createServer(async (req, res) => {
 
   // 3.1 Get Live WhatsApp Incoming/Outgoing Messages for Inbox Sync
   if (pathname === '/api/wa-session/live-messages' && req.method === 'GET') {
-    const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
-    const list = liveWaContactsByAgency[agId] || liveWaContactsByAgency['agency_master_1'] || [];
+    const tenant = resolveCanonicalTenant(urlObj.searchParams.get('agencyId'), urlObj.searchParams.get('clientId'));
+    let list = liveWaContactsByAgency[tenant.agencyId];
+    if (!Array.isArray(list) || list.length === 0) {
+      list = await hydrateLiveWaContactsFromDB(tenant.agencyId);
+    }
+    if ((!list || list.length === 0) && tenant.agencyId !== 'agency_master_1') {
+      list = liveWaContactsByAgency['agency_master_1'] || [];
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, leads: list }));
+    res.end(JSON.stringify({ success: true, leads: list || [], chats: list || [] }));
     return;
   }
 
@@ -2070,15 +2565,19 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const data = JSON.parse(body);
-        const { to, message, token, phoneId, sessionId } = data;
-        const activeSessionId = sessionId || 'agency_hq';
-        const session = activeSessions[activeSessionId];
+        const { to, message, token, phoneId, sessionId, agencyId, clientId } = data;
+        const tenant = resolveCanonicalTenant(agencyId || (sessionId && sessionId.startsWith('agency_') ? sessionId.replace('agency_', '') : ''), clientId);
+        const activeSock = getConnectedSock(sessionId || tenant.clientId || tenant.agencyId, tenant.agencyId);
 
-        if (session && session.connected && session.sock) {
-          const cleanPhone = to.replace(/\D/g, '');
+        if (activeSock) {
+          const cleanPhone = String(to || '').replace(/\D/g, '');
           const jid = `${cleanPhone}@s.whatsapp.net`;
-          const result = await session.sock.sendMessage(jid, { text: message });
-          console.log(`[Baileys - ${activeSessionId}] 📤 Mensaje real enviado a +${cleanPhone}: "${message.slice(0, 40)}..."`);
+          aiOutgoingCooldowns.set(cleanPhone, Date.now() + 10000);
+          aiOutgoingCooldowns.set(jid, Date.now() + 10000);
+          const result = await activeSock.sendMessage(jid, { text: message });
+          if (result?.key?.id) processedWaMsgIds.add(result.key.id);
+          recordLiveWaMessage(tenant.agencyId, cleanPhone, `Cliente +${cleanPhone.slice(-4)}`, 'agent', message, 'WhatsApp Directo', tenant.clientId);
+          console.log(`[Baileys] Mensaje real enviado a +${cleanPhone}: "${String(message || '').slice(0, 40)}..."`);
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: true, engine: 'baileys_socket', result }));
           return;
@@ -2236,16 +2735,21 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { agencyId, activeClientId, clients } = JSON.parse(body || '{}');
-        const agId = agencyId || 'agency_master_1';
+        const agId = await ensureAgencyRowExists(resolveCanonicalTenant(agencyId).agencyId);
         if (activeClientId) {
           activeClientByAgency[agId] = activeClientId;
         }
-        const cleanClients = (Array.isArray(clients) ? clients : []).filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1');
+        const cleanClients = (Array.isArray(clients) ? clients : [])
+          .filter(c => c && c.id !== 'client_dental_1' && c.id !== 'client_resto_1')
+          .map(c => ({
+            ...c,
+            agentName: sanitizeHumanAgentName(c.agentName, c.name || 'la empresa')
+          }));
 
         memoryCompanies[agId] = cleanClients;
         saveCompaniesToDisk();
 
-        // Also persist to Neon PostgreSQL clients table if available
+        // Also persist ALL client config fields to Neon PostgreSQL clients table
         if (db) {
           for (const c of cleanClients) {
             try {
@@ -2253,6 +2757,7 @@ const server = http.createServer(async (req, res) => {
                 `INSERT INTO clients (id, agency_id, name, industry, phone, notes)
                  VALUES ($1, $2, $3, $4, $5, $6)
                  ON CONFLICT (id) DO UPDATE SET 
+                   agency_id = EXCLUDED.agency_id,
                    name = EXCLUDED.name,
                    industry = EXCLUDED.industry,
                    phone = EXCLUDED.phone,
@@ -2265,6 +2770,17 @@ const server = http.createServer(async (req, res) => {
                   c.phone || null,
                   JSON.stringify({
                     agentName: c.agentName,
+                    tone: c.tone || 'profesional_calido',
+                    goal: c.goal || 'sales',
+                    monthlyFee: c.monthlyFee || '490',
+                    waConnected: !!c.waConnected,
+                    calendarLink: c.calendarLink || '',
+                    googleCalendarEmail: c.googleCalendarEmail || '',
+                    scheduleStart: c.scheduleStart || '09:00',
+                    scheduleEnd: c.scheduleEnd || '19:00',
+                    slotDuration: c.slotDuration || '30',
+                    reminderEnabled: c.reminderEnabled !== false,
+                    reminderTemplate: c.reminderTemplate || '',
                     systemPrompt: c.systemPrompt,
                     knowledgeBase: c.knowledgeBase,
                     catalog: c.catalog,
@@ -2544,17 +3060,20 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { agencyId, filename, fileType, text, fileSize } = JSON.parse(body || '{}');
+        const { agencyId, clientId, filename, fileType, text, fileSize } = JSON.parse(body || '{}');
         if (!text || !filename) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Falta el nombre o contenido del documento.' }));
           return;
         }
-        const agId = agencyId || 'agency_master_1';
+        const tenant = resolveCanonicalTenant(agencyId, clientId);
+        const safeAg = await ensureAgencyRowExists(tenant.agencyId);
+        const docBytes = Number(fileSize) || text.length;
         const result = await db.query(
-          `INSERT INTO knowledge_docs (agency_id, filename, file_type, file_size, extracted_text)
-           VALUES ($1, $2, $3, $4, $5) RETURNING id, filename, file_type, file_size, created_at`,
-          [agId, filename, fileType || 'text/plain', fileSize || text.length, text]
+          `INSERT INTO knowledge_docs (agency_id, client_id, filename, file_type, file_size, char_count, extracted_text)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, agency_id, client_id, filename, file_type, COALESCE(NULLIF(file_size, 0), char_count, 0) as file_size, created_at`,
+          [safeAg, tenant.clientId, filename, fileType || 'text/plain', docBytes, text.length, text]
         );
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, doc: result.rows[0] }));
@@ -2568,12 +3087,22 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/api/knowledge/list' && req.method === 'GET') {
     try {
-      const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
-      const result = await db.query(
-        `SELECT id, filename, file_type, file_size, created_at 
-         FROM knowledge_docs WHERE agency_id = $1 ORDER BY id DESC`,
-        [agId]
-      );
+      const tenant = resolveCanonicalTenant(urlObj.searchParams.get('agencyId'), urlObj.searchParams.get('clientId'));
+      const result = tenant.clientId
+        ? await db.query(
+            `SELECT id, agency_id, client_id, filename, file_type, COALESCE(NULLIF(file_size, 0), char_count, LENGTH(extracted_text), 0) as file_size, created_at
+             FROM knowledge_docs
+             WHERE (client_id = $1 OR (agency_id = $2 AND (client_id IS NULL OR client_id = '')))
+             ORDER BY id DESC`,
+            [tenant.clientId, tenant.agencyId]
+          )
+        : await db.query(
+            `SELECT id, agency_id, client_id, filename, file_type, COALESCE(NULLIF(file_size, 0), char_count, LENGTH(extracted_text), 0) as file_size, created_at
+             FROM knowledge_docs
+             WHERE agency_id = $1
+             ORDER BY id DESC`,
+            [tenant.agencyId]
+          );
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, docs: result?.rows || [] }));
     } catch (err) {
@@ -2588,8 +3117,12 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { id, agencyId } = JSON.parse(body || '{}');
-        await db.query(`DELETE FROM knowledge_docs WHERE id = $1 AND agency_id = $2`, [id, agencyId || 'agency_master_1']);
+        const { id, agencyId, clientId } = JSON.parse(body || '{}');
+        const tenant = resolveCanonicalTenant(agencyId, clientId);
+        await db.query(
+          `DELETE FROM knowledge_docs WHERE id = $1 AND (agency_id = $2 OR ($3 IS NOT NULL AND client_id = $3))`,
+          [id, tenant.agencyId, tenant.clientId]
+        );
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
       } catch (err) {
@@ -2606,24 +3139,25 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { agencyId, contactName, contactPhone, serviceName, appointmentDate } = JSON.parse(body || '{}');
+        const { agencyId, clientId, contactName, contactPhone, serviceName, appointmentDate } = JSON.parse(body || '{}');
         if (!contactName || !contactPhone || !appointmentDate) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Faltan campos obligatorios para agendar la cita.' }));
           return;
         }
-        const agId = agencyId || 'agency_master_1';
+        const tenant = resolveCanonicalTenant(agencyId, clientId);
+        const safeAg = await ensureAgencyRowExists(tenant.agencyId);
         const result = await db.query(
-          `INSERT INTO appointments (agency_id, contact_name, contact_phone, service_name, appointment_date, status)
-           VALUES ($1, $2, $3, $4, $5, 'confirmed') RETURNING *`,
-          [agId, contactName, contactPhone, serviceName || 'Atención General', appointmentDate]
+          `INSERT INTO appointments (agency_id, client_id, contact_name, contact_phone, service_name, appointment_date, status)
+           VALUES ($1, $2, $3, $4, $5, $6, 'confirmed') RETURNING *`,
+          [safeAg, tenant.clientId, contactName, String(contactPhone).replace(/\D/g, '') || contactPhone, serviceName || 'Atención General', appointmentDate]
         );
 
         // Auto-create event in Google Calendar if service account credentials exist
         const endDt = new Date(new Date(appointmentDate).getTime() + 30 * 60 * 1000).toISOString();
         createGoogleCalendarEvent(null, {
           summary: `Cita: ${contactName} - ${serviceName || 'Atención General'}`,
-          description: `Cita agendada por NEXUS AI.\nCliente: ${contactName}\nWhatsApp: +${contactPhone}\nServicio: ${serviceName || 'Atención General'}`,
+          description: `Cita agendada por Plataforma IA.\nCliente: ${contactName}\nWhatsApp: +${contactPhone}\nServicio: ${serviceName || 'Atención General'}`,
           startIso: new Date(appointmentDate).toISOString(),
           endIso: endDt
         }).catch(e => console.log('[Google Calendar Note]', e.message));
@@ -2640,11 +3174,16 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === '/api/appointments/list' && req.method === 'GET') {
     try {
-      const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
-      const result = await db.query(
-        `SELECT * FROM appointments WHERE agency_id = $1 ORDER BY appointment_date ASC`,
-        [agId]
-      );
+      const tenant = resolveCanonicalTenant(urlObj.searchParams.get('agencyId'), urlObj.searchParams.get('clientId'));
+      const result = tenant.clientId
+        ? await db.query(
+            `SELECT * FROM appointments WHERE agency_id = $1 AND (client_id = $2 OR client_id IS NULL) ORDER BY appointment_date ASC`,
+            [tenant.agencyId, tenant.clientId]
+          )
+        : await db.query(
+            `SELECT * FROM appointments WHERE agency_id = $1 ORDER BY appointment_date ASC`,
+            [tenant.agencyId]
+          );
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, appointments: result?.rows || [] }));
     } catch (err) {
@@ -2677,34 +3216,35 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { agencyId, name, messageTemplate, recipients } = JSON.parse(body || '{}');
+        const { agencyId, clientId, name, messageTemplate, recipients } = JSON.parse(body || '{}');
         if (!messageTemplate || !recipients || !Array.isArray(recipients) || recipients.length === 0) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'Plantilla de mensaje o lista de destinatarios vacía.' }));
           return;
         }
-        const agId = agencyId || 'agency_master_1';
+        const tenant = resolveCanonicalTenant(agencyId, clientId);
+        const safeAg = await ensureAgencyRowExists(tenant.agencyId);
 
-        // 1. Create campaign in DB
+        // 1. Create campaign in DB using canonical schema columns
         const campRes = await db.query(
-          `INSERT INTO broadcast_campaigns (agency_id, name, message_template, total_contacts, status)
-           VALUES ($1, $2, $3, $4, 'running') RETURNING id`,
-          [agId, name || 'Campaña WhatsApp', messageTemplate, recipients.length]
+          `INSERT INTO broadcast_campaigns (agency_id, client_id, name, message_template, total_recipients, total_contacts, status)
+           VALUES ($1, $2, $3, $4, $5, $5, 'running') RETURNING id`,
+          [safeAg, tenant.clientId, name || 'Campaña WhatsApp', messageTemplate, recipients.length]
         );
         const campId = campRes.rows[0].id;
 
         // 2. Insert recipients
         for (const r of recipients) {
+          const cleanRPhone = String(r.phone || '').replace(/\D/g, '');
           await db.query(
-            `INSERT INTO broadcast_recipients (campaign_id, phone, name) VALUES ($1, $2, $3)`,
-            [campId, r.phone, r.name || '']
+            `INSERT INTO broadcast_recipients (campaign_id, phone, contact_name, name) VALUES ($1, $2, $3, $3)`,
+            [campId, cleanRPhone, r.name || '']
           );
         }
 
         // 3. Start background runner
-        const runnerStatus = startBroadcastExecution(campId, agId, messageTemplate, recipients, (targetAgId) => {
-          const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
-          return sess?.sock;
+        const runnerStatus = startBroadcastExecution(campId, safeAg, messageTemplate, recipients, (targetAgId) => {
+          return getConnectedSock(tenant.clientId || targetAgId, safeAg);
         });
 
         res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -2739,10 +3279,10 @@ const server = http.createServer(async (req, res) => {
   // ==================== FEATURE 5: OWNER NOTIFICATION SETTINGS ====================
   if (pathname === '/api/agency/owner-settings' && req.method === 'GET') {
     try {
-      const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
+      const tenant = resolveCanonicalTenant(urlObj.searchParams.get('agencyId'));
       const resDb = await db.query(
         `SELECT id, name, owner_alert_phone, owner_alerts_enabled FROM agencies WHERE id = $1`,
-        [agId]
+        [tenant.agencyId]
       );
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true, agency: resDb?.rows?.[0] || {} }));
@@ -2759,10 +3299,10 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { agencyId, ownerAlertPhone, ownerAlertsEnabled } = JSON.parse(body || '{}');
-        const agId = agencyId || 'agency_master_1';
+        const safeAg = await ensureAgencyRowExists(resolveCanonicalTenant(agencyId).agencyId);
         await db.query(
           `UPDATE agencies SET owner_alert_phone = $1, owner_alerts_enabled = $2 WHERE id = $3`,
-          [ownerAlertPhone || '', ownerAlertsEnabled !== false, agId]
+          [ownerAlertPhone || '', ownerAlertsEnabled !== false, safeAg]
         );
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, message: 'Configuración de alertas actualizada.' }));
@@ -3134,14 +3674,14 @@ const server = http.createServer(async (req, res) => {
 
   // ==================== ANTI-GHOSTING AUTO FOLLOW-UP ENDPOINTS (2h / 24h / 72h) ====================
   if (pathname === '/api/followups/list' && req.method === 'GET') {
-    const agId = urlObj.searchParams.get('agencyId') || 'agency_master_1';
-    getFollowUpsList(agId)
+    const tenant = resolveCanonicalTenant(urlObj.searchParams.get('agencyId'), urlObj.searchParams.get('clientId'));
+    getFollowUpsList(tenant.agencyId, tenant.clientId)
       .then(sequences => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
           success: true,
           sequences,
-          defaultTemplates: getDefaultFollowUpTemplates('{nombre}', '{rubro}', 'NEXUS AI Agency')
+          defaultTemplates: getDefaultFollowUpTemplates('{nombre}', '{rubro}', 'Nuestro Equipo')
         }));
       })
       .catch(err => {
@@ -3156,17 +3696,20 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { agencyId, contactPhone, contactName, interestTopic } = JSON.parse(body || '{}');
+        const { agencyId, clientId, contactPhone, contactName, interestTopic } = JSON.parse(body || '{}');
         if (!contactPhone) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: 'El teléfono del prospecto es obligatorio.' }));
           return;
         }
+        const tenant = resolveCanonicalTenant(agencyId, clientId);
+        const safeAg = await ensureAgencyRowExists(tenant.agencyId);
         const record = await registerOrUpdateFollowUp(
-          agencyId || 'agency_master_1',
+          safeAg,
           contactPhone,
           contactName || `Lead +${contactPhone}`,
-          interestTopic || 'Automatización IA'
+          interestTopic || 'Atención Especializada',
+          tenant.clientId
         );
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, sequence: record }));
@@ -3183,11 +3726,10 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { agencyId, followUpId, stage } = JSON.parse(body || '{}');
-        const agId = agencyId || 'agency_master_1';
-        const result = await triggerFollowUpNow(agId, followUpId, stage, (targetAgId) => {
-          const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
-          return sess?.sock;
+        const { agencyId, clientId, followUpId, stage } = JSON.parse(body || '{}');
+        const tenant = resolveCanonicalTenant(agencyId, clientId);
+        const result = await triggerFollowUpNow(tenant.agencyId, followUpId, stage, (targetPref, fallbackAg) => {
+          return getConnectedSock(targetPref, fallbackAg || tenant.agencyId);
         });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
@@ -3204,10 +3746,182 @@ const server = http.createServer(async (req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { agencyId, followUpId } = JSON.parse(body || '{}');
-        await deleteFollowUpSequence(agencyId || 'agency_master_1', followUpId);
+        const { agencyId, clientId, followUpId } = JSON.parse(body || '{}');
+        const tenant = resolveCanonicalTenant(agencyId, clientId);
+        await deleteFollowUpSequence(tenant.agencyId, followUpId);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // ==================== ENTERPRISE QUOTES & INVOICING DB API ====================
+  if (pathname === '/api/quotes/list' && req.method === 'GET') {
+    try {
+      const tenant = resolveCanonicalTenant(urlObj.searchParams.get('agencyId'), urlObj.searchParams.get('clientId'));
+      const resQ = await db.query(
+        `SELECT * FROM quotes WHERE agency_id = $1 ORDER BY id DESC LIMIT 100`,
+        [tenant.agencyId]
+      );
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, quotes: resQ?.rows || [] }));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: false, error: err.message }));
+    }
+    return;
+  }
+
+  if (pathname === '/api/quotes/create' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const q = JSON.parse(body || '{}');
+        const tenant = resolveCanonicalTenant(q.agencyId, q.clientId || q.companyId);
+        const safeAg = await ensureAgencyRowExists(tenant.agencyId);
+        const itemsJson = JSON.stringify(Array.isArray(q.items) ? q.items : []);
+        const ins = await db.query(
+          `INSERT INTO quotes (agency_id, client_id, company_name, folio, client_name, client_phone, client_email, items, subtotal, discount_pct, tax_pct, total, validity, notes, status, sent_via_wa)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+           RETURNING *`,
+          [
+            safeAg,
+            tenant.clientId,
+            q.companyName || 'NEXUS AI Agency',
+            q.folio || `COT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+            q.clientName || 'Cliente',
+            q.clientPhone || '',
+            q.clientEmail || '',
+            itemsJson,
+            Number(q.subtotal) || 0,
+            Number(q.discountPct) || 0,
+            Number(q.taxPct) || 0,
+            Number(q.total) || 0,
+            q.validity || '15 Días',
+            q.notes || '',
+            q.status || 'Enviada',
+            q.sentViaWa !== false
+          ]
+        );
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, quote: ins?.rows?.[0] || q }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/quotes/status' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { id, folio, status, agencyId } = JSON.parse(body || '{}');
+        const tenant = resolveCanonicalTenant(agencyId);
+        if (id && !String(id).startsWith('quote_')) {
+          await db.query(`UPDATE quotes SET status = $1 WHERE id = $2 AND agency_id = $3`, [status, id, tenant.agencyId]);
+        } else if (folio) {
+          await db.query(`UPDATE quotes SET status = $1 WHERE folio = $2 AND agency_id = $3`, [status, folio, tenant.agencyId]);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/quotes/delete' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { id, folio, agencyId } = JSON.parse(body || '{}');
+        const tenant = resolveCanonicalTenant(agencyId);
+        if (id && !String(id).startsWith('quote_')) {
+          await db.query(`DELETE FROM quotes WHERE id = $1 AND agency_id = $2`, [id, tenant.agencyId]);
+        } else if (folio) {
+          await db.query(`DELETE FROM quotes WHERE folio = $1 AND agency_id = $2`, [folio, tenant.agencyId]);
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // ==================== AI MARKETING COPYWRITER SERVER ENGINE ====================
+  if (pathname === '/api/marketing/generate' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { format, business, niche, extra } = JSON.parse(body || '{}');
+        if (!customAiKey) {
+          await hydrateRuntimeFromNeonDB().catch(() => { });
+        }
+        const effectiveKey = customAiKey || process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '';
+        const promptText = `Eres el Director Creativo y Copywriter Senior B2B/B2C.
+Genera contenido comercial en español limpio y persuasivo (formato '${format || 'ad'}') para la empresa '${business || 'tu empresa'}' del rubro '${niche || 'Servicios'}'.
+Detalle u oferta: '${extra || 'Asesoramiento especializado y turnos inmediatos'}'.
+Estructura clara con Gancho, Cuerpo de Valor y Llamado a la Acción directo.`;
+
+        let generatedText = '';
+        if (effectiveKey) {
+          if (effectiveKey.startsWith('sk-')) {
+            const r = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${effectiveKey}` },
+              signal: AbortSignal.timeout(9000),
+              body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: promptText }], temperature: 0.7, max_tokens: 700 })
+            });
+            if (r.ok) {
+              const d = await r.json();
+              generatedText = d?.choices?.[0]?.message?.content || '';
+            }
+          } else {
+            for (const modelName of GEMINI_FAST_MODELS) {
+              try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${effectiveKey}`;
+                const genConfig = { temperature: 0.7, maxOutputTokens: 750 };
+                if (modelName === 'gemini-3.1-flash-lite') genConfig.thinkingConfig = { thinkingBudget: 0 };
+                const gRes = await fetch(url, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  signal: AbortSignal.timeout(8000),
+                  body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: promptText }] }], generationConfig: genConfig })
+                });
+                if (gRes.ok) {
+                  const j = await gRes.json();
+                  const txt = j?.candidates?.[0]?.content?.parts?.find(p => typeof p.text === 'string' && !p.thought)?.text;
+                  if (txt && txt.trim()) {
+                    generatedText = txt.trim();
+                    break;
+                  }
+                }
+              } catch (e) { }
+            }
+          }
+        }
+
+        if (!generatedText) {
+          generatedText = `Titular: Atencion inmediata y profesional en ${business || 'nuestra empresa'}\n\nEn ${business || 'nuestra empresa'} ayudamos a clientes de ${niche || 'tu ciudad'} a resolver sus consultas en minutos con atencion personalizada y ${extra || 'disponibilidad prioritaria esta semana'}.\n\nEscribenos ahora para coordinar tu diagnostico inicial.`;
+        }
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, content: generatedText }));
       } catch (err) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, error: err.message }));
@@ -3461,16 +4175,10 @@ async function restoreAllBaileysSessions() {
 
 restoreAllBaileysSessions();
 // Start Background Appointment Reminder Cron (24h and 2h alerts)
-startAppointmentReminderCron((targetAgId) => {
-  const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
-  return sess?.sock;
-});
+startAppointmentReminderCron((preferredId, fallbackAg) => getConnectedSock(preferredId, fallbackAg));
 
 // Start Background Anti-Ghosting Follow-Up Cron (2h / 24h / 72h recovery)
-startFollowUpCron((targetAgId) => {
-  const sess = activeSessions[`agency_${targetAgId}`] || activeSessions['agency_hq'] || activeSessions['agency_master_1'];
-  return sess?.sock;
-});
+startFollowUpCron((preferredId, fallbackAg) => getConnectedSock(preferredId, fallbackAg));
 
 // Safely ensure DB schema and default agency on boot without dropping tables
 ensureDatabaseSchema().catch(e => console.log('DB schema check on boot note:', e.message));
